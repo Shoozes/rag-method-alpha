@@ -1,0 +1,48 @@
+{
+  "contract": "rag-behavior-v2-expected",
+  "version": 2,
+  "mode": "scoped_hybrid",
+  "cases": {
+    "deny_first_scope": {
+      "eligible_ids": ["global-handbook"],
+      "candidate_ids": ["global-handbook"],
+      "ordered_ids": ["global-handbook"],
+      "scores": [
+        {
+          "id": "global-handbook",
+          "score_micro": 600000,
+          "components": {
+            "exact_micro": 1000000,
+            "semantic_micro": 0,
+            "keyword_micro": 1000000,
+            "scope_micro": 1000000,
+            "provenance_micro": 1000000,
+            "authority_micro": 1000000,
+            "priority_micro": 0,
+            "aspect_coverage_micro": 1000000,
+            "cross_reference_micro": 0
+          },
+          "cross_reference_from_id": null
+        }
+      ],
+      "context_selected_ids": ["global-handbook"],
+      "context_tokens": 48,
+      "truncated": false,
+      "semantic_state": "disabled_by_settings",
+      "semantic_fallback_reason": "disabled_by_settings",
+      "errors": []
+    },
+    "exclude_all": {
+      "eligible_ids": [],
+      "candidate_ids": [],
+      "ordered_ids": [],
+      "scores": [],
+      "context_selected_ids": [],
+      "context_tokens": 0,
+      "truncated": false,
+      "semantic_state": "disabled_by_settings",
+      "semantic_fallback_reason": "disabled_by_settings",
+      "errors": []
+    }
+  }
+}

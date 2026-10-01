@@ -1,0 +1,2919 @@
+{
+  "contracts": {
+    "rag-behavior-v2": {
+      "contract": "rag-behavior-v2",
+      "files": {
+        "adapters/javascript.md": {
+          "bytes": 2047,
+          "data": "# JavaScript adapter\n\nImplement the frozen profile natively in TulpaWeaver. The parity lane may use\nSQLite and the existing vector-store dependency injection, but it must accept\ncontract vectors by record ID so duplicate text is unambiguous and no model or\nnetwork download is needed.\n\nPin native tests to every identity test vector in `retrieval-profile.json` as\nwell as the 15 retrieval reports; count query characters as Unicode scalar\nvalues rather than UTF-16 code units, reject unpaired UTF-16 surrogates, and\nmeasure the separately bounded UTF-8 encoding without replacement characters.\nUse Unicode-scalar lexicographic order for string tie fields rather than\nlocale-sensitive comparison or JavaScript's raw UTF-16 code-unit order.\nThe `complete_tie_break` and `context_budget` cases deliberately contain\nsupplementary scalars and will fail raw UTF-16 ordering or length logic.\n\nThe shared result order must be produced before prompt assembly, grounding,\ncitations, memory persistence, UI, or chat behavior. Disable the current\nmemory-trust, wiki decay, cross-reference tiers, aspect-first reorder, and\ndurable-first reorder in the parity path. Product features may consume the\nfrozen order but must not mutate it.\n\nTrim contract record strings before use and reject unpaired surrogates in\nrecords as well as queries; silently inserting Unicode replacement characters\nchanges identity, matching, ordering, and context counts.\n\nRequired return to the coordinator:\n\n- exact implementation commit and dirty state;\n- local commands and test results;\n- machine report path;\n- deviations with what, why, where, how, and done-when;\n- the next safe action.\n\nDone when: the JavaScript report validates, all cases match exactly, existing\nlocal TulpaWeaver verification passes, and duplicate-text vectors and query\ncancellation have explicit native seams.\n\n---\nAI-edited: 2026-08-09T22:15:16-04:00 | agent=Codex/root | model=gpt-5.6-sol | effort=max | task=rag-v2 | change=defined the native JavaScript parity adapter boundary and UTF-16 drift guards\n",
+          "path": "rag-behavior-v2/adapters/javascript.md",
+          "sha256": "1b53ed03b0bce627276dcee8284720fe07c02d36e2b1f95e058b56a0fb83e4a2"
+        },
+        "adapters/python.md": {
+          "bytes": 1188,
+          "data": "# Python adapter\n\nThe Python oracle is `mirrorlight_backend.rag_core.RagEngine`. The contract\nrunner loads fixture records and vectors without a model download, executes\nevery case, and compares the complete redacted observation to the frozen\nmode-specific expectation.\n\nThe profile's identity test vectors also pin the length-prefixed SHA-256\nencoding used by the reusable v2 chunking helpers.\n\nThe production `RagService` adapter must flatten its indexed chunks in the\nsame order as its stored vectors, map each chunk to `RagRecord`, and pass the\nsame record/vector set to `RagEngine`. Query embedding failure is represented\nas a semantic fallback; it must not select a second ranking implementation.\n\nRun:\n\n```powershell\npython scripts/rag_contract_validate.py\npython scripts/rag_run_python_adapter.py --output .artifacts/proof/rag-python-v2.json\n```\n\nDone when: the report has zero failed cases, production responses identify\n`rag-behavior-v2`, and a regression test proves `RagService` uses the oracle\npath.\n\n---\nAI-edited: 2026-08-09T22:15:16-04:00 | agent=Codex/root | model=gpt-5.6-sol | effort=max | task=rag-v2 | change=defined the Python oracle and production adapter boundary\n",
+          "path": "rag-behavior-v2/adapters/python.md",
+          "sha256": "c59f81ace2f0d2780c384ce25695f4fe4ca81af3ce63a1bd6d052e9394fe135c"
+        },
+        "adapters/rust.md": {
+          "bytes": 1588,
+          "data": "# Rust adapter\n\nImplement the frozen profile natively in EdgeSymbio. Copy the contract\nartifacts into an EdgeSymbio-owned test fixture or parse them from an explicit\noperator-supplied path during development; shipped runtime behavior must not\ndepend on RAG-Method-PY.\n\nPin native tests to every identity test vector in `retrieval-profile.json` as\nwell as the 15 retrieval reports. Identity parts use byte-length-prefixed\nstrict UTF-8, query and context character counts use Unicode scalar values,\nand string ties use Unicode-scalar lexicographic order.\nThe `complete_tie_break` and `context_budget` cases are the native regression\nanchors for these ordering and counting rules.\n\nPreserve EdgeSymbio storage, Nomic runtime, SQLite integrity, API, UI, chat,\nand cancellation machinery. The parity lane must use contract-supplied vectors\nand emit `rag-behavior-v2-report`. Replace product profile constants only where\nthey are inside the shared retrieval boundary. Do not edit expected outputs.\n\nRequired return to the coordinator:\n\n- exact implementation commit and dirty state;\n- local commands and test results;\n- machine report path;\n- deviations with what, why, where, how, and done-when;\n- the next safe action.\n\nDone when: the Rust report validates, all cases match exactly, existing local\nEdgeSymbio verification passes, and product-specific behavior remains outside\nthe parity ordering path.\n\n---\nAI-edited: 2026-08-09T22:15:16-04:00 | agent=Codex/root | model=gpt-5.6-sol | effort=max | task=rag-v2 | change=defined the native Rust parity adapter boundary and Unicode scalar rules\n",
+          "path": "rag-behavior-v2/adapters/rust.md",
+          "sha256": "395a8273c48947811c298425845bd9cf39430880d6423089d0f3e102f913c0c4"
+        },
+        "expected/exact-only.json": {
+          "bytes": 9378,
+          "data": {
+            "cases": {
+              "complete_tie_break": {
+                "candidate_ids": [
+                  "duplicate-a",
+                  "duplicate-b"
+                ],
+                "context_selected_ids": [
+                  "duplicate-a",
+                  "duplicate-b"
+                ],
+                "context_tokens": 84,
+                "eligible_ids": [
+                  "duplicate-a",
+                  "duplicate-b"
+                ],
+                "errors": [],
+                "ordered_ids": [
+                  "duplicate-a",
+                  "duplicate-b"
+                ],
+                "scores": [
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 1000000,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 0,
+                      "exact_micro": 1000000,
+                      "keyword_micro": 0,
+                      "priority_micro": 0,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 0
+                    },
+                    "cross_reference_from_id": null,
+                    "id": "duplicate-a",
+                    "score_micro": 450000
+                  },
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 0,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 0,
+                      "exact_micro": 1000000,
+                      "keyword_micro": 0,
+                      "priority_micro": 0,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 0
+                    },
+                    "cross_reference_from_id": null,
+                    "id": "duplicate-b",
+                    "score_micro": 400000
+                  }
+                ],
+                "semantic_fallback_reason": null,
+                "semantic_state": "not_requested",
+                "truncated": false
+              },
+              "context_budget": {
+                "candidate_ids": [
+                  "budget-long",
+                  "budget-short"
+                ],
+                "context_selected_ids": [
+                  "budget-short"
+                ],
+                "context_tokens": 38,
+                "eligible_ids": [
+                  "budget-long",
+                  "budget-short"
+                ],
+                "errors": [],
+                "ordered_ids": [
+                  "budget-short"
+                ],
+                "scores": [
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 1000000,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 0,
+                      "exact_micro": 1000000,
+                      "keyword_micro": 0,
+                      "priority_micro": 0,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 0
+                    },
+                    "cross_reference_from_id": null,
+                    "id": "budget-short",
+                    "score_micro": 450000
+                  }
+                ],
+                "semantic_fallback_reason": null,
+                "semantic_state": "not_requested",
+                "truncated": true
+              },
+              "exact_phrase": {
+                "candidate_ids": [
+                  "global-handbook"
+                ],
+                "context_selected_ids": [
+                  "global-handbook"
+                ],
+                "context_tokens": 48,
+                "eligible_ids": [
+                  "global-handbook"
+                ],
+                "errors": [],
+                "ordered_ids": [
+                  "global-handbook"
+                ],
+                "scores": [
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 1000000,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 0,
+                      "exact_micro": 1000000,
+                      "keyword_micro": 0,
+                      "priority_micro": 0,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 0
+                    },
+                    "cross_reference_from_id": null,
+                    "id": "global-handbook",
+                    "score_micro": 450000
+                  }
+                ],
+                "semantic_fallback_reason": null,
+                "semantic_state": "not_requested",
+                "truncated": false
+              },
+              "explicit_scope_priority": {
+                "candidate_ids": [
+                  "scope-workspace",
+                  "scope-project"
+                ],
+                "context_selected_ids": [
+                  "scope-workspace",
+                  "scope-project"
+                ],
+                "context_tokens": 77,
+                "eligible_ids": [
+                  "release-checklist",
+                  "scope-project",
+                  "scope-workspace",
+                  "unclassified-note",
+                  "workspace-plan"
+                ],
+                "errors": [],
+                "ordered_ids": [
+                  "scope-workspace",
+                  "scope-project"
+                ],
+                "scores": [
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 1000000,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 0,
+                      "exact_micro": 1000000,
+                      "keyword_micro": 0,
+                      "priority_micro": 500000,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 0
+                    },
+                    "cross_reference_from_id": null,
+                    "id": "scope-workspace",
+                    "score_micro": 475000
+                  },
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 0,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 0,
+                      "exact_micro": 1000000,
+                      "keyword_micro": 0,
+                      "priority_micro": 0,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 0
+                    },
+                    "cross_reference_from_id": null,
+                    "id": "scope-project",
+                    "score_micro": 400000
+                  }
+                ],
+                "semantic_fallback_reason": null,
+                "semantic_state": "not_requested",
+                "truncated": false
+              },
+              "reference_candidate_rerank": {
+                "candidate_ids": [
+                  "global-handbook",
+                  "release-checklist"
+                ],
+                "context_selected_ids": [
+                  "global-handbook",
+                  "release-checklist"
+                ],
+                "context_tokens": 103,
+                "eligible_ids": [
+                  "global-handbook",
+                  "release-checklist",
+                  "scope-workspace",
+                  "unclassified-note",
+                  "workspace-plan"
+                ],
+                "errors": [],
+                "ordered_ids": [
+                  "global-handbook",
+                  "release-checklist"
+                ],
+                "scores": [
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 1000000,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 0,
+                      "exact_micro": 1000000,
+                      "keyword_micro": 0,
+                      "priority_micro": 0,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 0
+                    },
+                    "cross_reference_from_id": null,
+                    "id": "global-handbook",
+                    "score_micro": 450000
+                  },
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 0,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 1000000,
+                      "exact_micro": 0,
+                      "keyword_micro": 0,
+                      "priority_micro": 100000,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 0
+                    },
+                    "cross_reference_from_id": "global-handbook",
+                    "id": "release-checklist",
+                    "score_micro": 205000
+                  }
+                ],
+                "semantic_fallback_reason": null,
+                "semantic_state": "not_requested",
+                "truncated": false
+              },
+              "source_diversity": {
+                "candidate_ids": [
+                  "multi-1",
+                  "multi-2",
+                  "other-1"
+                ],
+                "context_selected_ids": [
+                  "multi-1",
+                  "other-1",
+                  "multi-2"
+                ],
+                "context_tokens": 120,
+                "eligible_ids": [
+                  "multi-1",
+                  "multi-2",
+                  "other-1"
+                ],
+                "errors": [],
+                "ordered_ids": [
+                  "multi-1",
+                  "other-1",
+                  "multi-2"
+                ],
+                "scores": [
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 1000000,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 0,
+                      "exact_micro": 1000000,
+                      "keyword_micro": 0,
+                      "priority_micro": 0,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 0
+                    },
+                    "cross_reference_from_id": null,
+                    "id": "multi-1",
+                    "score_micro": 450000
+                  },
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 0,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 0,
+                      "exact_micro": 1000000,
+                      "keyword_micro": 0,
+                      "priority_micro": 0,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 0
+                    },
+                    "cross_reference_from_id": null,
+                    "id": "other-1",
+                    "score_micro": 400000
+                  },
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 0,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 0,
+                      "exact_micro": 1000000,
+                      "keyword_micro": 0,
+                      "priority_micro": 0,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 0
+                    },
+                    "cross_reference_from_id": null,
+                    "id": "multi-2",
+                    "score_micro": 400000
+                  }
+                ],
+                "semantic_fallback_reason": null,
+                "semantic_state": "not_requested",
+                "truncated": false
+              },
+              "unicode_nfkc_exact": {
+                "candidate_ids": [
+                  "unicode-record"
+                ],
+                "context_selected_ids": [
+                  "unicode-record"
+                ],
+                "context_tokens": 41,
+                "eligible_ids": [
+                  "unicode-record"
+                ],
+                "errors": [],
+                "ordered_ids": [
+                  "unicode-record"
+                ],
+                "scores": [
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 1000000,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 0,
+                      "exact_micro": 1000000,
+                      "keyword_micro": 0,
+                      "priority_micro": 0,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 0
+                    },
+                    "cross_reference_from_id": null,
+                    "id": "unicode-record",
+                    "score_micro": 450000
+                  }
+                ],
+                "semantic_fallback_reason": null,
+                "semantic_state": "not_requested",
+                "truncated": false
+              }
+            },
+            "contract": "rag-behavior-v2-expected",
+            "mode": "exact_only",
+            "version": 2
+          },
+          "path": "rag-behavior-v2/expected/exact-only.json",
+          "sha256": "cda2025dcb3762a3a1cb4c0f57ee97a67aed3494d898d827262f0999f93f2848"
+        },
+        "expected/hybrid.json": {
+          "bytes": 4930,
+          "data": {
+            "cases": {
+              "hybrid_aggregate": {
+                "candidate_ids": [
+                  "global-handbook",
+                  "workspace-plan",
+                  "release-checklist",
+                  "unclassified-note"
+                ],
+                "context_selected_ids": [
+                  "global-handbook",
+                  "workspace-plan",
+                  "release-checklist"
+                ],
+                "context_tokens": 153,
+                "eligible_ids": [
+                  "global-handbook",
+                  "release-checklist",
+                  "scope-workspace",
+                  "unclassified-note",
+                  "workspace-plan"
+                ],
+                "errors": [],
+                "ordered_ids": [
+                  "global-handbook",
+                  "workspace-plan",
+                  "release-checklist"
+                ],
+                "scores": [
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 333333,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 0,
+                      "exact_micro": 0,
+                      "keyword_micro": 333333,
+                      "priority_micro": 0,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 1000000
+                    },
+                    "cross_reference_from_id": null,
+                    "id": "global-handbook",
+                    "score_micro": 466666
+                  },
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 0,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 0,
+                      "exact_micro": 0,
+                      "keyword_micro": 333333,
+                      "priority_micro": 200000,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 800000
+                    },
+                    "cross_reference_from_id": null,
+                    "id": "workspace-plan",
+                    "score_micro": 409999
+                  },
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 0,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 1000000,
+                      "exact_micro": 0,
+                      "keyword_micro": 0,
+                      "priority_micro": 100000,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 600000
+                    },
+                    "cross_reference_from_id": "global-handbook",
+                    "id": "release-checklist",
+                    "score_micro": 355000
+                  }
+                ],
+                "semantic_fallback_reason": null,
+                "semantic_state": "ready",
+                "truncated": true
+              },
+              "hybrid_disabled_fallback": {
+                "candidate_ids": [
+                  "global-handbook"
+                ],
+                "context_selected_ids": [
+                  "global-handbook"
+                ],
+                "context_tokens": 48,
+                "eligible_ids": [
+                  "global-handbook"
+                ],
+                "errors": [],
+                "ordered_ids": [
+                  "global-handbook"
+                ],
+                "scores": [
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 1000000,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 0,
+                      "exact_micro": 1000000,
+                      "keyword_micro": 1000000,
+                      "priority_micro": 0,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 0
+                    },
+                    "cross_reference_from_id": null,
+                    "id": "global-handbook",
+                    "score_micro": 600000
+                  }
+                ],
+                "semantic_fallback_reason": "disabled_by_settings",
+                "semantic_state": "disabled_by_settings",
+                "truncated": false
+              },
+              "recorded_authority_only": {
+                "candidate_ids": [
+                  "workspace-plan",
+                  "release-checklist"
+                ],
+                "context_selected_ids": [
+                  "workspace-plan",
+                  "release-checklist"
+                ],
+                "context_tokens": 105,
+                "eligible_ids": [
+                  "release-checklist",
+                  "scope-workspace",
+                  "workspace-plan"
+                ],
+                "errors": [],
+                "ordered_ids": [
+                  "workspace-plan",
+                  "release-checklist"
+                ],
+                "scores": [
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 1000000,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 0,
+                      "exact_micro": 1000000,
+                      "keyword_micro": 1000000,
+                      "priority_micro": 200000,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 0
+                    },
+                    "cross_reference_from_id": null,
+                    "id": "workspace-plan",
+                    "score_micro": 610000
+                  },
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 0,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 1000000,
+                      "exact_micro": 0,
+                      "keyword_micro": 333333,
+                      "priority_micro": 100000,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 0
+                    },
+                    "cross_reference_from_id": "workspace-plan",
+                    "id": "release-checklist",
+                    "score_micro": 254999
+                  }
+                ],
+                "semantic_fallback_reason": "disabled_by_settings",
+                "semantic_state": "disabled_by_settings",
+                "truncated": false
+              }
+            },
+            "contract": "rag-behavior-v2-expected",
+            "mode": "hybrid",
+            "version": 2
+          },
+          "path": "rag-behavior-v2/expected/hybrid.json",
+          "sha256": "2a9225a26ca155602d099cc30b20a127b689e20ec7823c004c85d36724086ca2"
+        },
+        "expected/keyword-only.json": {
+          "bytes": 2343,
+          "data": {
+            "cases": {
+              "keyword_overlap": {
+                "candidate_ids": [
+                  "release-checklist",
+                  "workspace-plan",
+                  "scope-workspace"
+                ],
+                "context_selected_ids": [
+                  "release-checklist",
+                  "workspace-plan",
+                  "scope-workspace"
+                ],
+                "context_tokens": 144,
+                "eligible_ids": [
+                  "release-checklist",
+                  "scope-workspace",
+                  "unclassified-note",
+                  "workspace-plan"
+                ],
+                "errors": [],
+                "ordered_ids": [
+                  "release-checklist",
+                  "workspace-plan",
+                  "scope-workspace"
+                ],
+                "scores": [
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 1000000,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 1000000,
+                      "exact_micro": 0,
+                      "keyword_micro": 1000000,
+                      "priority_micro": 100000,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 0
+                    },
+                    "cross_reference_from_id": "workspace-plan",
+                    "id": "release-checklist",
+                    "score_micro": 405000
+                  },
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 0,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 0,
+                      "exact_micro": 0,
+                      "keyword_micro": 666666,
+                      "priority_micro": 200000,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 0
+                    },
+                    "cross_reference_from_id": null,
+                    "id": "workspace-plan",
+                    "score_micro": 259999
+                  },
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 0,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 0,
+                      "exact_micro": 0,
+                      "keyword_micro": 333333,
+                      "priority_micro": 0,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 0
+                    },
+                    "cross_reference_from_id": null,
+                    "id": "scope-workspace",
+                    "score_micro": 199999
+                  }
+                ],
+                "semantic_fallback_reason": null,
+                "semantic_state": "not_requested",
+                "truncated": false
+              }
+            },
+            "contract": "rag-behavior-v2-expected",
+            "mode": "keyword_only",
+            "version": 2
+          },
+          "path": "rag-behavior-v2/expected/keyword-only.json",
+          "sha256": "4246dc953da3d107f94c3bab4978ac1d0689454de438c52619887e9e51de8ee9"
+        },
+        "expected/scoped-hybrid.json": {
+          "bytes": 1373,
+          "data": {
+            "cases": {
+              "deny_first_scope": {
+                "candidate_ids": [
+                  "global-handbook"
+                ],
+                "context_selected_ids": [
+                  "global-handbook"
+                ],
+                "context_tokens": 48,
+                "eligible_ids": [
+                  "global-handbook"
+                ],
+                "errors": [],
+                "ordered_ids": [
+                  "global-handbook"
+                ],
+                "scores": [
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 1000000,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 0,
+                      "exact_micro": 1000000,
+                      "keyword_micro": 1000000,
+                      "priority_micro": 0,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 0
+                    },
+                    "cross_reference_from_id": null,
+                    "id": "global-handbook",
+                    "score_micro": 600000
+                  }
+                ],
+                "semantic_fallback_reason": "disabled_by_settings",
+                "semantic_state": "disabled_by_settings",
+                "truncated": false
+              },
+              "exclude_all": {
+                "candidate_ids": [],
+                "context_selected_ids": [],
+                "context_tokens": 0,
+                "eligible_ids": [],
+                "errors": [],
+                "ordered_ids": [],
+                "scores": [],
+                "semantic_fallback_reason": "disabled_by_settings",
+                "semantic_state": "disabled_by_settings",
+                "truncated": false
+              }
+            },
+            "contract": "rag-behavior-v2-expected",
+            "mode": "scoped_hybrid",
+            "version": 2
+          },
+          "path": "rag-behavior-v2/expected/scoped-hybrid.json",
+          "sha256": "3a760e221488b3475801ee57e8b6e48eb25ce1748520111340c3dd71ffd91c4d"
+        },
+        "expected/semantic-only.json": {
+          "bytes": 1451,
+          "data": {
+            "cases": {
+              "semantic_profile_mismatch": {
+                "candidate_ids": [],
+                "context_selected_ids": [],
+                "context_tokens": 0,
+                "eligible_ids": [
+                  "profile-mismatch"
+                ],
+                "errors": [
+                  "semantic retrieval unavailable: no_compatible_vectors"
+                ],
+                "ordered_ids": [],
+                "scores": [],
+                "semantic_fallback_reason": "no_compatible_vectors",
+                "semantic_state": "lexical_fallback",
+                "truncated": false
+              },
+              "semantic_threshold_inclusive": {
+                "candidate_ids": [
+                  "semantic-boundary"
+                ],
+                "context_selected_ids": [
+                  "semantic-boundary"
+                ],
+                "context_tokens": 39,
+                "eligible_ids": [
+                  "semantic-below",
+                  "semantic-boundary"
+                ],
+                "errors": [],
+                "ordered_ids": [
+                  "semantic-boundary"
+                ],
+                "scores": [
+                  {
+                    "components": {
+                      "aspect_coverage_micro": 0,
+                      "authority_micro": 1000000,
+                      "cross_reference_micro": 0,
+                      "exact_micro": 0,
+                      "keyword_micro": 0,
+                      "priority_micro": 0,
+                      "provenance_micro": 1000000,
+                      "scope_micro": 1000000,
+                      "semantic_micro": 200000
+                    },
+                    "cross_reference_from_id": null,
+                    "id": "semantic-boundary",
+                    "score_micro": 200000
+                  }
+                ],
+                "semantic_fallback_reason": null,
+                "semantic_state": "ready",
+                "truncated": false
+              }
+            },
+            "contract": "rag-behavior-v2-expected",
+            "mode": "semantic_only",
+            "version": 2
+          },
+          "path": "rag-behavior-v2/expected/semantic-only.json",
+          "sha256": "def481b75bfcbcd1e5af7e02492fb9ed5af7a707ecb0a984d056b23e61faebbb"
+        },
+        "manifest.json": {
+          "bytes": 1363,
+          "data": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "baseline_commits": {
+              "edgesymbio": "d73f3af94518487fbeb8e38fbd594b52cb6cf2da",
+              "rag_method_py": "f5453a1a45a6666771abfebb0d38ae9fae742681",
+              "tulpaweaver": "0fb0e9c23ae083da54f06b311f0482834d61135f"
+            },
+            "change_policy": "Any behavioral change requires a new contract version; adapters must not rewrite expectations.",
+            "contract": "rag-behavior-v2",
+            "files": {
+              "adapters": {
+                "javascript": "adapters/javascript.md",
+                "python": "adapters/python.md",
+                "rust": "adapters/rust.md"
+              },
+              "cases": "cases.json",
+              "expected": {
+                "exact_only": "expected/exact-only.json",
+                "hybrid": "expected/hybrid.json",
+                "keyword_only": "expected/keyword-only.json",
+                "scoped_hybrid": "expected/scoped-hybrid.json",
+                "semantic_only": "expected/semantic-only.json"
+              },
+              "profile": "retrieval-profile.json",
+              "query_schema": "query.schema.json",
+              "record_schema": "record.schema.json",
+              "records": "fixture-records.json",
+              "report_schema": "report.schema.json",
+              "response_schema": "response.schema.json",
+              "vectors": "fixture-vectors.json"
+            },
+            "fixture_counts": {
+              "cases": 15,
+              "expected_modes": 5,
+              "identity_vectors": 5,
+              "records": 19
+            },
+            "owner": "RAG-Method-PY",
+            "status": "frozen",
+            "version": 2
+          },
+          "path": "rag-behavior-v2/manifest.json",
+          "sha256": "b2d69a80c6a95cbce297bbc3c76704db9ae20d0810a8940846ceb8a11d4c6940"
+        },
+        "query.schema.json": {
+          "bytes": 1350,
+          "data": {
+            "$id": "rag-behavior-v2/query.schema.json",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "properties": {
+              "authority_policy": {
+                "enum": [
+                  "all",
+                  "recorded_only"
+                ]
+              },
+              "exclude_scopes": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              "expand": {
+                "type": "boolean"
+              },
+              "id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "include_scopes": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              "max_context_tokens": {
+                "maximum": 1800,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "mode": {
+                "enum": [
+                  "exact_only",
+                  "semantic_only",
+                  "keyword_only",
+                  "hybrid",
+                  "scoped_hybrid"
+                ]
+              },
+              "query": {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              "query_vector_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "scope_priorities": {
+                "additionalProperties": {
+                  "maximum": 100,
+                  "minimum": -100,
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              "semantic_enabled": {
+                "type": "boolean"
+              },
+              "semantic_fallback_reason": {
+                "enum": [
+                  "disabled_by_settings",
+                  "no_compatible_vectors",
+                  "embedding_failed"
+                ]
+              },
+              "top_k": {
+                "maximum": 100,
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "query",
+              "mode",
+              "top_k"
+            ],
+            "title": "RAG behavior v2 query case",
+            "type": "object"
+          },
+          "path": "rag-behavior-v2/query.schema.json",
+          "sha256": "1c718f01496cd6e9fe84af0cadecc4e58ed3e42515b15c6782c7b117bbddda31"
+        },
+        "record.schema.json": {
+          "bytes": 1661,
+          "data": {
+            "$id": "rag-behavior-v2/record.schema.json",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "properties": {
+              "authority": {
+                "enum": [
+                  "global_record",
+                  "workspace_record",
+                  "persona_vault",
+                  "conversation_memory",
+                  "unclassified"
+                ]
+              },
+              "embedding_profile_id": {
+                "minLength": 1,
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "metadata": {
+                "type": "object"
+              },
+              "path": {
+                "type": "string"
+              },
+              "pocket": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "priority": {
+                "maximum": 100,
+                "minimum": -100,
+                "type": "integer"
+              },
+              "provenance": {
+                "additionalProperties": false,
+                "properties": {
+                  "chunk_source": {
+                    "type": "boolean"
+                  },
+                  "file_source": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "file_source",
+                  "chunk_source"
+                ],
+                "type": "object"
+              },
+              "references": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              "scope": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "scopes": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "source_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "source_name": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "text": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "text",
+              "source_id",
+              "source_name",
+              "path",
+              "pocket",
+              "scopes",
+              "authority",
+              "priority",
+              "provenance",
+              "references",
+              "embedding_profile_id"
+            ],
+            "title": "RAG behavior v2 record",
+            "type": "object"
+          },
+          "path": "rag-behavior-v2/record.schema.json",
+          "sha256": "f72058232229ac5b8fd8c75a9f57156611a38091a60cdba190d4da55b3e21a3c"
+        },
+        "report.schema.json": {
+          "bytes": 4861,
+          "data": {
+            "$defs": {
+              "ids": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              "observation": {
+                "additionalProperties": false,
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "semantic_state": {
+                          "enum": [
+                            "not_requested",
+                            "ready"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "semantic_state"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "semantic_fallback_reason": {
+                          "const": null
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "semantic_state": {
+                          "const": "disabled_by_settings"
+                        }
+                      },
+                      "required": [
+                        "semantic_state"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "semantic_fallback_reason": {
+                          "const": "disabled_by_settings"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "semantic_state": {
+                          "const": "lexical_fallback"
+                        }
+                      },
+                      "required": [
+                        "semantic_state"
+                      ]
+                    },
+                    "then": {
+                      "properties": {
+                        "semantic_fallback_reason": {
+                          "enum": [
+                            "no_compatible_vectors",
+                            "embedding_failed"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                ],
+                "properties": {
+                  "candidate_ids": {
+                    "$ref": "#/$defs/ids"
+                  },
+                  "context_selected_ids": {
+                    "$ref": "#/$defs/ids"
+                  },
+                  "context_tokens": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "eligible_ids": {
+                    "$ref": "#/$defs/ids"
+                  },
+                  "errors": {
+                    "items": {
+                      "minLength": 1,
+                      "pattern": "\\S",
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "ordered_ids": {
+                    "$ref": "#/$defs/ids"
+                  },
+                  "scores": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "components": {
+                          "$ref": "response.schema.json#/$defs/components"
+                        },
+                        "cross_reference_from_id": {
+                          "minLength": 1,
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "id": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "score_micro": {
+                          "maximum": 1000000,
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "score_micro",
+                        "components",
+                        "cross_reference_from_id"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "semantic_fallback_reason": {
+                    "enum": [
+                      null,
+                      "disabled_by_settings",
+                      "no_compatible_vectors",
+                      "embedding_failed"
+                    ]
+                  },
+                  "semantic_state": {
+                    "enum": [
+                      "not_requested",
+                      "ready",
+                      "disabled_by_settings",
+                      "lexical_fallback"
+                    ]
+                  },
+                  "truncated": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "eligible_ids",
+                  "candidate_ids",
+                  "ordered_ids",
+                  "scores",
+                  "context_selected_ids",
+                  "context_tokens",
+                  "truncated",
+                  "semantic_state",
+                  "semantic_fallback_reason",
+                  "errors"
+                ],
+                "type": "object"
+              }
+            },
+            "$id": "rag-behavior-v2/report.schema.json",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "properties": {
+              "contract": {
+                "const": "rag-behavior-v2-report"
+              },
+              "profile_id": {
+                "const": "rag-behavior-v2-edge-derived"
+              },
+              "repository": {
+                "additionalProperties": false,
+                "properties": {
+                  "commit": {
+                    "pattern": "^[0-9a-f]{40}$",
+                    "type": "string"
+                  },
+                  "dirty": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "commit",
+                  "dirty"
+                ],
+                "type": "object"
+              },
+              "results": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "actual": {
+                      "$ref": "#/$defs/observation"
+                    },
+                    "expected": {
+                      "$ref": "#/$defs/observation"
+                    },
+                    "id": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "mode": {
+                      "enum": [
+                        "exact_only",
+                        "semantic_only",
+                        "keyword_only",
+                        "hybrid",
+                        "scoped_hybrid"
+                      ]
+                    },
+                    "passed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "mode",
+                    "passed",
+                    "expected",
+                    "actual"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "runner": {
+                "additionalProperties": false,
+                "properties": {
+                  "implementation": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "language": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "version": {
+                    "const": 1
+                  }
+                },
+                "required": [
+                  "implementation",
+                  "language",
+                  "version"
+                ],
+                "type": "object"
+              },
+              "summary": {
+                "additionalProperties": false,
+                "properties": {
+                  "cases": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "failed": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "passed": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "cases",
+                  "passed",
+                  "failed"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "contract",
+              "profile_id",
+              "runner",
+              "repository",
+              "summary",
+              "results"
+            ],
+            "title": "RAG behavior v2 adapter report",
+            "type": "object"
+          },
+          "path": "rag-behavior-v2/report.schema.json",
+          "sha256": "bd752c45830702792241f75adde57a059409087d56d7157bf54f9911ec3a42be"
+        },
+        "response.schema.json": {
+          "bytes": 3354,
+          "data": {
+            "$defs": {
+              "components": {
+                "additionalProperties": false,
+                "properties": {
+                  "aspect_coverage_micro": {
+                    "maximum": 1000000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "authority_micro": {
+                    "maximum": 1000000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "cross_reference_micro": {
+                    "maximum": 1000000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "exact_micro": {
+                    "maximum": 1000000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "keyword_micro": {
+                    "maximum": 1000000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "priority_micro": {
+                    "maximum": 1000000,
+                    "minimum": -1000000,
+                    "type": "integer"
+                  },
+                  "provenance_micro": {
+                    "maximum": 1000000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "scope_micro": {
+                    "maximum": 1000000,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "semantic_micro": {
+                    "maximum": 1000000,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "exact_micro",
+                  "semantic_micro",
+                  "keyword_micro",
+                  "scope_micro",
+                  "provenance_micro",
+                  "authority_micro",
+                  "priority_micro",
+                  "aspect_coverage_micro",
+                  "cross_reference_micro"
+                ],
+                "type": "object"
+              },
+              "ids": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              }
+            },
+            "$id": "rag-behavior-v2/response.schema.json",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "properties": {
+              "candidate_ids": {
+                "$ref": "#/$defs/ids"
+              },
+              "context_selected_ids": {
+                "$ref": "#/$defs/ids"
+              },
+              "context_tokens": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "contract": {
+                "const": "rag-behavior-v2"
+              },
+              "eligible_ids": {
+                "$ref": "#/$defs/ids"
+              },
+              "errors": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "mode": {
+                "enum": [
+                  "exact_only",
+                  "semantic_only",
+                  "keyword_only",
+                  "hybrid",
+                  "scoped_hybrid"
+                ]
+              },
+              "results": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "components": {
+                      "$ref": "#/$defs/components"
+                    },
+                    "cross_reference_from_id": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "match_type": {
+                      "enum": [
+                        "exact",
+                        "semantic",
+                        "keyword",
+                        "cross_reference",
+                        "none"
+                      ]
+                    },
+                    "record": {
+                      "$ref": "record.schema.json"
+                    },
+                    "scope_priority": {
+                      "maximum": 100,
+                      "minimum": -100,
+                      "type": "integer"
+                    },
+                    "score": {
+                      "maximum": 1,
+                      "minimum": 0,
+                      "type": "number"
+                    },
+                    "score_micro": {
+                      "maximum": 1000000,
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "record",
+                    "score_micro",
+                    "score",
+                    "match_type",
+                    "scope_priority",
+                    "cross_reference_from_id",
+                    "components"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "semantic_fallback_reason": {
+                "enum": [
+                  null,
+                  "disabled_by_settings",
+                  "no_compatible_vectors",
+                  "embedding_failed"
+                ],
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "semantic_state": {
+                "enum": [
+                  "not_requested",
+                  "ready",
+                  "disabled_by_settings",
+                  "lexical_fallback"
+                ]
+              },
+              "truncated": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "contract",
+              "mode",
+              "eligible_ids",
+              "candidate_ids",
+              "results",
+              "context_selected_ids",
+              "context_tokens",
+              "truncated",
+              "semantic_state",
+              "semantic_fallback_reason",
+              "errors"
+            ],
+            "title": "RAG behavior v2 response",
+            "type": "object"
+          },
+          "path": "rag-behavior-v2/response.schema.json",
+          "sha256": "2632fd88a5e6d4594ce11d1e4e7816aca37fd413c94e0c3a3491d89eb59d898c"
+        }
+      },
+      "input_digests": {
+        "adapters/javascript.md": "1b53ed03b0bce627276dcee8284720fe07c02d36e2b1f95e058b56a0fb83e4a2",
+        "adapters/python.md": "c59f81ace2f0d2780c384ce25695f4fe4ca81af3ce63a1bd6d052e9394fe135c",
+        "adapters/rust.md": "395a8273c48947811c298425845bd9cf39430880d6423089d0f3e102f913c0c4",
+        "expected/exact-only.json": "cda2025dcb3762a3a1cb4c0f57ee97a67aed3494d898d827262f0999f93f2848",
+        "expected/hybrid.json": "2a9225a26ca155602d099cc30b20a127b689e20ec7823c004c85d36724086ca2",
+        "expected/keyword-only.json": "4246dc953da3d107f94c3bab4978ac1d0689454de438c52619887e9e51de8ee9",
+        "expected/scoped-hybrid.json": "3a760e221488b3475801ee57e8b6e48eb25ce1748520111340c3dd71ffd91c4d",
+        "expected/semantic-only.json": "def481b75bfcbcd1e5af7e02492fb9ed5af7a707ecb0a984d056b23e61faebbb",
+        "manifest.json": "b2d69a80c6a95cbce297bbc3c76704db9ae20d0810a8940846ceb8a11d4c6940",
+        "query.schema.json": "1c718f01496cd6e9fe84af0cadecc4e58ed3e42515b15c6782c7b117bbddda31",
+        "record.schema.json": "f72058232229ac5b8fd8c75a9f57156611a38091a60cdba190d4da55b3e21a3c",
+        "report.schema.json": "bd752c45830702792241f75adde57a059409087d56d7157bf54f9911ec3a42be",
+        "response.schema.json": "2632fd88a5e6d4594ce11d1e4e7816aca37fd413c94e0c3a3491d89eb59d898c"
+      },
+      "source_manifest_sha256": "b2d69a80c6a95cbce297bbc3c76704db9ae20d0810a8940846ceb8a11d4c6940",
+      "version": 2
+    },
+    "rag-indexing-v1": {
+      "contract": "rag-indexing-v1",
+      "files": {
+        "adapters/javascript.md": {
+          "bytes": 973,
+          "data": "# JavaScript indexing adapter\n\nImplement the frozen profile with explicit code-point arrays or iteration so\noffsets and limits count Unicode scalars rather than UTF-16 code units. Route\nTulpaWeaver's production Markdown/text replacement path through the same native\nfunction used by its report adapter. Decode source bytes with a fatal UTF-8\ndecoder; replacement characters are not an accepted error policy.\n\nFilesystem scan limits, SQLite/vector writes, embeddings, wiki resolution,\ngraph policy, and chat remain outside this portable lane. The report must come\nfrom a clean commit and have no runtime dependency on RAG-Method-PY.\n\nDone when: all cases and production-seam regressions pass, a single long line\ncannot exceed 2,400 scalars, and exact report comparison succeeds.\n\n---\nAI-edited: 2026-08-09T00:00:00-04:00 | agent=Codex/root | model=gpt-5.6-sol | effort=max | task=rag-indexing-v1 | change=defined the native JavaScript indexing parity seam and UTF-16 guards\n",
+          "path": "rag-indexing-v1/adapters/javascript.md",
+          "sha256": "77ad34f7d1ac83d5eb4a15298577453c89e2f2e767f41a7cf4660b06b841985c"
+        },
+        "adapters/python.md": {
+          "bytes": 956,
+          "data": "# Python indexing adapter\n\nThe executable oracle is `mirrorlight_backend.rag_core.indexing.index_document`.\nThe production Markdown/text indexer must call the same function and may only\ntranslate its returned records into application graph and persistence shapes.\nIt must decode files as strict UTF-8 before that call. PDF, OCR, memory JSON,\nfilesystem scanning, embeddings, and graph resolution stay outside this lane.\n\nRun `python scripts/rag_indexing_contract.py`. Generate a retained report only\nfrom a clean commit with `--output .artifacts/proof/rag-indexing-v1/python.json`.\n\nDone when: all frozen cases pass, the production source path has a regression\ntest against the oracle observation, and invalid UTF-8 fails visibly rather\nthan being ignored or replaced.\n\n---\nAI-edited: 2026-08-09T00:00:00-04:00 | agent=Codex/root | model=gpt-5.6-sol | effort=max | task=rag-indexing-v1 | change=defined the shared Python oracle and production adapter seam\n",
+          "path": "rag-indexing-v1/adapters/python.md",
+          "sha256": "2bf66bc76126d2e7871b3e8dcd25e4bb3c11c362fb814435b51471bac6080bc7"
+        },
+        "adapters/rust.md": {
+          "bytes": 962,
+          "data": "# Rust indexing adapter\n\nImplement the frozen profile with Rust Unicode-scalar iteration and the v2\nidentity functions already shared by production retrieval. Route `.md` and\n`.txt` ingest through that native function before EdgeSymbio builds\n`FileChunkSource` values. `text_start` and `text_end` are canonical scalar\noffsets, not UTF-8 byte lengths. Keep PDF/OCR and SQLite behavior outside the\nportable lane.\n\nUse strict `std::str::from_utf8`, the explicit whitespace table, and fixture-\nsupplied limits. The report must be generated from a clean commit without a\nruntime dependency on RAG-Method-PY.\n\nDone when: all cases and native production-seam regressions pass, long lines\nstay bounded, supplementary characters are never split, and the clean report\nexactly matches the coordinator.\n\n---\nAI-edited: 2026-08-09T00:00:00-04:00 | agent=Codex/root | model=gpt-5.6-sol | effort=max | task=rag-indexing-v1 | change=defined the native Rust indexing parity seam\n",
+          "path": "rag-indexing-v1/adapters/rust.md",
+          "sha256": "5e9f98cddead3105248bd568b3a2bc8ff28efacf54c67787d73b811e622ed5eb"
+        },
+        "document.schema.json": {
+          "bytes": 927,
+          "data": {
+            "$id": "rag-indexing-v1/document.schema.json",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "properties": {
+              "authority": {
+                "enum": [
+                  "global_record",
+                  "workspace_record",
+                  "persona_vault",
+                  "conversation_memory",
+                  "unclassified"
+                ]
+              },
+              "content": {
+                "type": "string"
+              },
+              "format": {
+                "enum": [
+                  "markdown",
+                  "text"
+                ]
+              },
+              "path": {
+                "maxLength": 1024,
+                "minLength": 1,
+                "type": "string"
+              },
+              "pocket": {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              "priority": {
+                "maximum": 100,
+                "minimum": -100,
+                "type": "integer"
+              },
+              "scopes": {
+                "items": {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 64,
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "format",
+              "path",
+              "pocket",
+              "scopes",
+              "authority",
+              "priority",
+              "content"
+            ],
+            "title": "Portable RAG indexing document",
+            "type": "object"
+          },
+          "path": "rag-indexing-v1/document.schema.json",
+          "sha256": "72d6a3c50cce7560796230bb02fca3312e1d31c84a176d8e105d46536ad2ac7c"
+        },
+        "expected.json": {
+          "bytes": 31712,
+          "data": {
+            "contract": "rag-indexing-v1-expected",
+            "observations": {
+              "empty-after-frontmatter": {
+                "document": {
+                  "authority": "global_record",
+                  "canonical_content_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                  "canonical_scalar_count": 0,
+                  "format": "markdown",
+                  "limits": {
+                    "max_chars": 2400,
+                    "max_tokens": 600
+                  },
+                  "normalization": {
+                    "bom_removed": true,
+                    "frontmatter_removed": true,
+                    "line_endings_changed": false
+                  },
+                  "path": "empty.md",
+                  "pocket": "global",
+                  "priority": 0,
+                  "records": [],
+                  "scopes": [
+                    "global"
+                  ],
+                  "source_content_id": "a7401497adf47e7bb5f15649d4ddf24b63cf13a6392a4b4282ead0715df4c561",
+                  "source_id": "296ecc0bfc2e7184d0e79bf1cd6b9f6a071601f5e1aa3cf9f70f7bd569513f2f",
+                  "source_utf8_bytes": 30
+                },
+                "status": "ok"
+              },
+              "explicit-whitespace-token-ceiling": {
+                "document": {
+                  "authority": "global_record",
+                  "canonical_content_id": "db04da41160640aa556e67bb8f6edd938cfd6682f9f2bf169730d3a79684a354",
+                  "canonical_scalar_count": 23,
+                  "format": "text",
+                  "limits": {
+                    "max_chars": 100,
+                    "max_tokens": 3
+                  },
+                  "normalization": {
+                    "bom_removed": false,
+                    "frontmatter_removed": false,
+                    "line_endings_changed": false
+                  },
+                  "path": "unicode/whitespace.txt",
+                  "pocket": "global",
+                  "priority": 0,
+                  "records": [
+                    {
+                      "authority": "global_record",
+                      "embedding_profile_id": null,
+                      "id": "6fc9c97433a9be1c91b56596dbe659c0818534a6e3b1cd4354325bbe4fba14d8",
+                      "metadata": {
+                        "chunk_index": 0,
+                        "content_id": "e4a660208bcfc3f692c79f7b87b42a8dd652fc3a064754be5aa69ac24beec551",
+                        "heading": "Overview",
+                        "heading_level": 0,
+                        "indexing_contract": "rag-indexing-v1",
+                        "indexing_profile": "rag-indexing-v1-portable",
+                        "reference_targets": [],
+                        "section_index": 0,
+                        "text_end": 13,
+                        "text_start": 0,
+                        "token_estimate": 4
+                      },
+                      "path": "unicode/whitespace.txt",
+                      "pocket": "global",
+                      "priority": 0,
+                      "provenance": {
+                        "chunk_source": true,
+                        "file_source": true
+                      },
+                      "references": [],
+                      "scope": "global",
+                      "scopes": [
+                        "global"
+                      ],
+                      "source_id": "fbb5ef1c4cca1683d6f5a7c1102cc87b033cb0843b238fcea4d70e546ee6d96c",
+                      "source_name": "whitespace.txt",
+                      "text": "one two three"
+                    },
+                    {
+                      "authority": "global_record",
+                      "embedding_profile_id": null,
+                      "id": "31d601e0f109ef700b8539e7f37ca3bfe27bd260ba58d7d35d5d9860409cfa7e",
+                      "metadata": {
+                        "chunk_index": 1,
+                        "content_id": "6125b7bc8e96e375289e2ab057b94e63e0059e9fc5e3a0ca7efd6a34a2180d50",
+                        "heading": "Overview",
+                        "heading_level": 0,
+                        "indexing_contract": "rag-indexing-v1",
+                        "indexing_profile": "rag-indexing-v1-portable",
+                        "reference_targets": [],
+                        "section_index": 0,
+                        "text_end": 23,
+                        "text_start": 14,
+                        "token_estimate": 3
+                      },
+                      "path": "unicode/whitespace.txt",
+                      "pocket": "global",
+                      "priority": 0,
+                      "provenance": {
+                        "chunk_source": true,
+                        "file_source": true
+                      },
+                      "references": [],
+                      "scope": "global",
+                      "scopes": [
+                        "global"
+                      ],
+                      "source_id": "fbb5ef1c4cca1683d6f5a7c1102cc87b033cb0843b238fcea4d70e546ee6d96c",
+                      "source_name": "whitespace.txt",
+                      "text": "four five"
+                    }
+                  ],
+                  "scopes": [
+                    "global"
+                  ],
+                  "source_content_id": "db04da41160640aa556e67bb8f6edd938cfd6682f9f2bf169730d3a79684a354",
+                  "source_id": "fbb5ef1c4cca1683d6f5a7c1102cc87b033cb0843b238fcea4d70e546ee6d96c",
+                  "source_utf8_bytes": 26
+                },
+                "status": "ok"
+              },
+              "markdown-heading-edge-cases": {
+                "document": {
+                  "authority": "global_record",
+                  "canonical_content_id": "5a0fff4a10f93b3ed1e548c786bc5071df7e3afd27fc726768110ed03c8189e8",
+                  "canonical_scalar_count": 128,
+                  "format": "markdown",
+                  "limits": {
+                    "max_chars": 80,
+                    "max_tokens": 20
+                  },
+                  "normalization": {
+                    "bom_removed": false,
+                    "frontmatter_removed": false,
+                    "line_endings_changed": false
+                  },
+                  "path": "headings.md",
+                  "pocket": "global",
+                  "priority": 0,
+                  "records": [
+                    {
+                      "authority": "global_record",
+                      "embedding_profile_id": null,
+                      "id": "f7772eba1a944b9e62154cb26e0156c2221bfccd9c7145d59da4131d41ff26a8",
+                      "metadata": {
+                        "chunk_index": 0,
+                        "content_id": "dac4c1222a15fdc8b09adc7d11b55ae53bf0d4db9f4528a537fbc684da2d3a80",
+                        "heading": "Overview",
+                        "heading_level": 0,
+                        "indexing_contract": "rag-indexing-v1",
+                        "indexing_profile": "rag-indexing-v1-portable",
+                        "reference_targets": [],
+                        "section_index": 0,
+                        "text_end": 58,
+                        "text_start": 0,
+                        "token_estimate": 15
+                      },
+                      "path": "headings.md",
+                      "pocket": "global",
+                      "priority": 0,
+                      "provenance": {
+                        "chunk_source": true,
+                        "file_source": true
+                      },
+                      "references": [],
+                      "scope": "global",
+                      "scopes": [
+                        "global"
+                      ],
+                      "source_id": "50260f182323d66b07db1919ee2717632bd1ae1468114769034ec93ba156d673",
+                      "source_name": "headings.md",
+                      "text": "####### Seven is text\n#NoSpace is text\n # Indented is text"
+                    },
+                    {
+                      "authority": "global_record",
+                      "embedding_profile_id": null,
+                      "id": "500368ab0854165d0d64f8701ed27bced7520698949f632e44551b5845c13ea3",
+                      "metadata": {
+                        "chunk_index": 1,
+                        "content_id": "bb3db82648b04b64d3890a7ea11db35048d6ba0fa3c4c7262a6c58c9b2e9bcde",
+                        "heading": "Six ####",
+                        "heading_level": 6,
+                        "indexing_contract": "rag-indexing-v1",
+                        "indexing_profile": "rag-indexing-v1-portable",
+                        "reference_targets": [],
+                        "section_index": 1,
+                        "text_end": 79,
+                        "text_start": 59,
+                        "token_estimate": 5
+                      },
+                      "path": "headings.md",
+                      "pocket": "global",
+                      "priority": 0,
+                      "provenance": {
+                        "chunk_source": true,
+                        "file_source": true
+                      },
+                      "references": [],
+                      "scope": "global",
+                      "scopes": [
+                        "global"
+                      ],
+                      "source_id": "50260f182323d66b07db1919ee2717632bd1ae1468114769034ec93ba156d673",
+                      "source_name": "headings.md",
+                      "text": "###### Six ####\nBody"
+                    },
+                    {
+                      "authority": "global_record",
+                      "embedding_profile_id": null,
+                      "id": "f9ed3f659eb34fa74a2cd767cc25311149e2e2b0660aa108e9bfca8df0fce1a6",
+                      "metadata": {
+                        "chunk_index": 2,
+                        "content_id": "eabbadf63184f6cd754e677fd2fcc535b902de7075811014ceefef1065306bde",
+                        "heading": "Two",
+                        "heading_level": 2,
+                        "indexing_contract": "rag-indexing-v1",
+                        "indexing_profile": "rag-indexing-v1-portable",
+                        "reference_targets": [],
+                        "section_index": 2,
+                        "text_end": 103,
+                        "text_start": 80,
+                        "token_estimate": 6
+                      },
+                      "path": "headings.md",
+                      "pocket": "global",
+                      "priority": 0,
+                      "provenance": {
+                        "chunk_source": true,
+                        "file_source": true
+                      },
+                      "references": [],
+                      "scope": "global",
+                      "scopes": [
+                        "global"
+                      ],
+                      "source_id": "50260f182323d66b07db1919ee2717632bd1ae1468114769034ec93ba156d673",
+                      "source_name": "headings.md",
+                      "text": "## Two\nFirst duplicate."
+                    },
+                    {
+                      "authority": "global_record",
+                      "embedding_profile_id": null,
+                      "id": "50d398b8b16eaeba4b33a6398c48929021073a1504070831e99505f4079363da",
+                      "metadata": {
+                        "chunk_index": 3,
+                        "content_id": "a778d7d218998f942b30ece694e90cf71e9b50766da0a8bd1737fcc33fa3765b",
+                        "heading": "Two",
+                        "heading_level": 2,
+                        "indexing_contract": "rag-indexing-v1",
+                        "indexing_profile": "rag-indexing-v1-portable",
+                        "reference_targets": [],
+                        "section_index": 3,
+                        "text_end": 128,
+                        "text_start": 104,
+                        "token_estimate": 6
+                      },
+                      "path": "headings.md",
+                      "pocket": "global",
+                      "priority": 0,
+                      "provenance": {
+                        "chunk_source": true,
+                        "file_source": true
+                      },
+                      "references": [],
+                      "scope": "global",
+                      "scopes": [
+                        "global"
+                      ],
+                      "source_id": "50260f182323d66b07db1919ee2717632bd1ae1468114769034ec93ba156d673",
+                      "source_name": "headings.md",
+                      "text": "## Two\nSecond duplicate."
+                    }
+                  ],
+                  "scopes": [
+                    "global"
+                  ],
+                  "source_content_id": "5a0fff4a10f93b3ed1e548c786bc5071df7e3afd27fc726768110ed03c8189e8",
+                  "source_id": "50260f182323d66b07db1919ee2717632bd1ae1468114769034ec93ba156d673",
+                  "source_utf8_bytes": 128
+                },
+                "status": "ok"
+              },
+              "markdown-normalization-headings-links": {
+                "document": {
+                  "authority": "global_record",
+                  "canonical_content_id": "221c7fdd78cad0b55d045b3158dc7f221080006c4e8a06ec512703aca53c6a78",
+                  "canonical_scalar_count": 45,
+                  "format": "markdown",
+                  "limits": {
+                    "max_chars": 64,
+                    "max_tokens": 16
+                  },
+                  "normalization": {
+                    "bom_removed": true,
+                    "frontmatter_removed": true,
+                    "line_endings_changed": true
+                  },
+                  "path": "Docs/Guide.md",
+                  "pocket": "global",
+                  "priority": 0,
+                  "records": [
+                    {
+                      "authority": "global_record",
+                      "embedding_profile_id": null,
+                      "id": "a8863d8c505ea87a9aecc8104c0a4083aab805d5fa3850a3ffbb14c5a0e3112b",
+                      "metadata": {
+                        "chunk_index": 0,
+                        "content_id": "d62539bdd13cc28d1b0d537cff9c7827421d810b3e0b3a8dcdf2cadbd8103b2d",
+                        "heading": "Alpha",
+                        "heading_level": 1,
+                        "indexing_contract": "rag-indexing-v1",
+                        "indexing_profile": "rag-indexing-v1-portable",
+                        "reference_targets": [
+                          "Beta"
+                        ],
+                        "section_index": 0,
+                        "text_end": 29,
+                        "text_start": 0,
+                        "token_estimate": 8
+                      },
+                      "path": "Docs/Guide.md",
+                      "pocket": "global",
+                      "priority": 0,
+                      "provenance": {
+                        "chunk_source": true,
+                        "file_source": true
+                      },
+                      "references": [],
+                      "scope": "global",
+                      "scopes": [
+                        "global"
+                      ],
+                      "source_id": "c1b78702c910251036f5138c324fb3dbcc33d6e2e4c74e0bf12632643ef8f63b",
+                      "source_name": "Guide.md",
+                      "text": "# Alpha\nFirst [[Beta|label]]."
+                    },
+                    {
+                      "authority": "global_record",
+                      "embedding_profile_id": null,
+                      "id": "3a0783d84936cf647faf004fc8de23fb96e1e9963904881e5beae7983c33403a",
+                      "metadata": {
+                        "chunk_index": 1,
+                        "content_id": "cb31158ccd9ad9426f9995873837604e7431d2a1bc363ae00be31f8d2e7f8961",
+                        "heading": "Beta",
+                        "heading_level": 2,
+                        "indexing_contract": "rag-indexing-v1",
+                        "indexing_profile": "rag-indexing-v1-portable",
+                        "reference_targets": [],
+                        "section_index": 1,
+                        "text_end": 45,
+                        "text_start": 30,
+                        "token_estimate": 4
+                      },
+                      "path": "Docs/Guide.md",
+                      "pocket": "global",
+                      "priority": 0,
+                      "provenance": {
+                        "chunk_source": true,
+                        "file_source": true
+                      },
+                      "references": [],
+                      "scope": "global",
+                      "scopes": [
+                        "global"
+                      ],
+                      "source_id": "c1b78702c910251036f5138c324fb3dbcc33d6e2e4c74e0bf12632643ef8f63b",
+                      "source_name": "Guide.md",
+                      "text": "## Beta\nSecond."
+                    }
+                  ],
+                  "scopes": [
+                    "global"
+                  ],
+                  "source_content_id": "7171921e6e8b6d291382f8b44d44ba88e1ae4beace6633c83bf7f2f29a2349b4",
+                  "source_id": "c1b78702c910251036f5138c324fb3dbcc33d6e2e4c74e0bf12632643ef8f63b",
+                  "source_utf8_bytes": 77
+                },
+                "status": "ok"
+              },
+              "portable-path-and-multi-scope-identity": {
+                "document": {
+                  "authority": "persona_vault",
+                  "canonical_content_id": "d0bd372abd2e2e33e8cf86b05853c12b160157e28864beab44f0d7ec90d2e5d8",
+                  "canonical_scalar_count": 69,
+                  "format": "markdown",
+                  "limits": {
+                    "max_chars": 48,
+                    "max_tokens": 12
+                  },
+                  "normalization": {
+                    "bom_removed": false,
+                    "frontmatter_removed": false,
+                    "line_endings_changed": false
+                  },
+                  "path": "Vault/Lore/Café.MD",
+                  "pocket": "vault-astra",
+                  "priority": 7,
+                  "records": [
+                    {
+                      "authority": "persona_vault",
+                      "embedding_profile_id": null,
+                      "id": "3181d3ab75e4e0c852ab76891f17e07f7e4cca33ffc1fd1e41bf038a78829898",
+                      "metadata": {
+                        "chunk_index": 0,
+                        "content_id": "68793b5a97446e388ab32527dd1612b63b4caffe38c7bdd273b2642d6d14a5c8",
+                        "heading": "Overview",
+                        "heading_level": 0,
+                        "indexing_contract": "rag-indexing-v1",
+                        "indexing_profile": "rag-indexing-v1-portable",
+                        "reference_targets": [],
+                        "section_index": 0,
+                        "text_end": 16,
+                        "text_start": 0,
+                        "token_estimate": 4
+                      },
+                      "path": "Vault/Lore/Café.MD",
+                      "pocket": "vault-astra",
+                      "priority": 7,
+                      "provenance": {
+                        "chunk_source": true,
+                        "file_source": true
+                      },
+                      "references": [],
+                      "scope": "persona:astra",
+                      "scopes": [
+                        "persona:astra",
+                        "workspace:demo"
+                      ],
+                      "source_id": "972e8c0f3cc0c40342a6d1e54c2d60195d44da460b4add6649c8946ed00fda95",
+                      "source_name": "Café.MD",
+                      "text": "Preamble signal."
+                    },
+                    {
+                      "authority": "persona_vault",
+                      "embedding_profile_id": null,
+                      "id": "2515b21bfb64dd61324e1d0f55430a2dc03fa9c9bbec0d6fee849d4641ec3cbe",
+                      "metadata": {
+                        "chunk_index": 1,
+                        "content_id": "0e3b54736112cadb66f86f514407a4015c570bbcb12b542dad41d9e40e7179f3",
+                        "heading": "North",
+                        "heading_level": 1,
+                        "indexing_contract": "rag-indexing-v1",
+                        "indexing_profile": "rag-indexing-v1-portable",
+                        "reference_targets": [],
+                        "section_index": 1,
+                        "text_end": 42,
+                        "text_start": 17,
+                        "token_estimate": 7
+                      },
+                      "path": "Vault/Lore/Café.MD",
+                      "pocket": "vault-astra",
+                      "priority": 7,
+                      "provenance": {
+                        "chunk_source": true,
+                        "file_source": true
+                      },
+                      "references": [],
+                      "scope": "persona:astra",
+                      "scopes": [
+                        "persona:astra",
+                        "workspace:demo"
+                      ],
+                      "source_id": "972e8c0f3cc0c40342a6d1e54c2d60195d44da460b4add6649c8946ed00fda95",
+                      "source_name": "Café.MD",
+                      "text": "# North\nCompass 🧭 signal."
+                    },
+                    {
+                      "authority": "persona_vault",
+                      "embedding_profile_id": null,
+                      "id": "db988de17993e6850bf7f5dbcca0baa1660ce47324e91fd8c69b8c39521a168a",
+                      "metadata": {
+                        "chunk_index": 2,
+                        "content_id": "7134faeb361cf9bf4a1d903f0eb101ac65146bea3fec61236b73bebe3fe80df7",
+                        "heading": "North",
+                        "heading_level": 1,
+                        "indexing_contract": "rag-indexing-v1",
+                        "indexing_profile": "rag-indexing-v1-portable",
+                        "reference_targets": [],
+                        "section_index": 2,
+                        "text_end": 69,
+                        "text_start": 43,
+                        "token_estimate": 7
+                      },
+                      "path": "Vault/Lore/Café.MD",
+                      "pocket": "vault-astra",
+                      "priority": 7,
+                      "provenance": {
+                        "chunk_source": true,
+                        "file_source": true
+                      },
+                      "references": [],
+                      "scope": "persona:astra",
+                      "scopes": [
+                        "persona:astra",
+                        "workspace:demo"
+                      ],
+                      "source_id": "972e8c0f3cc0c40342a6d1e54c2d60195d44da460b4add6649c8946ed00fda95",
+                      "source_name": "Café.MD",
+                      "text": "# North\nDuplicate heading."
+                    }
+                  ],
+                  "scopes": [
+                    "persona:astra",
+                    "workspace:demo"
+                  ],
+                  "source_content_id": "d0bd372abd2e2e33e8cf86b05853c12b160157e28864beab44f0d7ec90d2e5d8",
+                  "source_id": "972e8c0f3cc0c40342a6d1e54c2d60195d44da460b4add6649c8946ed00fda95",
+                  "source_utf8_bytes": 72
+                },
+                "status": "ok"
+              },
+              "reject-duplicate-scope": {
+                "error": {
+                  "code": "invalid_scopes"
+                },
+                "status": "error"
+              },
+              "reject-nul-text": {
+                "error": {
+                  "code": "invalid_text"
+                },
+                "status": "error"
+              },
+              "reject-parent-path": {
+                "error": {
+                  "code": "invalid_path"
+                },
+                "status": "error"
+              },
+              "reject-unsupported-format": {
+                "error": {
+                  "code": "unsupported_format"
+                },
+                "status": "error"
+              },
+              "text-soft-boundaries": {
+                "document": {
+                  "authority": "workspace_record",
+                  "canonical_content_id": "2d22c613fb6e728ab0d4d10a2e9da56c3e306eae6da380216ec61e28db3c0b64",
+                  "canonical_scalar_count": 53,
+                  "format": "text",
+                  "limits": {
+                    "max_chars": 24,
+                    "max_tokens": 20
+                  },
+                  "normalization": {
+                    "bom_removed": false,
+                    "frontmatter_removed": false,
+                    "line_endings_changed": false
+                  },
+                  "path": "notes/soft.txt",
+                  "pocket": "workspace",
+                  "priority": -2,
+                  "records": [
+                    {
+                      "authority": "workspace_record",
+                      "embedding_profile_id": null,
+                      "id": "377f599b060a4c761a4280022f1885cb4e0698e4b114d0239bb5362373078fe7",
+                      "metadata": {
+                        "chunk_index": 0,
+                        "content_id": "f819e4752f7850b40f990c9fc1409465cbf54ca050ebf70a3dd28cf33d3895e9",
+                        "heading": "Overview",
+                        "heading_level": 0,
+                        "indexing_contract": "rag-indexing-v1",
+                        "indexing_profile": "rag-indexing-v1-portable",
+                        "reference_targets": [],
+                        "section_index": 0,
+                        "text_end": 22,
+                        "text_start": 0,
+                        "token_estimate": 6
+                      },
+                      "path": "notes/soft.txt",
+                      "pocket": "workspace",
+                      "priority": -2,
+                      "provenance": {
+                        "chunk_source": true,
+                        "file_source": true
+                      },
+                      "references": [],
+                      "scope": "workspace:demo",
+                      "scopes": [
+                        "workspace:demo"
+                      ],
+                      "source_id": "c9c81ca76e27165a315b9cc47104c9ee8d56228d795446c4be1ac68325edae5e",
+                      "source_name": "soft.txt",
+                      "text": "Alpha beta gamma delta"
+                    },
+                    {
+                      "authority": "workspace_record",
+                      "embedding_profile_id": null,
+                      "id": "34c91960d0194010459b3d2e7b3f6187c9c12818e733fbe07ac25a11a2812177",
+                      "metadata": {
+                        "chunk_index": 1,
+                        "content_id": "916b9a21923563e67be173c179b33e6c151f70759de106228331108a01c8eedc",
+                        "heading": "Overview",
+                        "heading_level": 0,
+                        "indexing_contract": "rag-indexing-v1",
+                        "indexing_profile": "rag-indexing-v1-portable",
+                        "reference_targets": [],
+                        "section_index": 0,
+                        "text_end": 46,
+                        "text_start": 23,
+                        "token_estimate": 6
+                      },
+                      "path": "notes/soft.txt",
+                      "pocket": "workspace",
+                      "priority": -2,
+                      "provenance": {
+                        "chunk_source": true,
+                        "file_source": true
+                      },
+                      "references": [],
+                      "scope": "workspace:demo",
+                      "scopes": [
+                        "workspace:demo"
+                      ],
+                      "source_id": "c9c81ca76e27165a315b9cc47104c9ee8d56228d795446c4be1ac68325edae5e",
+                      "source_name": "soft.txt",
+                      "text": "Second line with value."
+                    },
+                    {
+                      "authority": "workspace_record",
+                      "embedding_profile_id": null,
+                      "id": "a4ecf672291463901f6b00d0a2556e44953df71d6e981167bc6fb2401d077bc4",
+                      "metadata": {
+                        "chunk_index": 2,
+                        "content_id": "560c6aac8e55899e661512b8cdc6ff34dd56e16bd26da1aa476a08c0dab187ff",
+                        "heading": "Overview",
+                        "heading_level": 0,
+                        "indexing_contract": "rag-indexing-v1",
+                        "indexing_profile": "rag-indexing-v1-portable",
+                        "reference_targets": [],
+                        "section_index": 0,
+                        "text_end": 53,
+                        "text_start": 47,
+                        "token_estimate": 2
+                      },
+                      "path": "notes/soft.txt",
+                      "pocket": "workspace",
+                      "priority": -2,
+                      "provenance": {
+                        "chunk_source": true,
+                        "file_source": true
+                      },
+                      "references": [],
+                      "scope": "workspace:demo",
+                      "scopes": [
+                        "workspace:demo"
+                      ],
+                      "source_id": "c9c81ca76e27165a315b9cc47104c9ee8d56228d795446c4be1ac68325edae5e",
+                      "source_name": "soft.txt",
+                      "text": "Third."
+                    }
+                  ],
+                  "scopes": [
+                    "workspace:demo"
+                  ],
+                  "source_content_id": "2d22c613fb6e728ab0d4d10a2e9da56c3e306eae6da380216ec61e28db3c0b64",
+                  "source_id": "c9c81ca76e27165a315b9cc47104c9ee8d56228d795446c4be1ac68325edae5e",
+                  "source_utf8_bytes": 53
+                },
+                "status": "ok"
+              },
+              "unclosed-frontmatter-preserved": {
+                "document": {
+                  "authority": "global_record",
+                  "canonical_content_id": "f0525d461610ad7bbec814d9d79c1b65c165448c89e4477c03cfa9a335273d0f",
+                  "canonical_scalar_count": 31,
+                  "format": "markdown",
+                  "limits": {
+                    "max_chars": 2400,
+                    "max_tokens": 600
+                  },
+                  "normalization": {
+                    "bom_removed": false,
+                    "frontmatter_removed": false,
+                    "line_endings_changed": false
+                  },
+                  "path": "open-frontmatter.md",
+                  "pocket": "global",
+                  "priority": 0,
+                  "records": [
+                    {
+                      "authority": "global_record",
+                      "embedding_profile_id": null,
+                      "id": "7e86229e0ed81ee74df250bf9f632b44ca3f089bb45789db216a48ae8448b84e",
+                      "metadata": {
+                        "chunk_index": 0,
+                        "content_id": "3485fffdc8e6900cb4f31e5314e487c1871ade5903c9f39f607e6ab989196422",
+                        "heading": "Overview",
+                        "heading_level": 0,
+                        "indexing_contract": "rag-indexing-v1",
+                        "indexing_profile": "rag-indexing-v1-portable",
+                        "reference_targets": [],
+                        "section_index": 0,
+                        "text_end": 19,
+                        "text_start": 0,
+                        "token_estimate": 5
+                      },
+                      "path": "open-frontmatter.md",
+                      "pocket": "global",
+                      "priority": 0,
+                      "provenance": {
+                        "chunk_source": true,
+                        "file_source": true
+                      },
+                      "references": [],
+                      "scope": "global",
+                      "scopes": [
+                        "global"
+                      ],
+                      "source_id": "f3bf72e7f53ee75d4679bc2b4aa21dad8e11a60924e2936f78a96f38949fa421",
+                      "source_name": "open-frontmatter.md",
+                      "text": "---\ntitle: retained"
+                    },
+                    {
+                      "authority": "global_record",
+                      "embedding_profile_id": null,
+                      "id": "370e8abb2c613b98c98df13679a2d0d778448a455d45ca2490e90d0436fbb3df",
+                      "metadata": {
+                        "chunk_index": 1,
+                        "content_id": "001bc1bb54d46b0bbe55b25a325e5780ab66755a7140bfe9c050e438f43edc34",
+                        "heading": "Body",
+                        "heading_level": 1,
+                        "indexing_contract": "rag-indexing-v1",
+                        "indexing_profile": "rag-indexing-v1-portable",
+                        "reference_targets": [],
+                        "section_index": 1,
+                        "text_end": 31,
+                        "text_start": 20,
+                        "token_estimate": 3
+                      },
+                      "path": "open-frontmatter.md",
+                      "pocket": "global",
+                      "priority": 0,
+                      "provenance": {
+                        "chunk_source": true,
+                        "file_source": true
+                      },
+                      "references": [],
+                      "scope": "global",
+                      "scopes": [
+                        "global"
+                      ],
+                      "source_id": "f3bf72e7f53ee75d4679bc2b4aa21dad8e11a60924e2936f78a96f38949fa421",
+                      "source_name": "open-frontmatter.md",
+                      "text": "# Body\nFact"
+                    }
+                  ],
+                  "scopes": [
+                    "global"
+                  ],
+                  "source_content_id": "f0525d461610ad7bbec814d9d79c1b65c165448c89e4477c03cfa9a335273d0f",
+                  "source_id": "f3bf72e7f53ee75d4679bc2b4aa21dad8e11a60924e2936f78a96f38949fa421",
+                  "source_utf8_bytes": 31
+                },
+                "status": "ok"
+              },
+              "unicode-scalar-hard-boundary": {
+                "document": {
+                  "authority": "workspace_record",
+                  "canonical_content_id": "34e0ef2576c522192cf7e746982886e629436d48233426a04246802f0eae82db",
+                  "canonical_scalar_count": 9,
+                  "format": "text",
+                  "limits": {
+                    "max_chars": 4,
+                    "max_tokens": 10
+                  },
+                  "normalization": {
+                    "bom_removed": false,
+                    "frontmatter_removed": false,
+                    "line_endings_changed": false
+                  },
+                  "path": "unicode/scalars.txt",
+                  "pocket": "workspace",
+                  "priority": 0,
+                  "records": [
+                    {
+                      "authority": "workspace_record",
+                      "embedding_profile_id": null,
+                      "id": "a49212e98ecaf5164ad333c5180907f895720e9d3e344b07653ebd9680288d26",
+                      "metadata": {
+                        "chunk_index": 0,
+                        "content_id": "43e430a23dfbd28e7dc745a46aa15395873f7c4072c3499c0fe03f76bd67f6ae",
+                        "heading": "Overview",
+                        "heading_level": 0,
+                        "indexing_contract": "rag-indexing-v1",
+                        "indexing_profile": "rag-indexing-v1-portable",
+                        "reference_targets": [],
+                        "section_index": 0,
+                        "text_end": 4,
+                        "text_start": 0,
+                        "token_estimate": 1
+                      },
+                      "path": "unicode/scalars.txt",
+                      "pocket": "workspace",
+                      "priority": 0,
+                      "provenance": {
+                        "chunk_source": true,
+                        "file_source": true
+                      },
+                      "references": [],
+                      "scope": "workspace:demo",
+                      "scopes": [
+                        "workspace:demo"
+                      ],
+                      "source_id": "26b1ee7fbae66883abb08b7632c656ceb33feab3bbbdc3fb82915f2e1ea7f8b2",
+                      "source_name": "scalars.txt",
+                      "text": "🧭界𐀀a"
+                    },
+                    {
+                      "authority": "workspace_record",
+                      "embedding_profile_id": null,
+                      "id": "45979a8a9435b7e92adcf05b330d9328604a4dcbd8c7f732ba08037636a6febb",
+                      "metadata": {
+                        "chunk_index": 1,
+                        "content_id": "aaaaf2863e043b9df604158ad5c16ff1adaf3fd7e9fcea5dcb322b6762b3b59a",
+                        "heading": "Overview",
+                        "heading_level": 0,
+                        "indexing_contract": "rag-indexing-v1",
+                        "indexing_profile": "rag-indexing-v1-portable",
+                        "reference_targets": [],
+                        "section_index": 0,
+                        "text_end": 8,
+                        "text_start": 4,
+                        "token_estimate": 1
+                      },
+                      "path": "unicode/scalars.txt",
+                      "pocket": "workspace",
+                      "priority": 0,
+                      "provenance": {
+                        "chunk_source": true,
+                        "file_source": true
+                      },
+                      "references": [],
+                      "scope": "workspace:demo",
+                      "scopes": [
+                        "workspace:demo"
+                      ],
+                      "source_id": "26b1ee7fbae66883abb08b7632c656ceb33feab3bbbdc3fb82915f2e1ea7f8b2",
+                      "source_name": "scalars.txt",
+                      "text": "bcde"
+                    },
+                    {
+                      "authority": "workspace_record",
+                      "embedding_profile_id": null,
+                      "id": "d2375d6f6649185a13837c3f6ecbc361ce4763d62e7f241f6026bd098f626095",
+                      "metadata": {
+                        "chunk_index": 2,
+                        "content_id": "252f10c83610ebca1a059c0bae8255eba2f95be4d1d7bcfa89d7248a82d9f111",
+                        "heading": "Overview",
+                        "heading_level": 0,
+                        "indexing_contract": "rag-indexing-v1",
+                        "indexing_profile": "rag-indexing-v1-portable",
+                        "reference_targets": [],
+                        "section_index": 0,
+                        "text_end": 9,
+                        "text_start": 8,
+                        "token_estimate": 1
+                      },
+                      "path": "unicode/scalars.txt",
+                      "pocket": "workspace",
+                      "priority": 0,
+                      "provenance": {
+                        "chunk_source": true,
+                        "file_source": true
+                      },
+                      "references": [],
+                      "scope": "workspace:demo",
+                      "scopes": [
+                        "workspace:demo"
+                      ],
+                      "source_id": "26b1ee7fbae66883abb08b7632c656ceb33feab3bbbdc3fb82915f2e1ea7f8b2",
+                      "source_name": "scalars.txt",
+                      "text": "f"
+                    }
+                  ],
+                  "scopes": [
+                    "workspace:demo"
+                  ],
+                  "source_content_id": "34e0ef2576c522192cf7e746982886e629436d48233426a04246802f0eae82db",
+                  "source_id": "26b1ee7fbae66883abb08b7632c656ceb33feab3bbbdc3fb82915f2e1ea7f8b2",
+                  "source_utf8_bytes": 17
+                },
+                "status": "ok"
+              }
+            },
+            "version": 1
+          },
+          "path": "rag-indexing-v1/expected.json",
+          "sha256": "292ac53054f9a7575287250a4aa957d82ea090cc6b8003e3dbabb4cd46aff3e9"
+        },
+        "manifest.json": {
+          "bytes": 1003,
+          "data": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "baseline_commits": {
+              "edgesymbio": "c26420bd66857a8a88e173f319f2575670d0fe3b",
+              "rag_method_py": "a132fe92b7191b8c37c4f85b8507c8fdc756a84a",
+              "tulpaweaver": "eb96433d5b66ca266339801668a0ff37eb486781"
+            },
+            "change_policy": "Freeze expected observations once; any later behavioral change requires a new indexing contract version.",
+            "contract": "rag-indexing-v1",
+            "files": {
+              "adapters": {
+                "javascript": "adapters/javascript.md",
+                "python": "adapters/python.md",
+                "rust": "adapters/rust.md"
+              },
+              "document_schema": "document.schema.json",
+              "expected": "expected.json",
+              "fixtures": "fixture-documents.json",
+              "observation_schema": "observation.schema.json",
+              "profile": "indexing-profile.json",
+              "report_schema": "report.schema.json"
+            },
+            "fixture_counts": {
+              "cases": 12,
+              "errors": 4,
+              "success": 8
+            },
+            "owner": "RAG-Method-PY",
+            "status": "frozen",
+            "version": 1
+          },
+          "path": "rag-indexing-v1/manifest.json",
+          "sha256": "964a837a0907b8ae3c0ae648fbf6f818aa5c1e28b29dbfa73643ca18d1fcc859"
+        },
+        "observation.schema.json": {
+          "bytes": 2854,
+          "data": {
+            "$defs": {
+              "indexed_document": {
+                "additionalProperties": false,
+                "properties": {
+                  "authority": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "canonical_content_id": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "canonical_scalar_count": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "format": {
+                    "enum": [
+                      "markdown",
+                      "text"
+                    ]
+                  },
+                  "limits": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "max_chars": {
+                        "maximum": 2400,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "max_tokens": {
+                        "maximum": 600,
+                        "minimum": 1,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "max_chars",
+                      "max_tokens"
+                    ],
+                    "type": "object"
+                  },
+                  "normalization": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "bom_removed": {
+                        "type": "boolean"
+                      },
+                      "frontmatter_removed": {
+                        "type": "boolean"
+                      },
+                      "line_endings_changed": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "bom_removed",
+                      "line_endings_changed",
+                      "frontmatter_removed"
+                    ],
+                    "type": "object"
+                  },
+                  "path": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "pocket": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "priority": {
+                    "maximum": 100,
+                    "minimum": -100,
+                    "type": "integer"
+                  },
+                  "records": {
+                    "items": {
+                      "$ref": "../rag-behavior-v2/record.schema.json"
+                    },
+                    "type": "array"
+                  },
+                  "scopes": {
+                    "items": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "type": "array",
+                    "uniqueItems": true
+                  },
+                  "source_content_id": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "source_id": {
+                    "pattern": "^[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "source_utf8_bytes": {
+                    "maximum": 10485760,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "format",
+                  "path",
+                  "pocket",
+                  "scopes",
+                  "authority",
+                  "priority",
+                  "source_id",
+                  "source_content_id",
+                  "source_utf8_bytes",
+                  "canonical_content_id",
+                  "canonical_scalar_count",
+                  "normalization",
+                  "limits",
+                  "records"
+                ],
+                "type": "object"
+              }
+            },
+            "$id": "rag-indexing-v1/observation.schema.json",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "document": {
+                    "$ref": "#/$defs/indexed_document"
+                  },
+                  "status": {
+                    "const": "ok"
+                  }
+                },
+                "required": [
+                  "status",
+                  "document"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "error": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "code": {
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "code"
+                    ],
+                    "type": "object"
+                  },
+                  "status": {
+                    "const": "error"
+                  }
+                },
+                "required": [
+                  "status",
+                  "error"
+                ],
+                "type": "object"
+              }
+            ],
+            "title": "Portable RAG indexing observation"
+          },
+          "path": "rag-indexing-v1/observation.schema.json",
+          "sha256": "9a0893f18b0421f72c5c9e50e92a2f7835b636eb3055d446fe9b9bcd4e728bdd"
+        },
+        "report.schema.json": {
+          "bytes": 1781,
+          "data": {
+            "$id": "rag-indexing-v1/report.schema.json",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "properties": {
+              "contract": {
+                "const": "rag-indexing-v1-report"
+              },
+              "profile_id": {
+                "const": "rag-indexing-v1-portable"
+              },
+              "repository": {
+                "additionalProperties": false,
+                "properties": {
+                  "commit": {
+                    "pattern": "^[0-9a-f]{40}$",
+                    "type": "string"
+                  },
+                  "dirty": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "commit",
+                  "dirty"
+                ],
+                "type": "object"
+              },
+              "results": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "actual": {
+                      "$ref": "observation.schema.json"
+                    },
+                    "expected": {
+                      "$ref": "observation.schema.json"
+                    },
+                    "id": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "passed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "passed",
+                    "expected",
+                    "actual"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "runner": {
+                "additionalProperties": false,
+                "properties": {
+                  "implementation": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "language": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "version": {
+                    "const": 1
+                  }
+                },
+                "required": [
+                  "implementation",
+                  "language",
+                  "version"
+                ],
+                "type": "object"
+              },
+              "summary": {
+                "additionalProperties": false,
+                "properties": {
+                  "cases": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "failed": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "passed": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "cases",
+                  "passed",
+                  "failed"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "contract",
+              "profile_id",
+              "runner",
+              "repository",
+              "summary",
+              "results"
+            ],
+            "title": "Portable RAG indexing adapter report",
+            "type": "object"
+          },
+          "path": "rag-indexing-v1/report.schema.json",
+          "sha256": "706f2b6e30a3f618eb85a25cf9301ec23841e74c7da5b1161b011b43841aa8ea"
+        }
+      },
+      "input_digests": {
+        "adapters/javascript.md": "77ad34f7d1ac83d5eb4a15298577453c89e2f2e767f41a7cf4660b06b841985c",
+        "adapters/python.md": "2bf66bc76126d2e7871b3e8dcd25e4bb3c11c362fb814435b51471bac6080bc7",
+        "adapters/rust.md": "5e9f98cddead3105248bd568b3a2bc8ff28efacf54c67787d73b811e622ed5eb",
+        "document.schema.json": "72d6a3c50cce7560796230bb02fca3312e1d31c84a176d8e105d46536ad2ac7c",
+        "expected.json": "292ac53054f9a7575287250a4aa957d82ea090cc6b8003e3dbabb4cd46aff3e9",
+        "manifest.json": "964a837a0907b8ae3c0ae648fbf6f818aa5c1e28b29dbfa73643ca18d1fcc859",
+        "observation.schema.json": "9a0893f18b0421f72c5c9e50e92a2f7835b636eb3055d446fe9b9bcd4e728bdd",
+        "report.schema.json": "706f2b6e30a3f618eb85a25cf9301ec23841e74c7da5b1161b011b43841aa8ea"
+      },
+      "source_manifest_sha256": "964a837a0907b8ae3c0ae648fbf6f818aa5c1e28b29dbfa73643ca18d1fcc859",
+      "version": 1
+    }
+  },
+  "generated_from": "contracts/",
+  "schema": "browser-rag-ts-proof-contract-v2",
+  "snapshot_digest": "02518181463859be4038a8822b3f7a1c4ede8f5a20407a6ac62e164046aeaaad"
+}

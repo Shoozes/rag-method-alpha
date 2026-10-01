@@ -1,0 +1,31 @@
+{
+  "contract": "rag-core-v1",
+  "profile": "rag-core-v1-default",
+  "version": 1,
+  "scoring": {
+    "exact_weight_micro": 450000,
+    "keyword_weight_micro": 300000,
+    "semantic_weight_micro": 250000,
+    "authority_weight_micro": 25000,
+    "priority_weight_micro": 25000,
+    "reference_weight_micro": 50000,
+    "tie_break": ["score_micro_desc", "source_id_asc", "path_asc", "id_asc"]
+  },
+  "modes": ["exact_only", "semantic_only", "keyword_only", "hybrid", "scoped_hybrid"],
+  "scope": {
+    "deny_first": true,
+    "all_token": "all"
+  },
+  "limits": {
+    "max_query_chars": 4000,
+    "max_records": 50000,
+    "max_top_k": 100,
+    "max_context_tokens": 8000,
+    "max_reference_expansion": 8,
+    "max_per_source": 8
+  },
+  "external_adapters": {
+    "edgesymbio": {"status": "gated", "owner": "external repository"},
+    "tulpaweaver": {"status": "gated", "owner": "external repository"}
+  }
+}

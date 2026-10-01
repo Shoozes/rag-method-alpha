@@ -1,0 +1,32 @@
+{
+  "contract": "rag-behavior-v2-fixture-vectors",
+  "version": 2,
+  "profile_id": "rag-behavior-v2-fixture-v1",
+  "dimension": 4,
+  "record_vectors": {
+    "global-handbook": [1.0, 0.0, 0.0, 0.0],
+    "private-persona-note": [0.0, 1.0, 0.0, 0.0],
+    "workspace-plan": [0.8, 0.6, 0.0, 0.0],
+    "release-checklist": [0.6, 0.8, 0.0, 0.0],
+    "memory-fact": [0.8, 0.6, 0.0, 0.0],
+    "unclassified-note": [0.7, 0.714142842854285, 0.0, 0.0],
+    "duplicate-a": [0.0, 0.0, 1.0, 0.0],
+    "duplicate-b": [0.0, 0.0, 1.0, 0.0],
+    "multi-1": [0.0, 0.0, 0.0, 1.0],
+    "multi-2": [0.0, 0.0, 0.0, 1.0],
+    "other-1": [0.0, 0.0, 0.0, 1.0],
+    "semantic-boundary": [1.0, 4.898979485566356, 0.0, 0.0],
+    "semantic-below": [1.0, 5.0, 0.0, 0.0],
+    "profile-mismatch": [1.0, 0.0, 0.0, 0.0],
+    "budget-short": [0.0, 0.0, 0.0, 1.0],
+    "budget-long": [0.0, 0.0, 0.0, 1.0],
+    "unicode-record": [0.0, 0.0, 1.0, 0.0],
+    "scope-workspace": [0.0, 1.0, 0.0, 0.0],
+    "scope-project": [0.0, 1.0, 0.0, 0.0]
+  },
+  "query_vectors": {
+    "semantic-release": [1.0, 0.0, 0.0, 0.0],
+    "semantic-threshold": [1.0, 0.0, 0.0, 0.0],
+    "semantic-mismatch": [1.0, 0.0, 0.0, 0.0]
+  }
+}

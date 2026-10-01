@@ -1,0 +1,9 @@
+{
+  "$schema": "./module.schema.json",
+  "id": "browser-rag-ts",
+  "version": "0.1.0",
+  "status": "experimental",
+  "stable_lab_baseline": "25cba8ce241b75e4509abf7150aeb23465860654",
+  "retrieval_contract": "rag-behavior-v2",
+  "indexing_contract": "rag-indexing-v1"
+}

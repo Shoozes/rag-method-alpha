@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rag-behavior-v2/response.schema.json",
+  "title": "RAG behavior v2 response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "mode",
+    "eligible_ids",
+    "candidate_ids",
+    "results",
+    "context_selected_ids",
+    "context_tokens",
+    "truncated",
+    "semantic_state",
+    "semantic_fallback_reason",
+    "errors"
+  ],
+  "properties": {
+    "contract": {"const": "rag-behavior-v2"},
+    "mode": {
+      "enum": ["exact_only", "semantic_only", "keyword_only", "hybrid", "scoped_hybrid"]
+    },
+    "eligible_ids": {"$ref": "#/$defs/ids"},
+    "candidate_ids": {"$ref": "#/$defs/ids"},
+    "context_selected_ids": {"$ref": "#/$defs/ids"},
+    "context_tokens": {"type": "integer", "minimum": 0},
+    "truncated": {"type": "boolean"},
+    "semantic_state": {
+      "enum": ["not_requested", "ready", "disabled_by_settings", "lexical_fallback"]
+    },
+    "semantic_fallback_reason": {
+      "type": ["string", "null"],
+      "enum": [null, "disabled_by_settings", "no_compatible_vectors", "embedding_failed"]
+    },
+    "errors": {"type": "array", "items": {"type": "string"}},
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "record",
+          "score_micro",
+          "score",
+          "match_type",
+          "scope_priority",
+          "cross_reference_from_id",
+          "components"
+        ],
+        "properties": {
+          "record": {"$ref": "record.schema.json"},
+          "score_micro": {"type": "integer", "minimum": 0, "maximum": 1000000},
+          "score": {"type": "number", "minimum": 0, "maximum": 1},
+          "match_type": {"enum": ["exact", "semantic", "keyword", "cross_reference", "none"]},
+          "scope_priority": {"type": "integer", "minimum": -100, "maximum": 100},
+          "cross_reference_from_id": {"type": ["string", "null"]},
+          "components": {"$ref": "#/$defs/components"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "components": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exact_micro",
+        "semantic_micro",
+        "keyword_micro",
+        "scope_micro",
+        "provenance_micro",
+        "authority_micro",
+        "priority_micro",
+        "aspect_coverage_micro",
+        "cross_reference_micro"
+      ],
+      "properties": {
+        "exact_micro": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "semantic_micro": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "keyword_micro": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "scope_micro": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "provenance_micro": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "authority_micro": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "priority_micro": {"type": "integer", "minimum": -1000000, "maximum": 1000000},
+        "aspect_coverage_micro": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "cross_reference_micro": {"type": "integer", "minimum": 0, "maximum": 1000000}
+      }
+    }
+  }
+}

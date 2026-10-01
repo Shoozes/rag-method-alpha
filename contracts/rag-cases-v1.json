@@ -1,0 +1,45 @@
+{
+  "contract": "rag-core-v1",
+  "version": 1,
+  "records": [
+    {
+      "id": "global-release",
+      "text": "The release canary is amber and belongs to the global handbook.",
+      "source_id": "global-handbook",
+      "path": "global-handbook.md",
+      "scope": "global",
+      "authority": "system"
+    },
+    {
+      "id": "private-release",
+      "text": "The private canary is violet.",
+      "source_id": "private-note",
+      "path": "private-note.md",
+      "scope": "persona:private",
+      "authority": "local-file"
+    },
+    {
+      "id": "workspace-plan",
+      "text": "Project Edge uses an amber release canary and links to the release checklist.",
+      "source_id": "workspace",
+      "path": "workspace-plan.md",
+      "scope": "workspace:edge",
+      "authority": "workspace",
+      "references": ["workspace-checklist"]
+    },
+    {
+      "id": "workspace-checklist",
+      "text": "Release checklist verifies scope isolation and persistence.",
+      "source_id": "workspace",
+      "path": "release-checklist.md",
+      "scope": "workspace:edge",
+      "authority": "workspace"
+    }
+  ],
+  "cases": [
+    {"id": "exact", "query": "release canary is amber", "mode": "exact_only", "expected_ids": ["global-release"]},
+    {"id": "keyword", "query": "scope isolation persistence", "mode": "keyword_only", "expected_ids": ["workspace-checklist"]},
+    {"id": "deny_first", "query": "canary", "mode": "scoped_hybrid", "include_scopes": ["global", "persona:private"], "exclude_scopes": ["persona:private"], "expected_ids": ["global-release"]},
+    {"id": "reference", "query": "project edge amber", "mode": "scoped_hybrid", "include_scopes": ["workspace:edge"], "expected_ids": ["workspace-plan", "workspace-checklist"]}
+  ]
+}

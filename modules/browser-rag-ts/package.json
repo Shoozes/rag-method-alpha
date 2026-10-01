@@ -1,0 +1,39 @@
+{
+  "name": "@rag-method/browser-rag-ts",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "contracts:sync": "node scripts/sync-contracts.mjs",
+    "contracts:check": "node scripts/sync-contracts.mjs --check",
+    "core:check": "node scripts/check-core-boundaries.mjs",
+    "vendor:check": "node scripts/check-vendor.mjs",
+    "worker-bundle:check": "node scripts/check-worker-bundle.mjs",
+    "artifact:stage": "node scripts/stage-static-artifact.mjs",
+    "static:check": "node scripts/check-static-dist.mjs",
+    "tool:info": "node scripts/tool-info.mjs",
+    "typecheck": "node scripts/tsc.mjs",
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/check-vendor.mjs && node --test tests/artifact/static-artifact.test.mjs tests/artifact/public-source.test.mjs tests/presentation/node-spawn-motion.test.mjs && node scripts/test.mjs",
+    "test:indexing": "node scripts/test.mjs indexing",
+    "test:retrieval": "node scripts/test.mjs retrieval",
+    "test:shared": "node scripts/test.mjs shared",
+    "unicode:check": "node scripts/check-unicode.mjs",
+    "adapter:conformance": "node scripts/test.mjs && node scripts/adapter-conformance.mjs",
+    "report:indexing": "node scripts/report-indexing.mjs",
+    "report:retrieval": "node scripts/report-retrieval.mjs",
+    "report:worker:prepare": "node scripts/prepare-worker-reports.mjs",
+    "dev": "node scripts/vite.mjs"
+  },
+  "devDependencies": {
+    "@types/three": "0.185.0",
+    "playwright": "1.62.0",
+    "typescript": "5.9.3",
+    "vite": "7.3.6"
+  },
+  "dependencies": {
+    "@ours/forcegraph-tsl": "file:vendor/ours-forcegraph-tsl-0.3.0-alpha.1.tgz",
+    "three": "0.185.0"
+  }
+}

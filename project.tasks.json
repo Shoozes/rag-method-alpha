@@ -1,0 +1,322 @@
+{
+  "schema": "gknome_task_registry_v1",
+  "project": "rag-method",
+  "description": "App-focused setup, run, and test declarations. Setup is an explicit choice.",
+  "tasks": [
+    {
+      "id": "setup-browser",
+      "label": "Set up browser explorer",
+      "description": "Explicit locked npm installation for the browser application.",
+      "explicit_setup": true,
+      "spec": {
+        "kind": "process",
+        "program": "npm.cmd",
+        "args": [
+          "ci",
+          "--ignore-scripts",
+          "--no-audit",
+          "--no-fund"
+        ],
+        "working_directory": "modules/browser-rag-ts"
+      }
+    },
+    {
+      "id": "browser-rag-run",
+      "label": "Run browser explorer",
+      "description": "Start the loopback explorer with prepared npm dependencies; no Python required.",
+      "alias": "run-browser",
+      "spec": {
+        "kind": "process",
+        "program": "npm.cmd",
+        "args": [
+          "run",
+          "dev"
+        ],
+        "working_directory": "modules/browser-rag-ts"
+      }
+    },
+    {
+      "id": "browser-rag-unit",
+      "label": "Check browser implementation",
+      "description": "Check frozen snapshots, Unicode/core boundaries, types, graph bytes, notices, and units.",
+      "alias": "test-browser-unit",
+      "spec": {
+        "kind": "sequence",
+        "tasks": [
+          {
+            "kind": "check",
+            "program": "npm.cmd",
+            "args": [
+              "run",
+              "contracts:check"
+            ],
+            "working_directory": "modules/browser-rag-ts",
+            "timeout_ms": 180000,
+            "max_output_bytes": 4194304
+          },
+          {
+            "kind": "check",
+            "program": "npm.cmd",
+            "args": [
+              "run",
+              "core:check"
+            ],
+            "working_directory": "modules/browser-rag-ts",
+            "timeout_ms": 180000,
+            "max_output_bytes": 4194304
+          },
+          {
+            "kind": "check",
+            "program": "npm.cmd",
+            "args": [
+              "run",
+              "unicode:check"
+            ],
+            "working_directory": "modules/browser-rag-ts",
+            "timeout_ms": 180000,
+            "max_output_bytes": 4194304
+          },
+          {
+            "kind": "check",
+            "program": "npm.cmd",
+            "args": [
+              "run",
+              "typecheck"
+            ],
+            "working_directory": "modules/browser-rag-ts",
+            "timeout_ms": 180000,
+            "max_output_bytes": 4194304
+          },
+          {
+            "kind": "check",
+            "program": "npm.cmd",
+            "args": [
+              "test"
+            ],
+            "working_directory": "modules/browser-rag-ts",
+            "timeout_ms": 180000,
+            "max_output_bytes": 4194304
+          }
+        ]
+      }
+    },
+    {
+      "id": "browser-rag-build",
+      "label": "Build static browser artifact",
+      "description": "Build and validate output against the exact public source manifest.",
+      "alias": "build-browser",
+      "spec": {
+        "kind": "process",
+        "program": "npm.cmd",
+        "args": [
+          "run",
+          "build"
+        ],
+        "working_directory": "modules/browser-rag-ts"
+      }
+    },
+    {
+      "id": "setup-lab",
+      "label": "Set up Python/React Lab",
+      "description": "Explicit Python 3.12 locked environment and frontend npm installation.",
+      "explicit_setup": true,
+      "spec": {
+        "kind": "process",
+        "program": "python.exe",
+        "args": [
+          "-B",
+          "scripts/setup_lab.py"
+        ],
+        "working_directory": "."
+      }
+    },
+    {
+      "id": "visual-run",
+      "label": "Run local Lab",
+      "description": "Managed loopback launch and cleanup through the prepared Lab Python.",
+      "alias": "run-lab",
+      "spec": {
+        "kind": "process",
+        "program": "python.exe",
+        "args": [
+          "-B",
+          "scripts/run.py",
+          "-Task",
+          "visual-run"
+        ],
+        "working_directory": "."
+      }
+    },
+    {
+      "id": "test",
+      "label": "Check local Lab",
+      "description": "Run the existing portable application verification; use the prepared Lab Python.",
+      "alias": "test-lab",
+      "spec": {
+        "kind": "process",
+        "program": "python.exe",
+        "args": [
+          "-B",
+          "scripts/run.py",
+          "-Task",
+          "test"
+        ],
+        "working_directory": "."
+      }
+    },
+    {
+      "id": "rag-contract",
+      "label": "Check frozen retrieval method",
+      "description": "Run the 15 reference cases through the portable Python app runner.",
+      "spec": {
+        "kind": "process",
+        "program": "python.exe",
+        "args": [
+          "-B",
+          "scripts/run.py",
+          "-Task",
+          "rag-contract"
+        ],
+        "working_directory": "."
+      }
+    },
+    {
+      "id": "rag-indexing-contract",
+      "label": "Check frozen indexing method",
+      "description": "Run the 12 raw Markdown/text reference cases through the portable app runner.",
+      "spec": {
+        "kind": "process",
+        "program": "python.exe",
+        "args": [
+          "-B",
+          "scripts/run.py",
+          "-Task",
+          "rag-indexing-contract"
+        ],
+        "working_directory": "."
+      }
+    },
+    {
+      "id": "browser-rag-smoke",
+      "label": "Run explorer browser journey",
+      "description": "Explicit application lifecycle and Python/Node/Worker evidence with local Chromium.",
+      "alias": "test-browser",
+      "spec": {
+        "kind": "process",
+        "program": "python.exe",
+        "args": [
+          "-B",
+          "scripts/run.py",
+          "-Task",
+          "browser-rag-smoke"
+        ],
+        "working_directory": "."
+      }
+    },
+    {
+      "id": "browser-smoke",
+      "label": "Run Lab browser journey",
+      "description": "Explicit UI/import/report/cancellation/cleanup evidence with local Chromium.",
+      "alias": "test-lab-browser",
+      "spec": {
+        "kind": "process",
+        "program": "python.exe",
+        "args": [
+          "-B",
+          "scripts/run.py",
+          "-Task",
+          "browser-smoke"
+        ],
+        "working_directory": "."
+      }
+    },
+    {
+      "id": "test-method",
+      "label": "Check both frozen methods",
+      "description": "Run indexing and retrieval reference cases.",
+      "menu": false,
+      "spec": {
+        "kind": "sequence",
+        "tasks": [
+          {
+            "kind": "check",
+            "program": "python.exe",
+            "args": [
+              "-B",
+              "scripts/run.py",
+              "-Task",
+              "rag-indexing-contract"
+            ],
+            "working_directory": ".",
+            "timeout_ms": 60000,
+            "max_output_bytes": 1048576
+          },
+          {
+            "kind": "check",
+            "program": "python.exe",
+            "args": [
+              "-B",
+              "scripts/run.py",
+              "-Task",
+              "rag-contract"
+            ],
+            "working_directory": ".",
+            "timeout_ms": 60000,
+            "max_output_bytes": 1048576
+          }
+        ]
+      }
+    },
+    {
+      "id": "backend-test",
+      "label": "Run backend tests",
+      "description": "Active application unit/failure/API/launcher tests.",
+      "menu": false,
+      "spec": {
+        "kind": "process",
+        "program": "python.exe",
+        "args": [
+          "-B",
+          "scripts/run.py",
+          "-Task",
+          "backend-test"
+        ],
+        "working_directory": "."
+      }
+    },
+    {
+      "id": "frontend-test",
+      "label": "Check Lab frontend",
+      "description": "Existing frontend typecheck and build.",
+      "menu": false,
+      "spec": {
+        "kind": "process",
+        "program": "python.exe",
+        "args": [
+          "-B",
+          "scripts/run.py",
+          "-Task",
+          "frontend-test"
+        ],
+        "working_directory": "."
+      }
+    },
+    {
+      "id": "browser-rag-test",
+      "label": "Run full prepared browser checks",
+      "description": "Existing portable application checks, build, and Unicode/adapter comparison; no clean-Git workflow.",
+      "menu": false,
+      "spec": {
+        "kind": "process",
+        "program": "python.exe",
+        "args": [
+          "-B",
+          "scripts/run.py",
+          "-Task",
+          "browser-rag-test"
+        ],
+        "working_directory": "."
+      }
+    }
+  ]
+}

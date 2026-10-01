@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rag-behavior-v2/record.schema.json",
+  "title": "RAG behavior v2 record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "text",
+    "source_id",
+    "source_name",
+    "path",
+    "pocket",
+    "scopes",
+    "authority",
+    "priority",
+    "provenance",
+    "references",
+    "embedding_profile_id"
+  ],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "text": {"type": "string", "minLength": 1},
+    "source_id": {"type": "string", "minLength": 1},
+    "source_name": {"type": "string", "minLength": 1},
+    "path": {"type": "string"},
+    "pocket": {"type": "string", "minLength": 1},
+    "scope": {"type": "string", "minLength": 1},
+    "scopes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "authority": {
+      "enum": [
+        "global_record",
+        "workspace_record",
+        "persona_vault",
+        "conversation_memory",
+        "unclassified"
+      ]
+    },
+    "priority": {"type": "integer", "minimum": -100, "maximum": 100},
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file_source", "chunk_source"],
+      "properties": {
+        "file_source": {"type": "boolean"},
+        "chunk_source": {"type": "boolean"}
+      }
+    },
+    "references": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "embedding_profile_id": {"type": ["string", "null"], "minLength": 1},
+    "metadata": {"type": "object"}
+  }
+}

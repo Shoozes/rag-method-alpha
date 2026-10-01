@@ -1,0 +1,115 @@
+{
+  "schema": "browser-rag-ts-unicode-conformance-v1",
+  "metadata": {
+    "generator": "scripts/browser_rag_unicode_conformance.py",
+    "generator_version": "casefold-v1",
+    "python_version": "3.13.3",
+    "unicode_version": "15.1.0",
+    "mapping_entries": 1530,
+    "table_sha256": "a1a363e5a7bd6347b6b391bb45a92f20d35d30034f0d0bb6b0dbab8398f69ca9"
+  },
+  "cases": [
+    {
+      "id": "street_sharp_s",
+      "input": "Straße",
+      "retrieval_lowercase": "straße",
+      "identity_casefold": "strasse"
+    },
+    {
+      "id": "street_ascii",
+      "input": "STRASSE",
+      "retrieval_lowercase": "strasse",
+      "identity_casefold": "strasse"
+    },
+    {
+      "id": "greek_final_sigma",
+      "input": "ΟΣ",
+      "retrieval_lowercase": "ος",
+      "identity_casefold": "οσ"
+    },
+    {
+      "id": "cyrillic",
+      "input": "КИРИЛЛИЦА",
+      "retrieval_lowercase": "кириллица",
+      "identity_casefold": "кириллица"
+    },
+    {
+      "id": "cherokee",
+      "input": "Ꭰꭰ",
+      "retrieval_lowercase": "ꭰꭰ",
+      "identity_casefold": "ᎠᎠ"
+    },
+    {
+      "id": "contract_whitespace",
+      "input": "Alpha Beta Gamma ",
+      "retrieval_lowercase": "alpha beta gamma",
+      "identity_casefold": "alpha beta gamma"
+    },
+    {
+      "id": "combining",
+      "input": "Café",
+      "retrieval_lowercase": "café",
+      "identity_casefold": "café"
+    },
+    {
+      "id": "supplementary",
+      "input": "𐀀🧭",
+      "retrieval_lowercase": "𐀀🧭",
+      "identity_casefold": "𐀀🧭"
+    }
+  ],
+  "distinctions": {
+    "street_retrieval_values_must_differ": [
+      "straße",
+      "strasse"
+    ],
+    "street_identity_values_must_match": "strasse"
+  },
+  "identity_test_vectors": {
+    "canonical_hash": {
+      "parts": [
+        "",
+        "é",
+        "🧭"
+      ],
+      "expected": "328ebac536f33028ea6b8879ecb70450374c408872c2ef2302f7e2e02c199360"
+    },
+    "content_id": {
+      "text": "Café 🧭",
+      "expected": "64d52a724725f19a89c6e135eda4d57e27cefbb0709a50b42687cfa6dd3a249c"
+    },
+    "source_id": {
+      "source_kind": " FILE ",
+      "pocket": "  Ｄｏｃｓ \t",
+      "source_key": " Folder\\A.TXT ",
+      "expected": "338300efd243f481b5fa7556e26134cd1f0bf9c255e98b133cde799bbddb669d"
+    },
+    "source_chunk_id": {
+      "source_id": "338300efd243f481b5fa7556e26134cd1f0bf9c255e98b133cde799bbddb669d",
+      "chunk_index": 12,
+      "text_start": null,
+      "text_end": null,
+      "content_id": "64d52a724725f19a89c6e135eda4d57e27cefbb0709a50b42687cfa6dd3a249c",
+      "expected": "7ec598b2f164701ebd406ce881da482b3c5e45149be4db50bf7341552f2eede7"
+    },
+    "embedding_id": {
+      "chunk_id": "7ec598b2f164701ebd406ce881da482b3c5e45149be4db50bf7341552f2eede7",
+      "profile_id": "profile:v2",
+      "expected": "c871a6269b78c977ce85d3e417b2aaaec5d9421499ea7836eb02cde82be1f86e"
+    }
+  },
+  "scope_cases": [
+    {
+      "input": " workspace:edge ",
+      "normalized": "workspace:edge"
+    },
+    {
+      "input": "Persona:Private",
+      "normalized": "Persona:Private"
+    }
+  ],
+  "invalid_utf16_code_units": [
+    "D800",
+    "DC00"
+  ]
+}

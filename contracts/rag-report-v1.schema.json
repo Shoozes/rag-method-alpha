@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rag-report-v1.schema.json",
+  "title": "RAG Core v1 differential report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "runner", "cases", "passed", "failed"],
+  "properties": {
+    "contract": {"const": "rag-core-v1-report"},
+    "runner": {"type": "string", "minLength": 1},
+    "cases": {"type": "integer", "minimum": 0},
+    "passed": {"type": "integer", "minimum": 0},
+    "failed": {"type": "integer", "minimum": 0},
+    "results": {"type": "array", "items": {"type": "object"}}
+  }
+}

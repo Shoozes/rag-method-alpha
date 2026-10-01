@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract": "rag-behavior-v2",
+  "version": 2,
+  "status": "frozen",
+  "owner": "RAG-Method-PY",
+  "baseline_commits": {
+    "rag_method_py": "f5453a1a45a6666771abfebb0d38ae9fae742681",
+    "edgesymbio": "d73f3af94518487fbeb8e38fbd594b52cb6cf2da",
+    "tulpaweaver": "0fb0e9c23ae083da54f06b311f0482834d61135f"
+  },
+  "fixture_counts": {
+    "records": 19,
+    "cases": 15,
+    "expected_modes": 5,
+    "identity_vectors": 5
+  },
+  "files": {
+    "profile": "retrieval-profile.json",
+    "record_schema": "record.schema.json",
+    "query_schema": "query.schema.json",
+    "response_schema": "response.schema.json",
+    "report_schema": "report.schema.json",
+    "cases": "cases.json",
+    "records": "fixture-records.json",
+    "vectors": "fixture-vectors.json",
+    "expected": {
+      "exact_only": "expected/exact-only.json",
+      "keyword_only": "expected/keyword-only.json",
+      "semantic_only": "expected/semantic-only.json",
+      "hybrid": "expected/hybrid.json",
+      "scoped_hybrid": "expected/scoped-hybrid.json"
+    },
+    "adapters": {
+      "python": "adapters/python.md",
+      "rust": "adapters/rust.md",
+      "javascript": "adapters/javascript.md"
+    }
+  },
+  "change_policy": "Any behavioral change requires a new contract version; adapters must not rewrite expectations."
+}

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rag-indexing-v1/report.schema.json",
+  "title": "Portable RAG indexing adapter report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "profile_id", "runner", "repository", "summary", "results"],
+  "properties": {
+    "contract": {"const": "rag-indexing-v1-report"},
+    "profile_id": {"const": "rag-indexing-v1-portable"},
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["implementation", "language", "version"],
+      "properties": {
+        "implementation": {"type": "string", "minLength": 1},
+        "language": {"type": "string", "minLength": 1},
+        "version": {"const": 1}
+      }
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "dirty"],
+      "properties": {
+        "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "dirty": {"type": "boolean"}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cases", "passed", "failed"],
+      "properties": {
+        "cases": {"type": "integer", "minimum": 1},
+        "passed": {"type": "integer", "minimum": 0},
+        "failed": {"type": "integer", "minimum": 0}
+      }
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "passed", "expected", "actual"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "passed": {"type": "boolean"},
+          "expected": {"$ref": "observation.schema.json"},
+          "actual": {"$ref": "observation.schema.json"}
+        }
+      }
+    }
+  }
+}

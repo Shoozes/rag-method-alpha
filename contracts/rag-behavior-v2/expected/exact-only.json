@@ -1,0 +1,302 @@
+{
+  "contract": "rag-behavior-v2-expected",
+  "version": 2,
+  "mode": "exact_only",
+  "cases": {
+    "exact_phrase": {
+      "eligible_ids": ["global-handbook"],
+      "candidate_ids": ["global-handbook"],
+      "ordered_ids": ["global-handbook"],
+      "scores": [
+        {
+          "id": "global-handbook",
+          "score_micro": 450000,
+          "components": {
+            "exact_micro": 1000000,
+            "semantic_micro": 0,
+            "keyword_micro": 0,
+            "scope_micro": 1000000,
+            "provenance_micro": 1000000,
+            "authority_micro": 1000000,
+            "priority_micro": 0,
+            "aspect_coverage_micro": 1000000,
+            "cross_reference_micro": 0
+          },
+          "cross_reference_from_id": null
+        }
+      ],
+      "context_selected_ids": ["global-handbook"],
+      "context_tokens": 48,
+      "truncated": false,
+      "semantic_state": "not_requested",
+      "semantic_fallback_reason": null,
+      "errors": []
+    },
+    "reference_candidate_rerank": {
+      "eligible_ids": [
+        "global-handbook",
+        "release-checklist",
+        "scope-workspace",
+        "unclassified-note",
+        "workspace-plan"
+      ],
+      "candidate_ids": ["global-handbook", "release-checklist"],
+      "ordered_ids": ["global-handbook", "release-checklist"],
+      "scores": [
+        {
+          "id": "global-handbook",
+          "score_micro": 450000,
+          "components": {
+            "exact_micro": 1000000,
+            "semantic_micro": 0,
+            "keyword_micro": 0,
+            "scope_micro": 1000000,
+            "provenance_micro": 1000000,
+            "authority_micro": 1000000,
+            "priority_micro": 0,
+            "aspect_coverage_micro": 1000000,
+            "cross_reference_micro": 0
+          },
+          "cross_reference_from_id": null
+        },
+        {
+          "id": "release-checklist",
+          "score_micro": 205000,
+          "components": {
+            "exact_micro": 0,
+            "semantic_micro": 0,
+            "keyword_micro": 0,
+            "scope_micro": 1000000,
+            "provenance_micro": 1000000,
+            "authority_micro": 1000000,
+            "priority_micro": 100000,
+            "aspect_coverage_micro": 0,
+            "cross_reference_micro": 1000000
+          },
+          "cross_reference_from_id": "global-handbook"
+        }
+      ],
+      "context_selected_ids": ["global-handbook", "release-checklist"],
+      "context_tokens": 103,
+      "truncated": false,
+      "semantic_state": "not_requested",
+      "semantic_fallback_reason": null,
+      "errors": []
+    },
+    "source_diversity": {
+      "eligible_ids": ["multi-1", "multi-2", "other-1"],
+      "candidate_ids": ["multi-1", "multi-2", "other-1"],
+      "ordered_ids": ["multi-1", "other-1", "multi-2"],
+      "scores": [
+        {
+          "id": "multi-1",
+          "score_micro": 450000,
+          "components": {
+            "exact_micro": 1000000,
+            "semantic_micro": 0,
+            "keyword_micro": 0,
+            "scope_micro": 1000000,
+            "provenance_micro": 1000000,
+            "authority_micro": 1000000,
+            "priority_micro": 0,
+            "aspect_coverage_micro": 1000000,
+            "cross_reference_micro": 0
+          },
+          "cross_reference_from_id": null
+        },
+        {
+          "id": "other-1",
+          "score_micro": 400000,
+          "components": {
+            "exact_micro": 1000000,
+            "semantic_micro": 0,
+            "keyword_micro": 0,
+            "scope_micro": 1000000,
+            "provenance_micro": 1000000,
+            "authority_micro": 1000000,
+            "priority_micro": 0,
+            "aspect_coverage_micro": 0,
+            "cross_reference_micro": 0
+          },
+          "cross_reference_from_id": null
+        },
+        {
+          "id": "multi-2",
+          "score_micro": 400000,
+          "components": {
+            "exact_micro": 1000000,
+            "semantic_micro": 0,
+            "keyword_micro": 0,
+            "scope_micro": 1000000,
+            "provenance_micro": 1000000,
+            "authority_micro": 1000000,
+            "priority_micro": 0,
+            "aspect_coverage_micro": 0,
+            "cross_reference_micro": 0
+          },
+          "cross_reference_from_id": null
+        }
+      ],
+      "context_selected_ids": ["multi-1", "other-1", "multi-2"],
+      "context_tokens": 120,
+      "truncated": false,
+      "semantic_state": "not_requested",
+      "semantic_fallback_reason": null,
+      "errors": []
+    },
+    "complete_tie_break": {
+      "eligible_ids": ["duplicate-a", "duplicate-b"],
+      "candidate_ids": ["duplicate-a", "duplicate-b"],
+      "ordered_ids": ["duplicate-a", "duplicate-b"],
+      "scores": [
+        {
+          "id": "duplicate-a",
+          "score_micro": 450000,
+          "components": {
+            "exact_micro": 1000000,
+            "semantic_micro": 0,
+            "keyword_micro": 0,
+            "scope_micro": 1000000,
+            "provenance_micro": 1000000,
+            "authority_micro": 1000000,
+            "priority_micro": 0,
+            "aspect_coverage_micro": 1000000,
+            "cross_reference_micro": 0
+          },
+          "cross_reference_from_id": null
+        },
+        {
+          "id": "duplicate-b",
+          "score_micro": 400000,
+          "components": {
+            "exact_micro": 1000000,
+            "semantic_micro": 0,
+            "keyword_micro": 0,
+            "scope_micro": 1000000,
+            "provenance_micro": 1000000,
+            "authority_micro": 1000000,
+            "priority_micro": 0,
+            "aspect_coverage_micro": 0,
+            "cross_reference_micro": 0
+          },
+          "cross_reference_from_id": null
+        }
+      ],
+      "context_selected_ids": ["duplicate-a", "duplicate-b"],
+      "context_tokens": 84,
+      "truncated": false,
+      "semantic_state": "not_requested",
+      "semantic_fallback_reason": null,
+      "errors": []
+    },
+    "context_budget": {
+      "eligible_ids": ["budget-long", "budget-short"],
+      "candidate_ids": ["budget-long", "budget-short"],
+      "ordered_ids": ["budget-short"],
+      "scores": [
+        {
+          "id": "budget-short",
+          "score_micro": 450000,
+          "components": {
+            "exact_micro": 1000000,
+            "semantic_micro": 0,
+            "keyword_micro": 0,
+            "scope_micro": 1000000,
+            "provenance_micro": 1000000,
+            "authority_micro": 1000000,
+            "priority_micro": 0,
+            "aspect_coverage_micro": 1000000,
+            "cross_reference_micro": 0
+          },
+          "cross_reference_from_id": null
+        }
+      ],
+      "context_selected_ids": ["budget-short"],
+      "context_tokens": 38,
+      "truncated": true,
+      "semantic_state": "not_requested",
+      "semantic_fallback_reason": null,
+      "errors": []
+    },
+    "unicode_nfkc_exact": {
+      "eligible_ids": ["unicode-record"],
+      "candidate_ids": ["unicode-record"],
+      "ordered_ids": ["unicode-record"],
+      "scores": [
+        {
+          "id": "unicode-record",
+          "score_micro": 450000,
+          "components": {
+            "exact_micro": 1000000,
+            "semantic_micro": 0,
+            "keyword_micro": 0,
+            "scope_micro": 1000000,
+            "provenance_micro": 1000000,
+            "authority_micro": 1000000,
+            "priority_micro": 0,
+            "aspect_coverage_micro": 1000000,
+            "cross_reference_micro": 0
+          },
+          "cross_reference_from_id": null
+        }
+      ],
+      "context_selected_ids": ["unicode-record"],
+      "context_tokens": 41,
+      "truncated": false,
+      "semantic_state": "not_requested",
+      "semantic_fallback_reason": null,
+      "errors": []
+    },
+    "explicit_scope_priority": {
+      "eligible_ids": [
+        "release-checklist",
+        "scope-project",
+        "scope-workspace",
+        "unclassified-note",
+        "workspace-plan"
+      ],
+      "candidate_ids": ["scope-workspace", "scope-project"],
+      "ordered_ids": ["scope-workspace", "scope-project"],
+      "scores": [
+        {
+          "id": "scope-workspace",
+          "score_micro": 475000,
+          "components": {
+            "exact_micro": 1000000,
+            "semantic_micro": 0,
+            "keyword_micro": 0,
+            "scope_micro": 1000000,
+            "provenance_micro": 1000000,
+            "authority_micro": 1000000,
+            "priority_micro": 500000,
+            "aspect_coverage_micro": 1000000,
+            "cross_reference_micro": 0
+          },
+          "cross_reference_from_id": null
+        },
+        {
+          "id": "scope-project",
+          "score_micro": 400000,
+          "components": {
+            "exact_micro": 1000000,
+            "semantic_micro": 0,
+            "keyword_micro": 0,
+            "scope_micro": 1000000,
+            "provenance_micro": 1000000,
+            "authority_micro": 1000000,
+            "priority_micro": 0,
+            "aspect_coverage_micro": 0,
+            "cross_reference_micro": 0
+          },
+          "cross_reference_from_id": null
+        }
+      ],
+      "context_selected_ids": ["scope-workspace", "scope-project"],
+      "context_tokens": 77,
+      "truncated": false,
+      "semantic_state": "not_requested",
+      "semantic_fallback_reason": null,
+      "errors": []
+    }
+  }
+}

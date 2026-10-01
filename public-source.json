@@ -1,0 +1,8 @@
+{
+  "schema": "public-source-ancestry/v1",
+  "project": "rag-method",
+  "base_commit": "cd6d3b619c3ea8938e60b85eae30e65d7931a68f",
+  "prepared_from_modified_worktree": true,
+  "identity_manifest": "PUBLIC_MANIFEST.json",
+  "note": "The base commit records ancestry only. PUBLIC_MANIFEST.json identifies the reviewed public source bytes; frozen legacy report envelopes use base_commit with dirty:true."
+}

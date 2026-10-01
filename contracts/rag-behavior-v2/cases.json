@@ -1,0 +1,123 @@
+{
+  "contract": "rag-behavior-v2-cases",
+  "version": 2,
+  "cases": [
+    {
+      "id": "exact_phrase",
+      "query": "release canary is amber",
+      "mode": "exact_only",
+      "top_k": 3,
+      "include_scopes": ["global"]
+    },
+    {
+      "id": "keyword_overlap",
+      "query": "scope isolation persistence",
+      "mode": "keyword_only",
+      "top_k": 3,
+      "include_scopes": ["workspace:edge"]
+    },
+    {
+      "id": "semantic_threshold_inclusive",
+      "query": "unrelated semantic wording",
+      "mode": "semantic_only",
+      "top_k": 3,
+      "include_scopes": ["test:threshold"],
+      "query_vector_id": "semantic-threshold"
+    },
+    {
+      "id": "semantic_profile_mismatch",
+      "query": "profile drift",
+      "mode": "semantic_only",
+      "top_k": 3,
+      "include_scopes": ["test:mismatch"],
+      "query_vector_id": "semantic-mismatch"
+    },
+    {
+      "id": "hybrid_aggregate",
+      "query": "color marks readiness",
+      "mode": "hybrid",
+      "top_k": 3,
+      "include_scopes": ["global", "workspace:edge"],
+      "query_vector_id": "semantic-release"
+    },
+    {
+      "id": "hybrid_disabled_fallback",
+      "query": "release canary",
+      "mode": "hybrid",
+      "top_k": 3,
+      "include_scopes": ["global"],
+      "semantic_enabled": false,
+      "semantic_fallback_reason": "disabled_by_settings"
+    },
+    {
+      "id": "recorded_authority_only",
+      "query": "amber release readiness",
+      "mode": "hybrid",
+      "top_k": 5,
+      "include_scopes": ["workspace:edge", "thread:fixture"],
+      "authority_policy": "recorded_only",
+      "semantic_enabled": false
+    },
+    {
+      "id": "reference_candidate_rerank",
+      "query": "stable marker",
+      "mode": "exact_only",
+      "top_k": 2,
+      "include_scopes": ["global", "workspace:edge"]
+    },
+    {
+      "id": "source_diversity",
+      "query": "diversity beacon",
+      "mode": "exact_only",
+      "top_k": 3,
+      "include_scopes": ["test:diversity"]
+    },
+    {
+      "id": "complete_tie_break",
+      "query": "shared duplicate content",
+      "mode": "exact_only",
+      "top_k": 2,
+      "include_scopes": ["test:tie"]
+    },
+    {
+      "id": "context_budget",
+      "query": "budget beacon",
+      "mode": "exact_only",
+      "top_k": 2,
+      "include_scopes": ["test:budget"],
+      "max_context_tokens": 45
+    },
+    {
+      "id": "unicode_nfkc_exact",
+      "query": "café ＡＴＬＡＳ",
+      "mode": "exact_only",
+      "top_k": 2,
+      "include_scopes": ["test:unicode"]
+    },
+    {
+      "id": "explicit_scope_priority",
+      "query": "scope priority beacon",
+      "mode": "exact_only",
+      "top_k": 2,
+      "include_scopes": ["workspace:edge", "project:edge"],
+      "scope_priorities": {"workspace:edge": 50, "project:edge": 0}
+    },
+    {
+      "id": "deny_first_scope",
+      "query": "canary",
+      "mode": "scoped_hybrid",
+      "top_k": 3,
+      "include_scopes": ["global", "persona:private"],
+      "exclude_scopes": ["persona:private"],
+      "semantic_enabled": false
+    },
+    {
+      "id": "exclude_all",
+      "query": "release",
+      "mode": "scoped_hybrid",
+      "top_k": 3,
+      "exclude_scopes": ["all"],
+      "semantic_enabled": false
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "schema": "rag-method-product-version/v1",
+  "app": "RAG Method Lab",
+  "slug": "rag-method",
+  "version": "0.1.0",
+  "channel": "mvp",
+  "components": {
+    "backend": "0.1.0",
+    "frontend": "0.1.0"
+  }
+}

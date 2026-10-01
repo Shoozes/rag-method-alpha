@@ -1,0 +1,41 @@
+{
+  "schema": "rag-method-documentation-evaluation-v1",
+  "corpus": "threejs-docs-1a1c86699f9c",
+  "cases": [
+    {
+      "id": "exact-texture-loader",
+      "query": "TextureLoader loadAsync",
+      "relevant_paths": ["api/TextureLoader.md"]
+    },
+    {
+      "id": "close-loader-names",
+      "query": "ImageLoader TextureLoader load images textures",
+      "relevant_paths": ["api/ImageLoader.md", "api/TextureLoader.md"]
+    },
+    {
+      "id": "procedural-responsive",
+      "query": "resize renderer canvas without stretching the scene",
+      "relevant_paths": ["manual/responsive.md"]
+    },
+    {
+      "id": "linked-loader-source",
+      "query": "what loading manager does TextureLoader use",
+      "relevant_paths": ["api/TextureLoader.md", "api/Loader.md", "api/LoadingManager.md"]
+    },
+    {
+      "id": "displayed-disposal-prompt",
+      "query": "dispose geometries materials textures render targets",
+      "relevant_paths": ["manual/how-to-dispose-of-objects.md", "manual/cleanup.md"]
+    },
+    {
+      "id": "displayed-tsl-prompt",
+      "query": "TSL Fn functions reusable shader nodes",
+      "relevant_paths": ["tsl/syntax/function.md"]
+    },
+    {
+      "id": "absent-database-topic",
+      "query": "walreceiver pgoutput logicaldecoding",
+      "relevant_paths": []
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "contract": "rag-behavior-v2-expected",
+  "version": 2,
+  "mode": "semantic_only",
+  "cases": {
+    "semantic_threshold_inclusive": {
+      "eligible_ids": ["semantic-below", "semantic-boundary"],
+      "candidate_ids": ["semantic-boundary"],
+      "ordered_ids": ["semantic-boundary"],
+      "scores": [
+        {
+          "id": "semantic-boundary",
+          "score_micro": 200000,
+          "components": {
+            "exact_micro": 0,
+            "semantic_micro": 200000,
+            "keyword_micro": 0,
+            "scope_micro": 1000000,
+            "provenance_micro": 1000000,
+            "authority_micro": 1000000,
+            "priority_micro": 0,
+            "aspect_coverage_micro": 0,
+            "cross_reference_micro": 0
+          },
+          "cross_reference_from_id": null
+        }
+      ],
+      "context_selected_ids": ["semantic-boundary"],
+      "context_tokens": 39,
+      "truncated": false,
+      "semantic_state": "ready",
+      "semantic_fallback_reason": null,
+      "errors": []
+    },
+    "semantic_profile_mismatch": {
+      "eligible_ids": ["profile-mismatch"],
+      "candidate_ids": [],
+      "ordered_ids": [],
+      "scores": [],
+      "context_selected_ids": [],
+      "context_tokens": 0,
+      "truncated": false,
+      "semantic_state": "lexical_fallback",
+      "semantic_fallback_reason": "no_compatible_vectors",
+      "errors": ["semantic retrieval unavailable: no_compatible_vectors"]
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "registry": "rag-contracts-v3",
+  "owner": "RAG-Method-PY",
+  "active": "rag-behavior-v2/manifest.json",
+  "active_boundaries": {
+    "retrieval": "rag-behavior-v2/manifest.json",
+    "indexing": "rag-indexing-v1/manifest.json"
+  },
+  "contracts": {
+    "rag-behavior-v2": {
+      "status": "frozen-active",
+      "manifest": "rag-behavior-v2/manifest.json"
+    },
+    "rag-indexing-v1": {
+      "status": "frozen-active",
+      "manifest": "rag-indexing-v1/manifest.json"
+    },
+    "rag-core-v1": {
+      "status": "superseded-read-only",
+      "profile": "rag-profile-v1.json",
+      "cases": "rag-cases-v1.json",
+      "response_schema": "rag-core-v1.schema.json",
+      "report_schema": "rag-report-v1.schema.json"
+    }
+  }
+}

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mirrorlight-backend"
+version = "0.1.0"
+description = "RAG Method Lab local FastAPI backend"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi>=0.110",
+  "pydantic>=2.0",
+  "uvicorn[standard]>=0.29",
+  "networkx>=3.0",
+  "numpy>=1.26",
+  "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+vectors = [
+  "sentence-transformers>=3.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]

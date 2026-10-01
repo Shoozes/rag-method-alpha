@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract": "rag-behavior-v2",
+  "version": 2,
+  "profile_id": "rag-behavior-v2-edge-derived",
+  "status": "frozen",
+  "identity": {
+    "version": 2,
+    "digest": "sha256",
+    "part_encoding": "utf8_length_prefixed_u64_little_endian",
+    "domains": {
+      "source": "rag-source",
+      "source_chunk": "rag-source-chunk",
+      "embedding": "rag-embedding"
+    },
+    "normalization": {
+      "source_kind": "trim_unicode_lowercase",
+      "pocket": "unicode_nfkc_casefold_collapse_whitespace",
+      "source_key": "trim_unicode_whitespace_replace_backslash_with_forward_slash_unicode_lowercase",
+      "content": "raw_utf8",
+      "numeric_parts": "base10_ascii_no_padding",
+      "missing_offsets": "empty_string"
+    },
+    "test_vectors": {
+      "canonical_hash": {
+        "parts": ["", "é", "🧭"],
+        "expected": "328ebac536f33028ea6b8879ecb70450374c408872c2ef2302f7e2e02c199360"
+      },
+      "content_id": {
+        "text": "Café 🧭",
+        "expected": "64d52a724725f19a89c6e135eda4d57e27cefbb0709a50b42687cfa6dd3a249c"
+      },
+      "source_id": {
+        "source_kind": " FILE ",
+        "pocket": "  Ｄｏｃｓ \t",
+        "source_key": " Folder\\A.TXT ",
+        "expected": "338300efd243f481b5fa7556e26134cd1f0bf9c255e98b133cde799bbddb669d"
+      },
+      "source_chunk_id": {
+        "source_id": "338300efd243f481b5fa7556e26134cd1f0bf9c255e98b133cde799bbddb669d",
+        "chunk_index": 12,
+        "text_start": null,
+        "text_end": null,
+        "content_id": "64d52a724725f19a89c6e135eda4d57e27cefbb0709a50b42687cfa6dd3a249c",
+        "expected": "7ec598b2f164701ebd406ce881da482b3c5e45149be4db50bf7341552f2eede7"
+      },
+      "embedding_id": {
+        "chunk_id": "7ec598b2f164701ebd406ce881da482b3c5e45149be4db50bf7341552f2eede7",
+        "profile_id": "profile:v2",
+        "expected": "c871a6269b78c977ce85d3e417b2aaaec5d9421499ea7836eb02cde82be1f86e"
+      }
+    }
+  },
+  "normalization": {
+    "record_strings": "trim_unicode_whitespace_require_valid_unicode_scalars",
+    "exact": "unicode_nfkc_lowercase_collapse_whitespace",
+    "keywords": "unicode_nfkc_lowercase_unique_alphanumeric_terms",
+    "stop_words": [],
+    "query_expansions": []
+  },
+  "embedding": {
+    "fixture_profile_id": "rag-behavior-v2-fixture-v1",
+    "fixture_dimension": 4,
+    "compatibility": "exact_profile_id_and_dimension",
+    "semantic_min_score_micro": 200000,
+    "threshold_inclusive": true,
+    "cosine_policy": "raw_cosine_clamped_0_to_1",
+    "rounding": "floor(value_times_1000000_plus_0_5)"
+  },
+  "scoring": {
+    "units": 1000000,
+    "exact_weight_micro": 250000,
+    "semantic_weight_micro": 250000,
+    "keyword_weight_micro": 150000,
+    "scope_weight_micro": 50000,
+    "provenance_weight_micro": 50000,
+    "authority_weight_micro": 50000,
+    "priority_weight_micro": 50000,
+    "aspect_coverage_weight_micro": 50000,
+    "cross_reference_weight_micro": 50000,
+    "positive_weight_budget_micro": 950000,
+    "aggregate_rounding": "sum_weighted_components_then_truncate_toward_zero",
+    "final_clamp_micro": [0, 1000000],
+    "string_order": "unicode_scalar_value_lexicographic_ascending",
+    "tie_break": [
+      "score_micro_desc",
+      "scope_priority_desc",
+      "source_name_asc",
+      "text_asc",
+      "source_id_asc",
+      "id_asc"
+    ],
+    "diversity_tie_break": [
+      "rank_score_micro_desc",
+      "base_score_micro_desc",
+      "source_id_asc",
+      "id_asc"
+    ]
+  },
+  "authority": {
+    "policy_values": ["all", "recorded_only"],
+    "recorded_kinds": ["global_record", "workspace_record", "persona_vault"],
+    "component_micro": {
+      "global_record": 1000000,
+      "workspace_record": 1000000,
+      "conversation_memory": 900000,
+      "persona_vault": 800000,
+      "unclassified": 250000
+    },
+    "intent_detection": "none_explicit_query_policy_only"
+  },
+  "scope": {
+    "deny_first": true,
+    "all_token": "all",
+    "label_normalization": "trim_unicode_whitespace_preserve_case",
+    "comparison": "exact_unicode_scalar_sequence",
+    "multi_scope_match": "any",
+    "priority": "explicit_numeric_max_matching_scope",
+    "priority_range": [-100, 100]
+  },
+  "references": {
+    "representation": "ordered_target_record_ids",
+    "behavior": "one_hop_candidate_only_reranking",
+    "max_expansions": 4,
+    "self_source_links": "ignored",
+    "duplicate_targets": "first_anchor_wins"
+  },
+  "selection": {
+    "durable_candidate_limit": 48,
+    "memory_candidate_limit": 16,
+    "memory_authority": "conversation_memory",
+    "max_chunks_per_source": 2,
+    "prefer_unseen_sources": true,
+    "aspect_coverage": "new_query_terms_not_yet_covered"
+  },
+  "context": {
+    "max_prompt_tokens": 4096,
+    "reserved_generation_tokens": 1024,
+    "max_rag_context_tokens": 1800,
+    "token_estimator": "floor((text_scalar_count+source_name_scalar_count+pocket_scalar_count+sum_scope_scalar_counts+99)/4)"
+  },
+  "limits": {
+    "max_query_chars": 4000,
+    "query_character_unit": "unicode_scalar_values",
+    "max_query_utf8_bytes": 16384,
+    "query_byte_encoding": "utf8_strict",
+    "max_records": 50000,
+    "max_top_k": 100
+  },
+  "semantic_states": [
+    "not_requested",
+    "ready",
+    "disabled_by_settings",
+    "lexical_fallback"
+  ],
+  "fallback_reasons": [
+    "disabled_by_settings",
+    "no_compatible_vectors",
+    "embedding_failed"
+  ],
+  "modes": [
+    "exact_only",
+    "semantic_only",
+    "keyword_only",
+    "hybrid",
+    "scoped_hybrid"
+  ],
+  "cancellation_checkpoints": [
+    "filter.start",
+    "filter.scan",
+    "rank.start",
+    "rank.scan",
+    "cross_reference.before",
+    "cross_reference.after",
+    "selection.start",
+    "return"
+  ]
+}

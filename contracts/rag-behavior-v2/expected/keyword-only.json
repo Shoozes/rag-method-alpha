@@ -1,0 +1,85 @@
+{
+  "contract": "rag-behavior-v2-expected",
+  "version": 2,
+  "mode": "keyword_only",
+  "cases": {
+    "keyword_overlap": {
+      "eligible_ids": [
+        "release-checklist",
+        "scope-workspace",
+        "unclassified-note",
+        "workspace-plan"
+      ],
+      "candidate_ids": [
+        "release-checklist",
+        "workspace-plan",
+        "scope-workspace"
+      ],
+      "ordered_ids": [
+        "release-checklist",
+        "workspace-plan",
+        "scope-workspace"
+      ],
+      "scores": [
+        {
+          "id": "release-checklist",
+          "score_micro": 405000,
+          "components": {
+            "exact_micro": 0,
+            "semantic_micro": 0,
+            "keyword_micro": 1000000,
+            "scope_micro": 1000000,
+            "provenance_micro": 1000000,
+            "authority_micro": 1000000,
+            "priority_micro": 100000,
+            "aspect_coverage_micro": 1000000,
+            "cross_reference_micro": 1000000
+          },
+          "cross_reference_from_id": "workspace-plan"
+        },
+        {
+          "id": "workspace-plan",
+          "score_micro": 259999,
+          "components": {
+            "exact_micro": 0,
+            "semantic_micro": 0,
+            "keyword_micro": 666666,
+            "scope_micro": 1000000,
+            "provenance_micro": 1000000,
+            "authority_micro": 1000000,
+            "priority_micro": 200000,
+            "aspect_coverage_micro": 0,
+            "cross_reference_micro": 0
+          },
+          "cross_reference_from_id": null
+        },
+        {
+          "id": "scope-workspace",
+          "score_micro": 199999,
+          "components": {
+            "exact_micro": 0,
+            "semantic_micro": 0,
+            "keyword_micro": 333333,
+            "scope_micro": 1000000,
+            "provenance_micro": 1000000,
+            "authority_micro": 1000000,
+            "priority_micro": 0,
+            "aspect_coverage_micro": 0,
+            "cross_reference_micro": 0
+          },
+          "cross_reference_from_id": null
+        }
+      ],
+      "context_selected_ids": [
+        "release-checklist",
+        "workspace-plan",
+        "scope-workspace"
+      ],
+      "context_tokens": 144,
+      "truncated": false,
+      "semantic_state": "not_requested",
+      "semantic_fallback_reason": null,
+      "errors": []
+    }
+  }
+}

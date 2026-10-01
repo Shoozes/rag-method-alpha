@@ -1,0 +1,148 @@
+{
+  "contract": "rag-indexing-v1-fixtures",
+  "version": 1,
+  "cases": [
+    {
+      "id": "markdown-normalization-headings-links",
+      "expected_status": "ok",
+      "format": "markdown",
+      "path": "Docs\\Guide.md",
+      "pocket": "global",
+      "scopes": ["global"],
+      "authority": "global_record",
+      "priority": 0,
+      "limits": {"max_chars": 64, "max_tokens": 16},
+      "content": "\ufeff---\r\ntitle: ignored\r\n---\r\n# Alpha\r\nFirst [[Beta|label]].\r\n## Beta\r\nSecond."
+    },
+    {
+      "id": "text-soft-boundaries",
+      "expected_status": "ok",
+      "format": "text",
+      "path": "notes/soft.txt",
+      "pocket": "workspace",
+      "scopes": ["workspace:demo"],
+      "authority": "workspace_record",
+      "priority": -2,
+      "limits": {"max_chars": 24, "max_tokens": 20},
+      "content": "Alpha beta gamma delta\nSecond line with value.\nThird."
+    },
+    {
+      "id": "unicode-scalar-hard-boundary",
+      "expected_status": "ok",
+      "format": "text",
+      "path": "unicode/scalars.txt",
+      "pocket": "workspace",
+      "scopes": ["workspace:demo"],
+      "authority": "workspace_record",
+      "priority": 0,
+      "limits": {"max_chars": 4, "max_tokens": 10},
+      "content": "🧭界𐀀abcdef"
+    },
+    {
+      "id": "explicit-whitespace-token-ceiling",
+      "expected_status": "ok",
+      "format": "text",
+      "path": "unicode/whitespace.txt",
+      "pocket": "global",
+      "scopes": ["global"],
+      "authority": "global_record",
+      "priority": 0,
+      "limits": {"max_chars": 100, "max_tokens": 3},
+      "content": "one\u00a0two\u2003three four five"
+    },
+    {
+      "id": "empty-after-frontmatter",
+      "expected_status": "ok",
+      "format": "markdown",
+      "path": "empty.md",
+      "pocket": "global",
+      "scopes": ["global"],
+      "authority": "global_record",
+      "priority": 0,
+      "content": "\ufeff---\nname: metadata\n---\n\u3000\n"
+    },
+    {
+      "id": "portable-path-and-multi-scope-identity",
+      "expected_status": "ok",
+      "format": "markdown",
+      "path": " ./Vault//Lore\\Café.MD ",
+      "pocket": "vault-astra",
+      "scopes": ["persona:astra", "workspace:demo"],
+      "authority": "persona_vault",
+      "priority": 7,
+      "limits": {"max_chars": 48, "max_tokens": 12},
+      "content": "Preamble signal.\n# North\nCompass 🧭 signal.\n# North\nDuplicate heading."
+    },
+    {
+      "id": "markdown-heading-edge-cases",
+      "expected_status": "ok",
+      "format": "markdown",
+      "path": "headings.md",
+      "pocket": "global",
+      "scopes": ["global"],
+      "authority": "global_record",
+      "priority": 0,
+      "limits": {"max_chars": 80, "max_tokens": 20},
+      "content": "####### Seven is text\n#NoSpace is text\n # Indented is text\n###### Six ####\nBody\n## Two\nFirst duplicate.\n## Two\nSecond duplicate."
+    },
+    {
+      "id": "unclosed-frontmatter-preserved",
+      "expected_status": "ok",
+      "format": "markdown",
+      "path": "open-frontmatter.md",
+      "pocket": "global",
+      "scopes": ["global"],
+      "authority": "global_record",
+      "priority": 0,
+      "content": "---\ntitle: retained\n# Body\nFact"
+    },
+    {
+      "id": "reject-parent-path",
+      "expected_status": "error",
+      "expected_error_code": "invalid_path",
+      "format": "markdown",
+      "path": "../escape.md",
+      "pocket": "global",
+      "scopes": ["global"],
+      "authority": "global_record",
+      "priority": 0,
+      "content": "# Unsafe"
+    },
+    {
+      "id": "reject-duplicate-scope",
+      "expected_status": "error",
+      "expected_error_code": "invalid_scopes",
+      "format": "text",
+      "path": "duplicate.txt",
+      "pocket": "global",
+      "scopes": ["global", "global"],
+      "authority": "global_record",
+      "priority": 0,
+      "content": "duplicate scope"
+    },
+    {
+      "id": "reject-unsupported-format",
+      "expected_status": "error",
+      "expected_error_code": "unsupported_format",
+      "format": "html",
+      "path": "page.html",
+      "pocket": "global",
+      "scopes": ["global"],
+      "authority": "global_record",
+      "priority": 0,
+      "content": "<p>not in the portable lane</p>"
+    },
+    {
+      "id": "reject-nul-text",
+      "expected_status": "error",
+      "expected_error_code": "invalid_text",
+      "format": "text",
+      "path": "nul.txt",
+      "pocket": "global",
+      "scopes": ["global"],
+      "authority": "global_record",
+      "priority": 0,
+      "content": "before\u0000after"
+    }
+  ]
+}

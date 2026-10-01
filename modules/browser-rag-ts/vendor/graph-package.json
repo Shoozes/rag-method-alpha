@@ -1,0 +1,21 @@
+{
+  "schema": "browser-rag-ts-vendored-graph-v2",
+  "source": {
+    "kind": "source-snapshot",
+    "fingerprint_sha256": "413d366cc4f37d42836f7c2aaf4b72c1276efd5fd75eeef9524749a66cbaee41",
+    "base_commit": "8c59170f7bab1b77157a4f4687a868a8aba5539f"
+  },
+  "package": {
+    "name": "@ours/forcegraph-tsl",
+    "version": "0.3.0-alpha.1",
+    "license": "MIT"
+  },
+  "archive": {
+    "path": "vendor/ours-forcegraph-tsl-0.3.0-alpha.1.tgz",
+    "bytes": 313331,
+    "sha256": "ff8fdd7167bf30dc0ab392c8054564bc83eb255c0f260b5a0a362f4b8fb9ebb8"
+  },
+  "peer_dependencies": {
+    "three": "^0.185.0"
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rag-core-v1.schema.json",
+  "title": "Language-neutral RAG Core v1 response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "mode", "results", "context_tokens", "truncated", "errors"],
+  "properties": {
+    "contract": {"const": "rag-core-v1"},
+    "mode": {"enum": ["exact_only", "semantic_only", "keyword_only", "hybrid", "scoped_hybrid"]},
+    "context_tokens": {"type": "integer", "minimum": 0},
+    "truncated": {"type": "boolean"},
+    "errors": {"type": "array", "items": {"type": "string"}},
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "source_id", "scope", "authority", "score_micro", "score", "components"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "text": {"type": "string", "minLength": 1},
+          "source_id": {"type": "string", "minLength": 1},
+          "path": {"type": "string"},
+          "scope": {"type": "string", "minLength": 1},
+          "authority": {"type": "string", "minLength": 1},
+          "priority": {"type": "integer"},
+          "aspects": {"type": "array", "items": {"type": "string"}},
+          "references": {"type": "array", "items": {"type": "string"}},
+          "metadata": {"type": "object"},
+          "score_micro": {"type": "integer", "minimum": 0, "maximum": 1000000},
+          "score": {"type": "number", "minimum": 0, "maximum": 1},
+          "components": {
+            "type": "object",
+            "required": ["exact_micro", "keyword_micro", "semantic_micro", "reference_micro"],
+            "properties": {
+              "exact_micro": {"type": "integer", "minimum": 0, "maximum": 1000000},
+              "keyword_micro": {"type": "integer", "minimum": 0, "maximum": 1000000},
+              "semantic_micro": {"type": ["integer", "null"], "minimum": 0, "maximum": 1000000},
+              "reference_micro": {"type": "integer", "minimum": 0, "maximum": 1000000}
+            }
+          }
+        }
+      }
+    }
+  }
+}

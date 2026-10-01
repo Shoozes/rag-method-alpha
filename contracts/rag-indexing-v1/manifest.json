@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract": "rag-indexing-v1",
+  "version": 1,
+  "status": "frozen",
+  "owner": "RAG-Method-PY",
+  "baseline_commits": {
+    "rag_method_py": "a132fe92b7191b8c37c4f85b8507c8fdc756a84a",
+    "edgesymbio": "c26420bd66857a8a88e173f319f2575670d0fe3b",
+    "tulpaweaver": "eb96433d5b66ca266339801668a0ff37eb486781"
+  },
+  "fixture_counts": {
+    "cases": 12,
+    "success": 8,
+    "errors": 4
+  },
+  "files": {
+    "profile": "indexing-profile.json",
+    "document_schema": "document.schema.json",
+    "observation_schema": "observation.schema.json",
+    "report_schema": "report.schema.json",
+    "fixtures": "fixture-documents.json",
+    "expected": "expected.json",
+    "adapters": {
+      "python": "adapters/python.md",
+      "rust": "adapters/rust.md",
+      "javascript": "adapters/javascript.md"
+    }
+  },
+  "change_policy": "Freeze expected observations once; any later behavioral change requires a new indexing contract version."
+}

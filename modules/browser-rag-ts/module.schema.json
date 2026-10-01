@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "browser-rag-ts/module.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "id", "version", "status", "stable_lab_baseline", "retrieval_contract", "indexing_contract"],
+  "properties": {
+    "$schema": {"type": "string", "const": "./module.schema.json"},
+    "id": {"type": "string", "const": "browser-rag-ts"},
+    "version": {"type": "string", "const": "0.1.0"},
+    "status": {"type": "string", "const": "experimental"},
+    "stable_lab_baseline": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "retrieval_contract": {"type": "string", "const": "rag-behavior-v2"},
+    "indexing_contract": {"type": "string", "const": "rag-indexing-v1"}
+  }
+}

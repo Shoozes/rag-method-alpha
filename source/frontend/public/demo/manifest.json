@@ -1,0 +1,46 @@
+{
+  "schema": "rag_method_demo_manifest_v1",
+  "fixture_version": "rag-method-demo-v1",
+  "collection_id": "rag-method-demo-v1",
+  "display_name": "RAG Method Demo",
+  "source_digest": "b869ebe52bf3dc1107cb5bdede75fcb5db91b2b47e657b65b8dec198a7896cc1",
+  "suggested_queries": [
+    "What color marks release readiness?",
+    "Which storage decision is recorded, and what cloud dependency is prohibited?",
+    "Which note links to the release checklist?"
+  ],
+  "files": [
+    {
+      "relative_path": "decision-log.md",
+      "content": "# Decision log\n\n## D-014 — Local durable storage\n\nThe recorded storage decision is to keep the demonstration collection in\nbounded local files with deterministic identities. A required cloud database\nor hosted vector dependency is prohibited for the default example.\n\nThis decision supports the local-first promise in [[project-charter]].\n"
+    },
+    {
+      "relative_path": "duplicate-note.md",
+      "content": "# Duplicate wording exercise\n\nRelease readiness is marked by amber during review. This intentionally similar\nsentence lets the debugger show deterministic ranking and source diversity\nwhen multiple files overlap.\n\nUse [[release-checklist]] as the authoritative source rather than this note.\n"
+    },
+    {
+      "relative_path": "lore/architecture.md",
+      "content": "# Demo architecture\n\nDocuments are normalized and split into stable chunks before retrieval. Exact,\nkeyword, and optional semantic components feed scope and authority filtering,\nsource diversity, and bounded context selection.\n\nThe release color is owned by [[release-checklist]], while the local storage\nboundary is owned by [[decision-log]].\n"
+    },
+    {
+      "relative_path": "lore/glossary.md",
+      "content": "# Glossary\n\n- **Collection**: the user-facing name for one imported corpus. The stable API\n  field remains `companion_id` for compatibility.\n- **Pocket**: a bounded source class such as global, vault, lore, or memories.\n- **Unicode proof text**: café, naïve, Straße, and Σίσυφος remain valid UTF-8\n  through strict normalization and scalar-safe indexing.\n"
+    },
+    {
+      "relative_path": "meeting-notes.md",
+      "content": "# Meeting notes\n\nOne early suggestion proposed blue as the release-readiness color. That note\nwas not accepted. The authoritative checklist says amber marks release\nreadiness and green is reserved for a frozen snapshot.\n\nThe meeting also reaffirmed that a required cloud dependency would contradict\nthe local-first storage decision.\n"
+    },
+    {
+      "relative_path": "MIND.md",
+      "content": "# RAG Method Demo\n\nName: RAG Method Demo\n\nThis synthetic collection demonstrates strict Markdown indexing, bounded\nretrieval, provenance, cross-references, and context selection without using\nprivate data or a model download.\n\nThe release workflow is described in [[release-checklist]]. The storage\ndecision is recorded in [[decision-log]].\n"
+    },
+    {
+      "relative_path": "project-charter.md",
+      "content": "# Project charter\n\nRAG Method Lab is a local-first retrieval debugger and example application.\nIt helps an operator inspect indexed chunks, retrieval scores, provenance, and\ncontext selection. It is not a chatbot, hosted service, or production vector\nplatform.\n\nThe project favors deterministic local proof over hidden network behavior.\nRelease readiness must be visible, repeatable, and reversible.\n"
+    },
+    {
+      "relative_path": "release-checklist.md",
+      "content": "# Release checklist\n\nAmber marks release readiness while verification is still being reviewed.\nGreen is reserved for an immutable snapshot whose setup, rollback, browser\njourney, and proof hashes all agree.\n\n- Run the local verification matrix.\n- Confirm the demo fixture digest.\n- Review the evidence inspector and graph selection.\n- Record rollback instructions before freezing the snapshot.\n\nThe architecture summary lives in [[lore/architecture]].\n"
+    }
+  ]
+}

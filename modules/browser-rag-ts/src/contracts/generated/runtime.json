@@ -1,0 +1,1225 @@
+{
+  "contracts": {
+    "rag-behavior-v2": {
+      "contract": "rag-behavior-v2",
+      "files": {
+        "cases.json": {
+          "bytes": 3229,
+          "data": {
+            "cases": [
+              {
+                "id": "exact_phrase",
+                "include_scopes": [
+                  "global"
+                ],
+                "mode": "exact_only",
+                "query": "release canary is amber",
+                "top_k": 3
+              },
+              {
+                "id": "keyword_overlap",
+                "include_scopes": [
+                  "workspace:edge"
+                ],
+                "mode": "keyword_only",
+                "query": "scope isolation persistence",
+                "top_k": 3
+              },
+              {
+                "id": "semantic_threshold_inclusive",
+                "include_scopes": [
+                  "test:threshold"
+                ],
+                "mode": "semantic_only",
+                "query": "unrelated semantic wording",
+                "query_vector_id": "semantic-threshold",
+                "top_k": 3
+              },
+              {
+                "id": "semantic_profile_mismatch",
+                "include_scopes": [
+                  "test:mismatch"
+                ],
+                "mode": "semantic_only",
+                "query": "profile drift",
+                "query_vector_id": "semantic-mismatch",
+                "top_k": 3
+              },
+              {
+                "id": "hybrid_aggregate",
+                "include_scopes": [
+                  "global",
+                  "workspace:edge"
+                ],
+                "mode": "hybrid",
+                "query": "color marks readiness",
+                "query_vector_id": "semantic-release",
+                "top_k": 3
+              },
+              {
+                "id": "hybrid_disabled_fallback",
+                "include_scopes": [
+                  "global"
+                ],
+                "mode": "hybrid",
+                "query": "release canary",
+                "semantic_enabled": false,
+                "semantic_fallback_reason": "disabled_by_settings",
+                "top_k": 3
+              },
+              {
+                "authority_policy": "recorded_only",
+                "id": "recorded_authority_only",
+                "include_scopes": [
+                  "workspace:edge",
+                  "thread:fixture"
+                ],
+                "mode": "hybrid",
+                "query": "amber release readiness",
+                "semantic_enabled": false,
+                "top_k": 5
+              },
+              {
+                "id": "reference_candidate_rerank",
+                "include_scopes": [
+                  "global",
+                  "workspace:edge"
+                ],
+                "mode": "exact_only",
+                "query": "stable marker",
+                "top_k": 2
+              },
+              {
+                "id": "source_diversity",
+                "include_scopes": [
+                  "test:diversity"
+                ],
+                "mode": "exact_only",
+                "query": "diversity beacon",
+                "top_k": 3
+              },
+              {
+                "id": "complete_tie_break",
+                "include_scopes": [
+                  "test:tie"
+                ],
+                "mode": "exact_only",
+                "query": "shared duplicate content",
+                "top_k": 2
+              },
+              {
+                "id": "context_budget",
+                "include_scopes": [
+                  "test:budget"
+                ],
+                "max_context_tokens": 45,
+                "mode": "exact_only",
+                "query": "budget beacon",
+                "top_k": 2
+              },
+              {
+                "id": "unicode_nfkc_exact",
+                "include_scopes": [
+                  "test:unicode"
+                ],
+                "mode": "exact_only",
+                "query": "café ＡＴＬＡＳ",
+                "top_k": 2
+              },
+              {
+                "id": "explicit_scope_priority",
+                "include_scopes": [
+                  "workspace:edge",
+                  "project:edge"
+                ],
+                "mode": "exact_only",
+                "query": "scope priority beacon",
+                "scope_priorities": {
+                  "project:edge": 0,
+                  "workspace:edge": 50
+                },
+                "top_k": 2
+              },
+              {
+                "exclude_scopes": [
+                  "persona:private"
+                ],
+                "id": "deny_first_scope",
+                "include_scopes": [
+                  "global",
+                  "persona:private"
+                ],
+                "mode": "scoped_hybrid",
+                "query": "canary",
+                "semantic_enabled": false,
+                "top_k": 3
+              },
+              {
+                "exclude_scopes": [
+                  "all"
+                ],
+                "id": "exclude_all",
+                "mode": "scoped_hybrid",
+                "query": "release",
+                "semantic_enabled": false,
+                "top_k": 3
+              }
+            ],
+            "contract": "rag-behavior-v2-cases",
+            "version": 2
+          },
+          "path": "rag-behavior-v2/cases.json",
+          "sha256": "b4584800b9beabc8c364f3356dd3b3fccb0b71f81cb8195d71ba18c34af51560"
+        },
+        "fixture-records.json": {
+          "bytes": 9516,
+          "data": {
+            "contract": "rag-behavior-v2-fixture-records",
+            "records": [
+              {
+                "authority": "global_record",
+                "embedding_profile_id": "rag-behavior-v2-fixture-v1",
+                "id": "global-handbook",
+                "path": "global/handbook.md",
+                "pocket": "global",
+                "priority": 0,
+                "provenance": {
+                  "chunk_source": true,
+                  "file_source": true
+                },
+                "references": [
+                  "release-checklist"
+                ],
+                "scopes": [
+                  "global"
+                ],
+                "source_id": "source-global-handbook",
+                "source_name": "Global Handbook.md",
+                "text": "Release canary is amber. Project readiness uses a stable marker."
+              },
+              {
+                "authority": "persona_vault",
+                "embedding_profile_id": "rag-behavior-v2-fixture-v1",
+                "id": "private-persona-note",
+                "path": "vault/private.md",
+                "pocket": "vault",
+                "priority": 0,
+                "provenance": {
+                  "chunk_source": true,
+                  "file_source": true
+                },
+                "references": [],
+                "scopes": [
+                  "persona:private"
+                ],
+                "source_id": "source-private-note",
+                "source_name": "Private Note.md",
+                "text": "Private canary is violet. Personal preference only."
+              },
+              {
+                "authority": "workspace_record",
+                "embedding_profile_id": "rag-behavior-v2-fixture-v1",
+                "id": "workspace-plan",
+                "path": "workspace/plan.md",
+                "pocket": "workspace",
+                "priority": 20,
+                "provenance": {
+                  "chunk_source": true,
+                  "file_source": true
+                },
+                "references": [
+                  "release-checklist"
+                ],
+                "scopes": [
+                  "workspace:edge"
+                ],
+                "source_id": "source-workspace-plan",
+                "source_name": "Workspace Plan.md",
+                "text": "Project Edge uses amber release readiness and scope isolation."
+              },
+              {
+                "authority": "workspace_record",
+                "embedding_profile_id": "rag-behavior-v2-fixture-v1",
+                "id": "release-checklist",
+                "path": "workspace/checklist.md",
+                "pocket": "workspace",
+                "priority": 10,
+                "provenance": {
+                  "chunk_source": true,
+                  "file_source": true
+                },
+                "references": [],
+                "scopes": [
+                  "workspace:edge"
+                ],
+                "source_id": "source-release-checklist",
+                "source_name": "Release Checklist.md",
+                "text": "Release checklist verifies scope isolation persistence and exact commit evidence."
+              },
+              {
+                "authority": "conversation_memory",
+                "embedding_profile_id": "rag-behavior-v2-fixture-v1",
+                "id": "memory-fact",
+                "path": "memories/thread.json",
+                "pocket": "memories",
+                "priority": 30,
+                "provenance": {
+                  "chunk_source": true,
+                  "file_source": true
+                },
+                "references": [],
+                "scopes": [
+                  "thread:fixture"
+                ],
+                "source_id": "source-memory-fact",
+                "source_name": "Conversation Memory.md",
+                "text": "Project Edge uses amber release readiness from a conversation memory."
+              },
+              {
+                "authority": "unclassified",
+                "embedding_profile_id": "rag-behavior-v2-fixture-v1",
+                "id": "unclassified-note",
+                "path": "workspace/imported.md",
+                "pocket": "workspace",
+                "priority": 0,
+                "provenance": {
+                  "chunk_source": false,
+                  "file_source": false
+                },
+                "references": [],
+                "scopes": [
+                  "workspace:edge"
+                ],
+                "source_id": "source-unclassified",
+                "source_name": "Imported Note.md",
+                "text": "Project Edge uses amber release readiness from an imported note."
+              },
+              {
+                "authority": "workspace_record",
+                "embedding_profile_id": "rag-behavior-v2-fixture-v1",
+                "id": "duplicate-a",
+                "path": "ties/a.md",
+                "pocket": "test",
+                "priority": 0,
+                "provenance": {
+                  "chunk_source": true,
+                  "file_source": true
+                },
+                "references": [],
+                "scopes": [
+                  "test:tie"
+                ],
+                "source_id": "source-duplicate-a",
+                "source_name": "",
+                "text": "Shared duplicate content identifies parity tie behavior."
+              },
+              {
+                "authority": "workspace_record",
+                "embedding_profile_id": "rag-behavior-v2-fixture-v1",
+                "id": "duplicate-b",
+                "path": "ties/b.md",
+                "pocket": "test",
+                "priority": 0,
+                "provenance": {
+                  "chunk_source": true,
+                  "file_source": true
+                },
+                "references": [],
+                "scopes": [
+                  "test:tie"
+                ],
+                "source_id": "source-duplicate-b",
+                "source_name": "𐀀",
+                "text": "Shared duplicate content identifies parity tie behavior."
+              },
+              {
+                "authority": "workspace_record",
+                "embedding_profile_id": "rag-behavior-v2-fixture-v1",
+                "id": "multi-1",
+                "path": "diversity/multi.md",
+                "pocket": "test",
+                "priority": 0,
+                "provenance": {
+                  "chunk_source": true,
+                  "file_source": true
+                },
+                "references": [],
+                "scopes": [
+                  "test:diversity"
+                ],
+                "source_id": "source-multi",
+                "source_name": "Multi.md",
+                "text": "Diversity beacon alpha shared query."
+              },
+              {
+                "authority": "workspace_record",
+                "embedding_profile_id": "rag-behavior-v2-fixture-v1",
+                "id": "multi-2",
+                "path": "diversity/multi.md",
+                "pocket": "test",
+                "priority": 0,
+                "provenance": {
+                  "chunk_source": true,
+                  "file_source": true
+                },
+                "references": [],
+                "scopes": [
+                  "test:diversity"
+                ],
+                "source_id": "source-multi",
+                "source_name": "Multi.md",
+                "text": "Diversity beacon beta shared query."
+              },
+              {
+                "authority": "workspace_record",
+                "embedding_profile_id": "rag-behavior-v2-fixture-v1",
+                "id": "other-1",
+                "path": "diversity/other.md",
+                "pocket": "test",
+                "priority": 0,
+                "provenance": {
+                  "chunk_source": true,
+                  "file_source": true
+                },
+                "references": [],
+                "scopes": [
+                  "test:diversity"
+                ],
+                "source_id": "source-other",
+                "source_name": "Other.md",
+                "text": "Diversity beacon gamma shared query."
+              },
+              {
+                "authority": "workspace_record",
+                "embedding_profile_id": "rag-behavior-v2-fixture-v1",
+                "id": "semantic-boundary",
+                "path": "semantic/boundary.md",
+                "pocket": "test",
+                "priority": 0,
+                "provenance": {
+                  "chunk_source": true,
+                  "file_source": true
+                },
+                "references": [],
+                "scopes": [
+                  "test:threshold"
+                ],
+                "source_id": "source-semantic-boundary",
+                "source_name": "Boundary.md",
+                "text": "Threshold boundary candidate."
+              },
+              {
+                "authority": "workspace_record",
+                "embedding_profile_id": "rag-behavior-v2-fixture-v1",
+                "id": "semantic-below",
+                "path": "semantic/below.md",
+                "pocket": "test",
+                "priority": 0,
+                "provenance": {
+                  "chunk_source": true,
+                  "file_source": true
+                },
+                "references": [],
+                "scopes": [
+                  "test:threshold"
+                ],
+                "source_id": "source-semantic-below",
+                "source_name": "Below.md",
+                "text": "Threshold below candidate."
+              },
+              {
+                "authority": "workspace_record",
+                "embedding_profile_id": "different-profile",
+                "id": "profile-mismatch",
+                "path": "semantic/mismatch.md",
+                "pocket": "test",
+                "priority": 0,
+                "provenance": {
+                  "chunk_source": true,
+                  "file_source": true
+                },
+                "references": [],
+                "scopes": [
+                  "test:mismatch"
+                ],
+                "source_id": "source-profile-mismatch",
+                "source_name": "Profile Mismatch.md",
+                "text": "Profile drift semantic candidate."
+              },
+              {
+                "authority": "workspace_record",
+                "embedding_profile_id": "rag-behavior-v2-fixture-v1",
+                "id": "budget-short",
+                "path": "budget/short.md",
+                "pocket": "test",
+                "priority": 0,
+                "provenance": {
+                  "chunk_source": true,
+                  "file_source": true
+                },
+                "references": [],
+                "scopes": [
+                  "test:budget",
+                  "aux:🧭"
+                ],
+                "source_id": "source-budget-short",
+                "source_name": "Budget Short.md",
+                "text": "Budget beacon short."
+              },
+              {
+                "authority": "workspace_record",
+                "embedding_profile_id": "rag-behavior-v2-fixture-v1",
+                "id": "budget-long",
+                "path": "budget/long.md",
+                "pocket": "test",
+                "priority": 0,
+                "provenance": {
+                  "chunk_source": true,
+                  "file_source": true
+                },
+                "references": [],
+                "scopes": [
+                  "test:budget"
+                ],
+                "source_id": "source-budget-long",
+                "source_name": "Budget Long.md",
+                "text": "Budget beacon xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx."
+              },
+              {
+                "authority": "workspace_record",
+                "embedding_profile_id": "rag-behavior-v2-fixture-v1",
+                "id": "unicode-record",
+                "path": "unicode/record.md",
+                "pocket": "test",
+                "priority": 0,
+                "provenance": {
+                  "chunk_source": true,
+                  "file_source": true
+                },
+                "references": [],
+                "scopes": [
+                  "test:unicode"
+                ],
+                "source_id": "source-unicode",
+                "source_name": "Unicode.md",
+                "text": "Café ATLAS coordinates the résumé review."
+              },
+              {
+                "authority": "workspace_record",
+                "embedding_profile_id": "rag-behavior-v2-fixture-v1",
+                "id": "scope-workspace",
+                "path": "scope/workspace.md",
+                "pocket": "test",
+                "priority": 0,
+                "provenance": {
+                  "chunk_source": true,
+                  "file_source": true
+                },
+                "references": [],
+                "scopes": [
+                  "workspace:edge"
+                ],
+                "source_id": "source-scope-workspace",
+                "source_name": "Scope Workspace.md",
+                "text": "Scope priority beacon."
+              },
+              {
+                "authority": "workspace_record",
+                "embedding_profile_id": "rag-behavior-v2-fixture-v1",
+                "id": "scope-project",
+                "path": "scope/project.md",
+                "pocket": "test",
+                "priority": 0,
+                "provenance": {
+                  "chunk_source": true,
+                  "file_source": true
+                },
+                "references": [],
+                "scopes": [
+                  "project:edge"
+                ],
+                "source_id": "source-scope-project",
+                "source_name": "Scope Project.md",
+                "text": "Scope priority beacon."
+              }
+            ],
+            "version": 2
+          },
+          "path": "rag-behavior-v2/fixture-records.json",
+          "sha256": "80216b2c5e9b557addadd4587b0da3352250987a786d125214014f8508259bfd"
+        },
+        "fixture-vectors.json": {
+          "bytes": 1171,
+          "data": {
+            "contract": "rag-behavior-v2-fixture-vectors",
+            "dimension": 4,
+            "profile_id": "rag-behavior-v2-fixture-v1",
+            "query_vectors": {
+              "semantic-mismatch": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "semantic-release": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "semantic-threshold": [
+                1,
+                0,
+                0,
+                0
+              ]
+            },
+            "record_vectors": {
+              "budget-long": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "budget-short": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "duplicate-a": [
+                0,
+                0,
+                1,
+                0
+              ],
+              "duplicate-b": [
+                0,
+                0,
+                1,
+                0
+              ],
+              "global-handbook": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "memory-fact": [
+                0.8,
+                0.6,
+                0,
+                0
+              ],
+              "multi-1": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "multi-2": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "other-1": [
+                0,
+                0,
+                0,
+                1
+              ],
+              "private-persona-note": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "profile-mismatch": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "release-checklist": [
+                0.6,
+                0.8,
+                0,
+                0
+              ],
+              "scope-project": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "scope-workspace": [
+                0,
+                1,
+                0,
+                0
+              ],
+              "semantic-below": [
+                1,
+                5,
+                0,
+                0
+              ],
+              "semantic-boundary": [
+                1,
+                4.898979485566356,
+                0,
+                0
+              ],
+              "unclassified-note": [
+                0.7,
+                0.714142842854285,
+                0,
+                0
+              ],
+              "unicode-record": [
+                0,
+                0,
+                1,
+                0
+              ],
+              "workspace-plan": [
+                0.8,
+                0.6,
+                0,
+                0
+              ]
+            },
+            "version": 2
+          },
+          "path": "rag-behavior-v2/fixture-vectors.json",
+          "sha256": "a9811031a44d2bf9e6d322fed9a864034cdb4f40476b04558a61fbfcfc7d7795"
+        },
+        "retrieval-profile.json": {
+          "bytes": 5734,
+          "data": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "authority": {
+              "component_micro": {
+                "conversation_memory": 900000,
+                "global_record": 1000000,
+                "persona_vault": 800000,
+                "unclassified": 250000,
+                "workspace_record": 1000000
+              },
+              "intent_detection": "none_explicit_query_policy_only",
+              "policy_values": [
+                "all",
+                "recorded_only"
+              ],
+              "recorded_kinds": [
+                "global_record",
+                "workspace_record",
+                "persona_vault"
+              ]
+            },
+            "cancellation_checkpoints": [
+              "filter.start",
+              "filter.scan",
+              "rank.start",
+              "rank.scan",
+              "cross_reference.before",
+              "cross_reference.after",
+              "selection.start",
+              "return"
+            ],
+            "context": {
+              "max_prompt_tokens": 4096,
+              "max_rag_context_tokens": 1800,
+              "reserved_generation_tokens": 1024,
+              "token_estimator": "floor((text_scalar_count+source_name_scalar_count+pocket_scalar_count+sum_scope_scalar_counts+99)/4)"
+            },
+            "contract": "rag-behavior-v2",
+            "embedding": {
+              "compatibility": "exact_profile_id_and_dimension",
+              "cosine_policy": "raw_cosine_clamped_0_to_1",
+              "fixture_dimension": 4,
+              "fixture_profile_id": "rag-behavior-v2-fixture-v1",
+              "rounding": "floor(value_times_1000000_plus_0_5)",
+              "semantic_min_score_micro": 200000,
+              "threshold_inclusive": true
+            },
+            "fallback_reasons": [
+              "disabled_by_settings",
+              "no_compatible_vectors",
+              "embedding_failed"
+            ],
+            "identity": {
+              "digest": "sha256",
+              "domains": {
+                "embedding": "rag-embedding",
+                "source": "rag-source",
+                "source_chunk": "rag-source-chunk"
+              },
+              "normalization": {
+                "content": "raw_utf8",
+                "missing_offsets": "empty_string",
+                "numeric_parts": "base10_ascii_no_padding",
+                "pocket": "unicode_nfkc_casefold_collapse_whitespace",
+                "source_key": "trim_unicode_whitespace_replace_backslash_with_forward_slash_unicode_lowercase",
+                "source_kind": "trim_unicode_lowercase"
+              },
+              "part_encoding": "utf8_length_prefixed_u64_little_endian",
+              "test_vectors": {
+                "canonical_hash": {
+                  "expected": "328ebac536f33028ea6b8879ecb70450374c408872c2ef2302f7e2e02c199360",
+                  "parts": [
+                    "",
+                    "é",
+                    "🧭"
+                  ]
+                },
+                "content_id": {
+                  "expected": "64d52a724725f19a89c6e135eda4d57e27cefbb0709a50b42687cfa6dd3a249c",
+                  "text": "Café 🧭"
+                },
+                "embedding_id": {
+                  "chunk_id": "7ec598b2f164701ebd406ce881da482b3c5e45149be4db50bf7341552f2eede7",
+                  "expected": "c871a6269b78c977ce85d3e417b2aaaec5d9421499ea7836eb02cde82be1f86e",
+                  "profile_id": "profile:v2"
+                },
+                "source_chunk_id": {
+                  "chunk_index": 12,
+                  "content_id": "64d52a724725f19a89c6e135eda4d57e27cefbb0709a50b42687cfa6dd3a249c",
+                  "expected": "7ec598b2f164701ebd406ce881da482b3c5e45149be4db50bf7341552f2eede7",
+                  "source_id": "338300efd243f481b5fa7556e26134cd1f0bf9c255e98b133cde799bbddb669d",
+                  "text_end": null,
+                  "text_start": null
+                },
+                "source_id": {
+                  "expected": "338300efd243f481b5fa7556e26134cd1f0bf9c255e98b133cde799bbddb669d",
+                  "pocket": "  Ｄｏｃｓ \t",
+                  "source_key": " Folder\\A.TXT ",
+                  "source_kind": " FILE "
+                }
+              },
+              "version": 2
+            },
+            "limits": {
+              "max_query_chars": 4000,
+              "max_query_utf8_bytes": 16384,
+              "max_records": 50000,
+              "max_top_k": 100,
+              "query_byte_encoding": "utf8_strict",
+              "query_character_unit": "unicode_scalar_values"
+            },
+            "modes": [
+              "exact_only",
+              "semantic_only",
+              "keyword_only",
+              "hybrid",
+              "scoped_hybrid"
+            ],
+            "normalization": {
+              "exact": "unicode_nfkc_lowercase_collapse_whitespace",
+              "keywords": "unicode_nfkc_lowercase_unique_alphanumeric_terms",
+              "query_expansions": [],
+              "record_strings": "trim_unicode_whitespace_require_valid_unicode_scalars",
+              "stop_words": []
+            },
+            "profile_id": "rag-behavior-v2-edge-derived",
+            "references": {
+              "behavior": "one_hop_candidate_only_reranking",
+              "duplicate_targets": "first_anchor_wins",
+              "max_expansions": 4,
+              "representation": "ordered_target_record_ids",
+              "self_source_links": "ignored"
+            },
+            "scope": {
+              "all_token": "all",
+              "comparison": "exact_unicode_scalar_sequence",
+              "deny_first": true,
+              "label_normalization": "trim_unicode_whitespace_preserve_case",
+              "multi_scope_match": "any",
+              "priority": "explicit_numeric_max_matching_scope",
+              "priority_range": [
+                -100,
+                100
+              ]
+            },
+            "scoring": {
+              "aggregate_rounding": "sum_weighted_components_then_truncate_toward_zero",
+              "aspect_coverage_weight_micro": 50000,
+              "authority_weight_micro": 50000,
+              "cross_reference_weight_micro": 50000,
+              "diversity_tie_break": [
+                "rank_score_micro_desc",
+                "base_score_micro_desc",
+                "source_id_asc",
+                "id_asc"
+              ],
+              "exact_weight_micro": 250000,
+              "final_clamp_micro": [
+                0,
+                1000000
+              ],
+              "keyword_weight_micro": 150000,
+              "positive_weight_budget_micro": 950000,
+              "priority_weight_micro": 50000,
+              "provenance_weight_micro": 50000,
+              "scope_weight_micro": 50000,
+              "semantic_weight_micro": 250000,
+              "string_order": "unicode_scalar_value_lexicographic_ascending",
+              "tie_break": [
+                "score_micro_desc",
+                "scope_priority_desc",
+                "source_name_asc",
+                "text_asc",
+                "source_id_asc",
+                "id_asc"
+              ],
+              "units": 1000000
+            },
+            "selection": {
+              "aspect_coverage": "new_query_terms_not_yet_covered",
+              "durable_candidate_limit": 48,
+              "max_chunks_per_source": 2,
+              "memory_authority": "conversation_memory",
+              "memory_candidate_limit": 16,
+              "prefer_unseen_sources": true
+            },
+            "semantic_states": [
+              "not_requested",
+              "ready",
+              "disabled_by_settings",
+              "lexical_fallback"
+            ],
+            "status": "frozen",
+            "version": 2
+          },
+          "path": "rag-behavior-v2/retrieval-profile.json",
+          "sha256": "a11aa760b46def6fddb041cdbc7db922d810969db078f986f22d60cf75cef000"
+        }
+      },
+      "input_digests": {
+        "cases.json": "b4584800b9beabc8c364f3356dd3b3fccb0b71f81cb8195d71ba18c34af51560",
+        "fixture-records.json": "80216b2c5e9b557addadd4587b0da3352250987a786d125214014f8508259bfd",
+        "fixture-vectors.json": "a9811031a44d2bf9e6d322fed9a864034cdb4f40476b04558a61fbfcfc7d7795",
+        "retrieval-profile.json": "a11aa760b46def6fddb041cdbc7db922d810969db078f986f22d60cf75cef000"
+      },
+      "source_manifest_sha256": "b2d69a80c6a95cbce297bbc3c76704db9ae20d0810a8940846ceb8a11d4c6940",
+      "version": 2
+    },
+    "rag-indexing-v1": {
+      "contract": "rag-indexing-v1",
+      "files": {
+        "fixture-documents.json": {
+          "bytes": 4527,
+          "data": {
+            "cases": [
+              {
+                "authority": "global_record",
+                "content": "﻿---\r\ntitle: ignored\r\n---\r\n# Alpha\r\nFirst [[Beta|label]].\r\n## Beta\r\nSecond.",
+                "expected_status": "ok",
+                "format": "markdown",
+                "id": "markdown-normalization-headings-links",
+                "limits": {
+                  "max_chars": 64,
+                  "max_tokens": 16
+                },
+                "path": "Docs\\Guide.md",
+                "pocket": "global",
+                "priority": 0,
+                "scopes": [
+                  "global"
+                ]
+              },
+              {
+                "authority": "workspace_record",
+                "content": "Alpha beta gamma delta\nSecond line with value.\nThird.",
+                "expected_status": "ok",
+                "format": "text",
+                "id": "text-soft-boundaries",
+                "limits": {
+                  "max_chars": 24,
+                  "max_tokens": 20
+                },
+                "path": "notes/soft.txt",
+                "pocket": "workspace",
+                "priority": -2,
+                "scopes": [
+                  "workspace:demo"
+                ]
+              },
+              {
+                "authority": "workspace_record",
+                "content": "🧭界𐀀abcdef",
+                "expected_status": "ok",
+                "format": "text",
+                "id": "unicode-scalar-hard-boundary",
+                "limits": {
+                  "max_chars": 4,
+                  "max_tokens": 10
+                },
+                "path": "unicode/scalars.txt",
+                "pocket": "workspace",
+                "priority": 0,
+                "scopes": [
+                  "workspace:demo"
+                ]
+              },
+              {
+                "authority": "global_record",
+                "content": "one two three four five",
+                "expected_status": "ok",
+                "format": "text",
+                "id": "explicit-whitespace-token-ceiling",
+                "limits": {
+                  "max_chars": 100,
+                  "max_tokens": 3
+                },
+                "path": "unicode/whitespace.txt",
+                "pocket": "global",
+                "priority": 0,
+                "scopes": [
+                  "global"
+                ]
+              },
+              {
+                "authority": "global_record",
+                "content": "﻿---\nname: metadata\n---\n　\n",
+                "expected_status": "ok",
+                "format": "markdown",
+                "id": "empty-after-frontmatter",
+                "path": "empty.md",
+                "pocket": "global",
+                "priority": 0,
+                "scopes": [
+                  "global"
+                ]
+              },
+              {
+                "authority": "persona_vault",
+                "content": "Preamble signal.\n# North\nCompass 🧭 signal.\n# North\nDuplicate heading.",
+                "expected_status": "ok",
+                "format": "markdown",
+                "id": "portable-path-and-multi-scope-identity",
+                "limits": {
+                  "max_chars": 48,
+                  "max_tokens": 12
+                },
+                "path": " ./Vault//Lore\\Café.MD ",
+                "pocket": "vault-astra",
+                "priority": 7,
+                "scopes": [
+                  "persona:astra",
+                  "workspace:demo"
+                ]
+              },
+              {
+                "authority": "global_record",
+                "content": "####### Seven is text\n#NoSpace is text\n # Indented is text\n###### Six ####\nBody\n## Two\nFirst duplicate.\n## Two\nSecond duplicate.",
+                "expected_status": "ok",
+                "format": "markdown",
+                "id": "markdown-heading-edge-cases",
+                "limits": {
+                  "max_chars": 80,
+                  "max_tokens": 20
+                },
+                "path": "headings.md",
+                "pocket": "global",
+                "priority": 0,
+                "scopes": [
+                  "global"
+                ]
+              },
+              {
+                "authority": "global_record",
+                "content": "---\ntitle: retained\n# Body\nFact",
+                "expected_status": "ok",
+                "format": "markdown",
+                "id": "unclosed-frontmatter-preserved",
+                "path": "open-frontmatter.md",
+                "pocket": "global",
+                "priority": 0,
+                "scopes": [
+                  "global"
+                ]
+              },
+              {
+                "authority": "global_record",
+                "content": "# Unsafe",
+                "expected_error_code": "invalid_path",
+                "expected_status": "error",
+                "format": "markdown",
+                "id": "reject-parent-path",
+                "path": "../escape.md",
+                "pocket": "global",
+                "priority": 0,
+                "scopes": [
+                  "global"
+                ]
+              },
+              {
+                "authority": "global_record",
+                "content": "duplicate scope",
+                "expected_error_code": "invalid_scopes",
+                "expected_status": "error",
+                "format": "text",
+                "id": "reject-duplicate-scope",
+                "path": "duplicate.txt",
+                "pocket": "global",
+                "priority": 0,
+                "scopes": [
+                  "global",
+                  "global"
+                ]
+              },
+              {
+                "authority": "global_record",
+                "content": "<p>not in the portable lane</p>",
+                "expected_error_code": "unsupported_format",
+                "expected_status": "error",
+                "format": "html",
+                "id": "reject-unsupported-format",
+                "path": "page.html",
+                "pocket": "global",
+                "priority": 0,
+                "scopes": [
+                  "global"
+                ]
+              },
+              {
+                "authority": "global_record",
+                "content": "before\u0000after",
+                "expected_error_code": "invalid_text",
+                "expected_status": "error",
+                "format": "text",
+                "id": "reject-nul-text",
+                "path": "nul.txt",
+                "pocket": "global",
+                "priority": 0,
+                "scopes": [
+                  "global"
+                ]
+              }
+            ],
+            "contract": "rag-indexing-v1-fixtures",
+            "version": 1
+          },
+          "path": "rag-indexing-v1/fixture-documents.json",
+          "sha256": "a58c24a353a1c4dfe963831b2bdcda247046e56e79d764f3730f7565ae431295"
+        },
+        "indexing-profile.json": {
+          "bytes": 2434,
+          "data": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "chunking": {
+              "default_max_chars": 2400,
+              "default_max_tokens": 600,
+              "long_token": "hard-unicode-scalar-split",
+              "offset_unit": "canonical-unicode-scalars",
+              "overlap_chars": 0,
+              "soft_boundary": "rightmost-explicit-whitespace",
+              "token_definition": "runs-separated-by-explicit-whitespace",
+              "token_estimate": "ceil-chunk-unicode-scalars-divided-by-4"
+            },
+            "contract": "rag-indexing-v1",
+            "identity": {
+              "chunk": "rag-behavior-v2-source-chunk-id",
+              "content": "sha256-strict-utf8",
+              "path": "relative-forward-slash-collapse-dot-reject-parent-preserve-case",
+              "source": "rag-behavior-v2-source-id(file,pocket,normalized-path)"
+            },
+            "input": {
+              "formats": [
+                "markdown",
+                "text"
+              ],
+              "max_path_scalars": 1024,
+              "max_scopes": 64,
+              "max_source_utf8_bytes": 10485760,
+              "nul_policy": "reject",
+              "strict_utf8": true,
+              "unicode_unit": "scalar"
+            },
+            "normalization": {
+              "leading_bom": "strip_one",
+              "line_endings": "crlf_and_cr_to_lf",
+              "markdown_frontmatter": "remove_only_leading_exact-triple-dash-block",
+              "outer_whitespace": "unicode-white-space-15.1-explicit",
+              "unclosed_frontmatter": "preserve"
+            },
+            "product_boundaries": {
+              "product_owned": [
+                "filesystem scanning",
+                "PDF and OCR",
+                "database and vector persistence",
+                "embedding execution",
+                "wiki target resolution",
+                "graph policy",
+                "UI and chat orchestration"
+              ],
+              "shared": [
+                "strict text decode",
+                "normalization",
+                "sectioning",
+                "chunking",
+                "offsets",
+                "portable identity",
+                "record metadata"
+              ]
+            },
+            "profile_id": "rag-indexing-v1-portable",
+            "references": {
+              "aliases": "destination-before-first-pipe",
+              "extraction": "ordered-unique-wiki-link-destinations-per-chunk",
+              "record_ids": "unresolved-empty",
+              "resolution": "product-owned-after-portable-indexing"
+            },
+            "sections": {
+              "heading_line_in_first_chunk": true,
+              "markdown": "column-zero-atx-levels-1-through-6-with-space-or-tab",
+              "preamble_heading": "Overview",
+              "text": "single-overview"
+            },
+            "version": 1,
+            "whitespace_code_points": [
+              "0009",
+              "000A",
+              "000B",
+              "000C",
+              "000D",
+              "0020",
+              "0085",
+              "00A0",
+              "1680",
+              "2000",
+              "2001",
+              "2002",
+              "2003",
+              "2004",
+              "2005",
+              "2006",
+              "2007",
+              "2008",
+              "2009",
+              "200A",
+              "2028",
+              "2029",
+              "202F",
+              "205F",
+              "3000"
+            ]
+          },
+          "path": "rag-indexing-v1/indexing-profile.json",
+          "sha256": "caa86908dc772b30500e356562e907380b0b9436a98b55ea99b04e053b918778"
+        }
+      },
+      "input_digests": {
+        "fixture-documents.json": "a58c24a353a1c4dfe963831b2bdcda247046e56e79d764f3730f7565ae431295",
+        "indexing-profile.json": "caa86908dc772b30500e356562e907380b0b9436a98b55ea99b04e053b918778"
+      },
+      "source_manifest_sha256": "964a837a0907b8ae3c0ae648fbf6f818aa5c1e28b29dbfa73643ca18d1fcc859",
+      "version": 1
+    }
+  },
+  "generated_from": "contracts/",
+  "schema": "browser-rag-ts-runtime-contract-v2",
+  "snapshot_digest": "0a0250fd382191e1574fc24d31001e08232b10f5f67b07bc7f5eec88b4c1a60a"
+}

@@ -1,0 +1,3 @@
+# Preserve the exact reviewed source bytes across Git import and clone.
+# Git still detects text for ordinary diffs; no fixture newline conversion.
+* -text

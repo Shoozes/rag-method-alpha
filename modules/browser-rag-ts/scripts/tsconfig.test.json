@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "noEmit": false,
+    "outDir": "../.artifacts/test-dist",
+    "rootDir": "..",
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": ["../src", "../tests"]
+}

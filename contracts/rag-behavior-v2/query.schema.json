@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rag-behavior-v2/query.schema.json",
+  "title": "RAG behavior v2 query case",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "query", "mode", "top_k"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "query": {"type": "string", "maxLength": 4000},
+    "mode": {
+      "enum": ["exact_only", "semantic_only", "keyword_only", "hybrid", "scoped_hybrid"]
+    },
+    "top_k": {"type": "integer", "minimum": 1, "maximum": 100},
+    "include_scopes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "exclude_scopes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "scope_priorities": {
+      "type": "object",
+      "additionalProperties": {"type": "integer", "minimum": -100, "maximum": 100}
+    },
+    "authority_policy": {"enum": ["all", "recorded_only"]},
+    "query_vector_id": {"type": "string", "minLength": 1},
+    "semantic_enabled": {"type": "boolean"},
+    "semantic_fallback_reason": {
+      "enum": ["disabled_by_settings", "no_compatible_vectors", "embedding_failed"]
+    },
+    "max_context_tokens": {"type": "integer", "minimum": 1, "maximum": 1800},
+    "expand": {"type": "boolean"}
+  }
+}

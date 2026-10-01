@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract": "rag-indexing-v1",
+  "version": 1,
+  "profile_id": "rag-indexing-v1-portable",
+  "input": {
+    "formats": ["markdown", "text"],
+    "strict_utf8": true,
+    "unicode_unit": "scalar",
+    "max_source_utf8_bytes": 10485760,
+    "max_path_scalars": 1024,
+    "max_scopes": 64,
+    "nul_policy": "reject"
+  },
+  "normalization": {
+    "leading_bom": "strip_one",
+    "line_endings": "crlf_and_cr_to_lf",
+    "outer_whitespace": "unicode-white-space-15.1-explicit",
+    "markdown_frontmatter": "remove_only_leading_exact-triple-dash-block",
+    "unclosed_frontmatter": "preserve"
+  },
+  "whitespace_code_points": [
+    "0009", "000A", "000B", "000C", "000D", "0020", "0085", "00A0",
+    "1680", "2000", "2001", "2002", "2003", "2004", "2005", "2006",
+    "2007", "2008", "2009", "200A", "2028", "2029", "202F", "205F",
+    "3000"
+  ],
+  "sections": {
+    "text": "single-overview",
+    "markdown": "column-zero-atx-levels-1-through-6-with-space-or-tab",
+    "heading_line_in_first_chunk": true,
+    "preamble_heading": "Overview"
+  },
+  "chunking": {
+    "default_max_chars": 2400,
+    "default_max_tokens": 600,
+    "token_definition": "runs-separated-by-explicit-whitespace",
+    "soft_boundary": "rightmost-explicit-whitespace",
+    "long_token": "hard-unicode-scalar-split",
+    "overlap_chars": 0,
+    "offset_unit": "canonical-unicode-scalars",
+    "token_estimate": "ceil-chunk-unicode-scalars-divided-by-4"
+  },
+  "identity": {
+    "source": "rag-behavior-v2-source-id(file,pocket,normalized-path)",
+    "content": "sha256-strict-utf8",
+    "chunk": "rag-behavior-v2-source-chunk-id",
+    "path": "relative-forward-slash-collapse-dot-reject-parent-preserve-case"
+  },
+  "references": {
+    "extraction": "ordered-unique-wiki-link-destinations-per-chunk",
+    "aliases": "destination-before-first-pipe",
+    "record_ids": "unresolved-empty",
+    "resolution": "product-owned-after-portable-indexing"
+  },
+  "product_boundaries": {
+    "shared": [
+      "strict text decode",
+      "normalization",
+      "sectioning",
+      "chunking",
+      "offsets",
+      "portable identity",
+      "record metadata"
+    ],
+    "product_owned": [
+      "filesystem scanning",
+      "PDF and OCR",
+      "database and vector persistence",
+      "embedding execution",
+      "wiki target resolution",
+      "graph policy",
+      "UI and chat orchestration"
+    ]
+  }
+}
