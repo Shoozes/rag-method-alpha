@@ -2,10 +2,10 @@
   "schema": "public-release-manifest/v1",
   "project": "rag-method",
   "status": "pass",
-  "generated_at_utc": "2026-10-01T05:22:50.346Z",
+  "generated_at_utc": "2026-10-01T07:58:36.041Z",
   "fingerprint_algorithm": "sha256-json-file-table-v1",
   "fingerprint_definition": "SHA256(UTF8(JSON.stringify({schema:\"public-source-content/v1\",files:<ordered path,bytes,sha256 table>}) + \"\\n\"))",
-  "source_fingerprint_sha256": "ddcb9e3266eedd5a85c9a14d41f99046a5b2b874eaae60c6f24378ba04282850",
+  "source_fingerprint_sha256": "5e4537fa162ec27b5fb72acbb149d6ce452a062111ab37508fac68c51ba1a703",
   "self_manifest_exclusion": "PUBLIC_MANIFEST.json",
   "manifest_complete": true,
   "verification_exclusions": [
@@ -22,9 +22,9 @@
     "source/frontend/node_modules"
   ],
   "ignored_verification_roots": [],
-  "file_count": 1238,
-  "total_file_bytes": 10353775,
-  "scanned_text_files": 1439,
+  "file_count": 1239,
+  "total_file_bytes": 10372995,
+  "scanned_text_files": 1440,
   "binary_ascii_string_scans": 3,
   "files": [
     {
@@ -214,8 +214,8 @@
     },
     {
       "path": "corpora/threejs-docs/README.md",
-      "bytes": 1413,
-      "sha256": "d92839f9d974f3e050185930e02f25ba471d1d3703cc4305eacedc6f52d567fb"
+      "bytes": 1764,
+      "sha256": "2a366e95670e4dee4a8ddeca6c47b13f27199a8a73db9b8114d66924f1bea466"
     },
     {
       "path": "corpora/threejs-docs/THREEJS-LICENSE.txt",
@@ -229,8 +229,8 @@
     },
     {
       "path": "corpora/threejs-docs/manifest.json",
-      "bytes": 443830,
-      "sha256": "fdfddaf22fe71dc89e16b440c4f0ee05b2c7a1464526fd3b37a317b5147194e7"
+      "bytes": 443928,
+      "sha256": "8f501042cf4fe8265b494e0b5957639da65f3d5d74ddb03e999fce4a1a7e5705"
     },
     {
       "path": "corpora/threejs-docs/vault/api/AMFLoader.md",
@@ -729,8 +729,8 @@
     },
     {
       "path": "corpora/threejs-docs/vault/api/ClusteredLighting.md",
-      "bytes": 1859,
-      "sha256": "db0f22a9de41be7d0aa286ff2d4c6de165676a914cb13e6d2fc6735ac4cf61be"
+      "bytes": 1988,
+      "sha256": "ec889805e9f2a3c6678872280291a8764e88eea547e326bab71abb24db8d1cc2"
     },
     {
       "path": "corpora/threejs-docs/vault/api/ClusteredLightsNode.md",
@@ -864,8 +864,8 @@
     },
     {
       "path": "corpora/threejs-docs/vault/api/CountingSort.md",
-      "bytes": 4611,
-      "sha256": "879f720755d03373ce5ccf1b6cb8cbe25f305466be76e7834372b2f6e59cbc93"
+      "bytes": 4749,
+      "sha256": "45dd4f256ba0f5aed5cdfb7f7fae48c1f76e974b14ece3936592b368a7af6586"
     },
     {
       "path": "corpora/threejs-docs/vault/api/CubeCamera.md",
@@ -1084,8 +1084,8 @@
     },
     {
       "path": "corpora/threejs-docs/vault/api/DynamicLighting.md",
-      "bytes": 1766,
-      "sha256": "f92fb0998d9206c4cefea5c47bf0f2dc5b0333e29272c2187976b180f6546ec4"
+      "bytes": 2027,
+      "sha256": "f9e786664644ef5e584a98d8a1688193844105b1a5cadc63aaaedd863fddef83"
     },
     {
       "path": "corpora/threejs-docs/vault/api/DynamicLightsNode.md",
@@ -3664,8 +3664,8 @@
     },
     {
       "path": "corpora/threejs-docs/vault/api/UniformsGroup.md",
-      "bytes": 5855,
-      "sha256": "a44c5d7e616b21300c98b3a684b7e9d85f0a74d019d520f1a51e2f93949e9424"
+      "bytes": 6773,
+      "sha256": "7a43de943b301672bb96e069f28ddb530a004792516dabc68ae90256cfce69aa"
     },
     {
       "path": "corpora/threejs-docs/vault/api/UnpackFloatNode.md",
@@ -4379,8 +4379,8 @@
     },
     {
       "path": "corpora/threejs-docs/vault/manual/cleanup.md",
-      "bytes": 12971,
-      "sha256": "cc13e9e7c5415fbc2e4a920402a08dc75fa11de8162942b0390dc18ab8f16a49"
+      "bytes": 13105,
+      "sha256": "fdcdb5d8e127fbafae277bf64f152616a23f3d0704584a35ffcc0436a2ea5342"
     },
     {
       "path": "corpora/threejs-docs/vault/manual/creating-a-scene.md",
@@ -4389,8 +4389,8 @@
     },
     {
       "path": "corpora/threejs-docs/vault/manual/fundamentals.md",
-      "bytes": 17274,
-      "sha256": "685907edec70af4ac77e073d488bc631a56a89971651b4747855f6c8d7bbd9ff"
+      "bytes": 18161,
+      "sha256": "2de42f604ff0b9389a46f243c7ea256e74d1ecadafa65b2f263e48582c734091"
     },
     {
       "path": "corpora/threejs-docs/vault/manual/how-to-dispose-of-objects.md",
@@ -4399,28 +4399,28 @@
     },
     {
       "path": "corpora/threejs-docs/vault/manual/materials.md",
-      "bytes": 10115,
-      "sha256": "cab45c86da044a50d94272aefe8714c07742cabdf7ecaaf5de1272d1ccef80a0"
+      "bytes": 10249,
+      "sha256": "fdb0da60b969bfcb5f4e0168f33a721a49e292a3acb35fdc8a5af7292fb3e223"
     },
     {
       "path": "corpora/threejs-docs/vault/manual/primitives.md",
-      "bytes": 14040,
-      "sha256": "859e04cbaefaa4f406aa4636ea6343fb6b2968f1a3e34b055872914ed54d0cf0"
+      "bytes": 14576,
+      "sha256": "c0c3610338967798d716376bbf54b27b2cd1752809517078b6758e679818e87d"
     },
     {
       "path": "corpora/threejs-docs/vault/manual/responsive.md",
-      "bytes": 11102,
-      "sha256": "c07afd0575af26a297662e35a5cc77a2f768337cb7e6912d03b1cf0a3808fde4"
+      "bytes": 11225,
+      "sha256": "93adaeb39686140db6842311b156ef3db1502f09adae61545203345d5a31cae4"
     },
     {
       "path": "corpora/threejs-docs/vault/manual/scenegraph.md",
-      "bytes": 18703,
-      "sha256": "bdf4a9effac8e32c31d366c7acc21efee02752108905a8f284faab8274b11d78"
+      "bytes": 18689,
+      "sha256": "2cc924a8396c693ccdfda880bddc05427fa6ed3f3b8ab064b6d49cfaf2383bec"
     },
     {
       "path": "corpora/threejs-docs/vault/manual/textures.md",
-      "bytes": 20467,
-      "sha256": "492d6e4b17237281a9c0c33f7c781269dd623bd5384125fcf0702338557ed23b"
+      "bytes": 20995,
+      "sha256": "fbee685616d0ef033bffd236e9de549bd0d6d67e7e1500b1f2dcf500eb6b68c9"
     },
     {
       "path": "corpora/threejs-docs/vault/manual/webgpurenderer.md",
@@ -4839,8 +4839,8 @@
     },
     {
       "path": "docs/DEVELOPMENT.md",
-      "bytes": 4767,
-      "sha256": "b04e10727dce3d4d4d194a28ae0b46aead43d1aa68bd76d51202c4b68d480159"
+      "bytes": 4844,
+      "sha256": "f4dccc10e4b8ef5de605eb992f787cc82a5022177df014abbc83343f796c63c5"
     },
     {
       "path": "docs/METHOD.md",
@@ -4965,12 +4965,12 @@
     {
       "path": "modules/browser-rag-ts/demo/public/corpora/threejs-docs.manifest.json",
       "bytes": 415,
-      "sha256": "462df77adbf550527e370989b9d26962617b643550fd246bf72a2016e74a7ccc"
+      "sha256": "5f7d7f00244c2ad72a720565c44a457de521867f11736ab01d2a168212db47ad"
     },
     {
       "path": "modules/browser-rag-ts/demo/public/corpora/threejs-docs.pack.json",
-      "bytes": 3186618,
-      "sha256": "e5528067ce05a5194adb4eb4060289e26c4f85b53707c38dfaef6a9ca75092ea"
+      "bytes": 3190389,
+      "sha256": "226d56cf321ce542f3cba84e86193c74b55c61d4adcc6860e1f22fd2e2dc8a0c"
     },
     {
       "path": "modules/browser-rag-ts/demo/styles.css",
@@ -4999,8 +4999,8 @@
     },
     {
       "path": "modules/browser-rag-ts/package.json",
-      "bytes": 1705,
-      "sha256": "1ed6ea91bdf2654a4887ced3fd6885e90c26b56bd633f4c61f21751a59f04f79"
+      "bytes": 1747,
+      "sha256": "7c5224844ede72d777f6afb63dd73884fec7f5c62e471f4565873141499d05a2"
     },
     {
       "path": "modules/browser-rag-ts/scripts/adapter-conformance.mjs",
@@ -5538,6 +5538,11 @@
       "sha256": "c9915c19a1c81ab7b042bf91ebef5fd091ec2868be8282feb507338acff85d2b"
     },
     {
+      "path": "modules/browser-rag-ts/tests/artifact/threejs-doc-links.test.mjs",
+      "bytes": 5370,
+      "sha256": "9bd10cea3ca8be846337d13c233e64112386b6d150c7a7772b0fcf898b4bf44d"
+    },
+    {
       "path": "modules/browser-rag-ts/tests/conformance/fixtures.ts",
       "bytes": 550,
       "sha256": "676eeb05baae20bbd708642effa35a612cff32a06d5a275c6f495754c5503305"
@@ -5609,8 +5614,8 @@
     },
     {
       "path": "modules/browser-rag-ts/tests/worker/documentationCorpus.test.ts",
-      "bytes": 2748,
-      "sha256": "e9aae016196fcafc8324e04466888cee7988d176098bbcc15437e1abfa0b3657"
+      "bytes": 4849,
+      "sha256": "abe45ba120cb92450e3923cbd39cb389e1fb17a545468ad3c20adf2457ad109f"
     },
     {
       "path": "modules/browser-rag-ts/tests/worker/worker.test.ts",
@@ -5764,8 +5769,8 @@
     },
     {
       "path": "scripts/prepare_threejs_docs.mjs",
-      "bytes": 12721,
-      "sha256": "7f5d8439c4d02bbe831e4f3865f2c686a541d6951242e6d939a597783d3af6a3"
+      "bytes": 16357,
+      "sha256": "18790a826d2649e50e7411e29208da1cd5671716a2b2c02444c9bae384a29a48"
     },
     {
       "path": "scripts/proof_repository.py",
@@ -7323,7 +7328,7 @@
     }
   ],
   "inputs": {
-    "allowlist_sha256": "51659d026d9733cdc02f3846419b9fe2dba37d83a5d53ecef86ac7c9b3db5a79",
+    "allowlist_sha256": "3b7cef836e6f167bf6a3c76143e4ed0364f95ab75984e19f330772e36ff68e64",
     "media_reviews_sha256": "13971acef4aa41cd6f48e661530cfd6a146fa7572f150b0fa568e6b9eb071c11",
     "exceptions_sha256": "b894b63f0cbf5c9e9d14365926c75518410f6f7ef2a5db7129766a0c947e0f33"
   },

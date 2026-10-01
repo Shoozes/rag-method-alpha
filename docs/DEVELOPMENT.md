@@ -45,6 +45,7 @@ The build resolver hashes every ordinary source file, excluding the manifest its
 ```text
 node scripts/prepare_threejs_docs.mjs --upstream <local-three-checkout>
 node scripts/prepare_threejs_docs.mjs --upstream <local-three-checkout> --check
+node --test modules/browser-rag-ts/tests/artifact/threejs-doc-links.test.mjs
 ```
 
 This command does not clone or download content. Regeneration changes corpus identity and requires new review. Do not edit generated vault files to change test expectations.

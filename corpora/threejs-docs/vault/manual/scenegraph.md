@@ -398,7 +398,7 @@ below it around. The code uses a [SplineCurve](../api/SplineCurve.md) which it c
 along that curve. 0.0 is the start of the curve. 1.0 is the end of the curve. It
 asks for the current position where it puts the tank. It then asks for a
 position slightly further down the curve and uses that to point the tank in that
-direction using [Object3D.lookAt](../api/Object3D.lookAt.md).
+direction using [Object3D.lookAt](../api/Object3D.md).
 
 ```js
 const tankPosition = new THREE.Vector2();
@@ -416,7 +416,7 @@ tank.lookAt(tankTarget.x, 0, tankTarget.y);
 
 The turret on top of the tank is moved automatically by being a child
 of the tank. To point it at the target we just ask for the target's world position
-and then again use [Object3D.lookAt](../api/Object3D.lookAt.md)
+and then again use [Object3D.lookAt](../api/Object3D.md)
 
 ```js
 const targetPosition = new THREE.Vector3();

@@ -14,7 +14,7 @@ have to write yourself if you were to use WebGL directly.
 
 These tutorials assume you already know JavaScript and, for the
 most part they will use ES6 style. [See here for a
-terse list of things you're expected to already know](prerequisites.md).
+terse list of things you're expected to already know](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/prerequisites.html) (upstream; outside the offline vault).
 Most browsers that support three.js are auto-updated so most users should
 be able to run this code. If you'd like to make this code run
 on really old browsers look into a transpiler like [Babel](https://babeljs.io).
@@ -39,13 +39,13 @@ Things to notice about the diagram above.
 
 - [Mesh](../api/Mesh.md) objects represent drawing a specific `Geometry` with a specific [Material](../api/Material.md). Both [Material](../api/Material.md) objects and `Geometry` objects can be used by multiple [Mesh](../api/Mesh.md) objects. For example to draw two blue cubes in different locations we could need two [Mesh](../api/Mesh.md) objects to represent the position and orientation of each cube. We would only need one `Geometry` to hold the vertex data for a cube and we would only need one [Material](../api/Material.md) to specify the color blue. Both [Mesh](../api/Mesh.md) objects could reference the same `Geometry` object and the same [Material](../api/Material.md) object.
 
-- `Geometry` objects represent the vertex data of some piece of geometry like a sphere, cube, plane, dog, cat, human, tree, building, etc... Three.js provides many kinds of built in [geometry primitives](primitives.md). You can also [create custom geometry](custom-buffergeometry.md) as well as [load geometry from files](load-obj.md).
+- `Geometry` objects represent the vertex data of some piece of geometry like a sphere, cube, plane, dog, cat, human, tree, building, etc... Three.js provides many kinds of built in [geometry primitives](primitives.md). You can also [create custom geometry](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/custom-buffergeometry.html) (upstream; outside the offline vault) as well as [load geometry from files](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/load-obj.html) (upstream; outside the offline vault).
 
 - [Material](../api/Material.md) objects represent [the surface properties used to draw geometry](materials.md) including things like the color to use and how shiny it is. A [Material](../api/Material.md) can also reference one or more [Texture](../api/Texture.md) objects which can be used, for example, to wrap an image onto the surface of a geometry.
 
-- [Texture](../api/Texture.md) objects generally represent images either [loaded from image files](textures.md), [generated from a canvas](canvas-textures.md) or [rendered from another scene](rendertargets.md).
+- [Texture](../api/Texture.md) objects generally represent images either [loaded from image files](textures.md), [generated from a canvas](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/canvas-textures.html) (upstream; outside the offline vault) or [rendered from another scene](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/rendertargets.html) (upstream; outside the offline vault).
 
-- [Light](../api/Light.md) objects represent [different kinds of lights](lights.md).
+- [Light](../api/Light.md) objects represent [different kinds of lights](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/lights.html) (upstream; outside the offline vault).
 
 Given all of that we're going to make the smallest  "Hello Cube"  setup
 that looks like this
@@ -252,7 +252,7 @@ Outside the loop we call `requestAnimationFrame` one time to start the loop.
 
 It's a little better but it's still hard to see the 3d. What would help is to
 add some lighting so let's add a light. There are many kinds of lights in
-three.js which we'll go over in [a future article](lights.md). For now let's create a directional light.
+three.js which we'll go over in [a future article](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/lights.html) (upstream; outside the offline vault). For now let's create a directional light.
 
 ```js
 const color = 0xFFFFFF;
@@ -435,6 +435,3 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 
 </script>
 ```
-
-[geometry.html](geometry.md)
-[Geometry](Geometry)

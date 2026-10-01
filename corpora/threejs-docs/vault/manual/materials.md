@@ -195,7 +195,7 @@ There's really a lot to consider with materials and we actually still
 have a bunch more to go. In particular we've mostly ignored textures
 which open up a whole slew of options. Before we cover textures though
 we need to take a break and cover
-[setting up your development environment](setup.md)
+[setting up your development environment](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/setup.html) (upstream; outside the offline vault)
 
 ### material.needsUpdate
 

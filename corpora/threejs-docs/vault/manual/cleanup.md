@@ -374,7 +374,7 @@ class ResourceTracker {
 }
 ```
 
-And with that let's take an example from [the article on loading gltf files](load-gltf.md)
+And with that let's take an example from [the article on loading gltf files](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/load-gltf.html) (upstream; outside the offline vault)
 and make it load and free files.
 
 ```js

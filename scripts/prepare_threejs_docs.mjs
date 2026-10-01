@@ -1,12 +1,12 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
-import { basename, dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { basename, dirname, join, posix, relative, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const EXPECTED_COMMIT = "1a1c86699f9c38d4bef1cf51652e5f0e0680d745";
-const CONVERSION_VERSION = 1;
+const CONVERSION_VERSION = 2;
 const CORPUS_ROOT = resolve(ROOT, "corpora", "threejs-docs");
 const VAULT_ROOT = resolve(CORPUS_ROOT, "vault");
 const MANIFEST_PATH = resolve(CORPUS_ROOT, "manifest.json");
@@ -105,7 +105,7 @@ function splitTslGuide(content) {
   return documents;
 }
 
-function htmlToMarkdown(html, sourceName) {
+export function htmlToMarkdown(html, sourceName) {
   const title = decodeEntities(/<title>(.*?)<\/title>/isu.exec(html)?.[1] ?? basename(sourceName, ".html"));
   let body = /<body[^>]*>([\s\S]*?)<\/body>/iu.exec(html)?.[1];
   if (!body) throw new Error(`manual page has no body: ${sourceName}`);
@@ -121,7 +121,8 @@ function htmlToMarkdown(html, sourceName) {
     return marker;
   });
   body = body.replace(/<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/giu, (_, href, label) => {
-    const text = decodeEntities(label.replace(/<[^>]+>/gu, "")).trim() || href;
+    const text = decodeEntities(label.replace(/<[^>]+>/gu, "")).trim();
+    if (!text) return "";
     let target = href;
     const api = /^\/docs\/#api\/en\/(?:[^/]+\/)*([^/#]+)(?:#(.+))?$/u.exec(href);
     if (api) target = `../api/${api[1]}.md${api[2] ? `#${api[2]}` : ""}`;
@@ -139,6 +140,68 @@ function htmlToMarkdown(html, sourceName) {
   body = cleanWhitespace(decodeEntities(body));
   if (!body.startsWith("# ")) body = `# ${title}\n\n${body}`;
   return { title, content: `${body}\n` };
+}
+
+const API_SOURCE_FALLBACKS = Object.freeze({
+  "api/Lighting.md": "src/renderers/common/Lighting.js",
+  "api/UniformBuffer.md": "src/renderers/common/UniformBuffer.js",
+  "api/BitonicSort.md": "examples/jsm/gpgpu/BitonicSort.js",
+});
+const OUTSIDE_VAULT_NOTICE = " (upstream; outside the offline vault)";
+
+export function resolveVaultLink(href, document, { includedPaths, upstreamPaths }) {
+  if (/^(?:[a-z][a-z0-9+.-]*:|\/|#)/iu.test(href)) return { href, outsideVault: false };
+  const [pathname] = href.split(/[?#]/u);
+  const target = posix.normalize(posix.join(posix.dirname(document.path), pathname));
+  if (includedPaths.has(target)) return { href, outsideVault: false };
+  const classPage = target.replace(/\.([^.\/]+)\.md$/u, ".md");
+  if (target.startsWith("api/") && classPage !== target && includedPaths.has(classPage)) {
+    return { href: posix.relative(posix.dirname(document.path), classPage), outsideVault: false };
+  }
+  let upstreamPath = API_SOURCE_FALLBACKS[target];
+  if (!upstreamPath && document.original_path.startsWith("manual/pages/")) {
+    const originalRelative = pathname.replace(/\.md$/u, ".html");
+    const candidates = [
+      posix.normalize(posix.join(posix.dirname(document.original_path), originalRelative)),
+      posix.normalize(posix.join("manual", originalRelative)),
+    ];
+    upstreamPath = candidates.find((candidate) => upstreamPaths.has(candidate));
+  }
+  if (!upstreamPath || !upstreamPaths.has(upstreamPath)) {
+    throw new Error(`document link has no bundled or verified upstream target: ${document.path} -> ${target}`);
+  }
+  return { href: `https://github.com/mrdoob/three.js/blob/${EXPECTED_COMMIT}/${upstreamPath}`, outsideVault: true };
+}
+
+export function rewriteVaultLinks(content, document, context) {
+  let fence = null;
+  const output = [];
+  let prose = [];
+  const flush = () => {
+    if (!prose.length) return;
+    // Inline code is source text, even when it contains Markdown-shaped syntax.
+    output.push(prose.join("\n").replace(/(`+)([\s\S]*?)\1|(!?\[[^\]]*\]\(([^)]+)\))/gu, (match, code, _body, link, href) => {
+      if (code) return match;
+      const resolved = resolveVaultLink(href, document, context);
+      if (resolved.href === href && !resolved.outsideVault) return link;
+      return link.slice(0, link.lastIndexOf("(") + 1) + resolved.href + ")" + (resolved.outsideVault ? OUTSIDE_VAULT_NOTICE : "");
+    }));
+    prose = [];
+  };
+  for (const line of content.split("\n")) {
+    const marker = /^\s*(?:>\s*)*(`{3,}|~{3,})/u.exec(line)?.[1];
+    if (marker) {
+      if (!fence) { flush(); fence = marker; }
+      else if (marker[0] === fence[0] && marker.length >= fence.length) fence = null;
+      output.push(line);
+    } else if (fence) {
+      output.push(line);
+    } else {
+      prose.push(line);
+    }
+  }
+  flush();
+  return output.join("\n");
 }
 
 function documentRecord(kind, outputPath, title, originalPath, content) {
@@ -160,6 +223,7 @@ function documentRecord(kind, outputPath, title, originalPath, content) {
 async function buildCorpus(upstream) {
   const commit = execFileSync("git", ["-C", upstream, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
   if (commit !== EXPECTED_COMMIT) throw new Error(`upstream checkout must be ${EXPECTED_COMMIT}; received ${commit}`);
+  const upstreamPaths = new Set(execFileSync("git", ["-C", upstream, "ls-tree", "-r", "--name-only", EXPECTED_COMMIT], { encoding: "utf8", maxBuffer: 4 * 1024 * 1024 }).trim().split("\n"));
   const documents = [];
   const apiRoot = resolve(upstream, "docs", "pages");
   for (const source of await files(apiRoot, ".md")) {
@@ -176,6 +240,11 @@ async function buildCorpus(upstream) {
     const source = resolve(upstream, "manual", "pages", name);
     const converted = htmlToMarkdown(await readFile(source, "utf8"), name);
     documents.push(documentRecord("manual", `manual/${name.replace(/\.html$/u, ".md")}`, converted.title, `manual/pages/${name}`, converted.content));
+  }
+  const context = { includedPaths: new Set(documents.map((document) => document.path)), upstreamPaths };
+  for (const [index, document] of documents.entries()) {
+    const content = rewriteVaultLinks(document.content, document, context);
+    documents[index] = documentRecord(document.kind, document.path, document.title, document.original_path, content);
   }
   documents.sort((left, right) => left.path.localeCompare(right.path));
   const paths = new Set();
@@ -202,7 +271,7 @@ async function buildCorpus(upstream) {
       source_utf8_bytes: totalBytes,
     },
     conversion: {
-      api_markdown: "all checked-in docs/pages/*.md files; links normalized to vault Markdown paths",
+      api_markdown: "all checked-in docs/pages/*.md files; bundled local destinations retained, omitted destinations linked to verified pinned upstream sources and labeled outside the offline vault",
       tsl_guide: "direct text of each checked-in <page> section; nested page text is not duplicated",
       manual_html: `selected checked-in lessons: ${MANUAL_PAGES.join(", ")}; scripts, embeds, images, and page chrome removed`,
       refresh: "explicit only; runtime and offline tests never fetch upstream",
@@ -255,8 +324,10 @@ async function write(outputs) {
   }
 }
 
-const options = parseArguments(process.argv.slice(2));
-const { corpus, outputs } = await expectedOutputs(options.upstream);
-if (options.check) await verify(outputs);
-else await write(outputs);
-console.log(JSON.stringify({ status: options.check ? "verified" : "written", corpus_id: corpus.manifest.corpus_id, identity_sha256: corpus.manifest.identity_sha256, ...corpus.manifest.counts }));
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  const options = parseArguments(process.argv.slice(2));
+  const { corpus, outputs } = await expectedOutputs(options.upstream);
+  if (options.check) await verify(outputs);
+  else await write(outputs);
+  console.log(JSON.stringify({ status: options.check ? "verified" : "written", corpus_id: corpus.manifest.corpus_id, identity_sha256: corpus.manifest.identity_sha256, ...corpus.manifest.counts }));
+}

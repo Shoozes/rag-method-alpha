@@ -18,13 +18,13 @@ Constructs a new uniforms group.
 
 A Float32 array buffer with the uniform values.
 
-**Overrides:** [UniformBuffer#buffer](UniformBuffer.md#buffer)
+**Overrides:** [UniformBuffer#buffer](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/src/renderers/common/UniformBuffer.js) (upstream; outside the offline vault)
 
 ### .byteLength : number
 
 The byte length of the buffer with correct buffer alignment.
 
-**Overrides:** [UniformBuffer#byteLength](UniformBuffer.md#byteLength)
+**Overrides:** [UniformBuffer#byteLength](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/src/renderers/common/UniformBuffer.js) (upstream; outside the offline vault)
 
 ### .id : number (readonly)
 
@@ -46,7 +46,7 @@ Default is `true`.
 
 The name of the uniforms group.
 
-**Overrides:** [UniformBuffer#name](UniformBuffer.md#name)
+**Overrides:** [UniformBuffer#name](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/src/renderers/common/UniformBuffer.js) (upstream; outside the offline vault)
 
 ### .uniforms : Array.<Uniform>
 
@@ -102,13 +102,13 @@ The uniform.
 
 Clears all update ranges of this buffer.
 
-**Overrides:** [UniformBuffer#clearUpdateRanges](UniformBuffer.md#clearUpdateRanges)
+**Overrides:** [UniformBuffer#clearUpdateRanges](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/src/renderers/common/UniformBuffer.js) (upstream; outside the offline vault)
 
 ### .clone() : UniformsGroup
 
 Returns a new uniforms group with copied values from this instance.
 
-**Overrides:** [UniformBuffer#clone](UniformBuffer.md#clone)
+**Overrides:** [UniformBuffer#clone](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/src/renderers/common/UniformBuffer.js) (upstream; outside the offline vault)
 
 **Returns:** A clone of this instance.
 
@@ -134,7 +134,7 @@ Frees the GPU-related resources allocated by this instance. Call this method whe
 
 Releases the buffer.
 
-**Overrides:** [UniformBuffer#release](UniformBuffer.md#release)
+**Overrides:** [UniformBuffer#release](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/src/renderers/common/UniformBuffer.js) (upstream; outside the offline vault)
 
 ### .remove( uniform : Uniform ) : UniformsGroup
 
@@ -180,7 +180,7 @@ The usage to set.
 
 Updates this group by updating each uniform object of the internal uniform list. The uniform objects check if their values has actually changed so this method only returns `true` if there is a real value change.
 
-**Overrides:** [UniformBuffer#update](UniformBuffer.md#update)
+**Overrides:** [UniformBuffer#update](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/src/renderers/common/UniformBuffer.js) (upstream; outside the offline vault)
 
 **Returns:** Whether the uniforms have been updated and must be uploaded to the GPU.
 

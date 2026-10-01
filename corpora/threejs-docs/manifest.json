@@ -1,8 +1,8 @@
 {
   "schema": "rag-method-threejs-docs-manifest-v1",
   "corpus_id": "threejs-docs-1a1c86699f9c",
-  "identity_sha256": "fae516e333deca47e2d0cc60bcb4688539a7f7863ffdc49e7189c9998fe94327",
-  "conversion_version": 1,
+  "identity_sha256": "845ef40e642ed05c1fee4c7037e8c277490a79770110aeb966671f2f1f939fe7",
+  "conversion_version": 2,
   "upstream": {
     "repository": "https://github.com/mrdoob/three.js",
     "commit": "1a1c86699f9c38d4bef1cf51652e5f0e0680d745",
@@ -13,10 +13,10 @@
     "api": 829,
     "tsl": 82,
     "manual": 10,
-    "source_utf8_bytes": 2658578
+    "source_utf8_bytes": 2662352
   },
   "conversion": {
-    "api_markdown": "all checked-in docs/pages/*.md files; links normalized to vault Markdown paths",
+    "api_markdown": "all checked-in docs/pages/*.md files; bundled local destinations retained, omitted destinations linked to verified pinned upstream sources and labeled outside the offline vault",
     "tsl_guide": "direct text of each checked-in <page> section; nested page text is not duplicated",
     "manual_html": "selected checked-in lessons: cleanup.html, creating-a-scene.html, fundamentals.html, how-to-dispose-of-objects.html, materials.html, primitives.html, responsive.html, scenegraph.html, textures.html, webgpurenderer.html; scripts, embeds, images, and page chrome removed",
     "refresh": "explicit only; runtime and offline tests never fetch upstream"
@@ -1019,8 +1019,8 @@
       "title": "ClusteredLighting",
       "original_path": "docs/pages/ClusteredLighting.html.md",
       "source_url": "https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/docs/pages/ClusteredLighting.html.md",
-      "content_sha256": "db0f22a9de41be7d0aa286ff2d4c6de165676a914cb13e6d2fc6735ac4cf61be",
-      "bytes": 1859,
+      "content_sha256": "ec889805e9f2a3c6678872280291a8764e88eea547e326bab71abb24db8d1cc2",
+      "bytes": 1988,
       "license": "MIT"
     },
     {
@@ -1316,8 +1316,8 @@
       "title": "CountingSort",
       "original_path": "docs/pages/CountingSort.html.md",
       "source_url": "https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/docs/pages/CountingSort.html.md",
-      "content_sha256": "879f720755d03373ce5ccf1b6cb8cbe25f305466be76e7834372b2f6e59cbc93",
-      "bytes": 4611,
+      "content_sha256": "45dd4f256ba0f5aed5cdfb7f7fae48c1f76e974b14ece3936592b368a7af6586",
+      "bytes": 4749,
       "license": "MIT"
     },
     {
@@ -1899,8 +1899,8 @@
       "title": "DynamicLighting",
       "original_path": "docs/pages/DynamicLighting.html.md",
       "source_url": "https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/docs/pages/DynamicLighting.html.md",
-      "content_sha256": "f92fb0998d9206c4cefea5c47bf0f2dc5b0333e29272c2187976b180f6546ec4",
-      "bytes": 1766,
+      "content_sha256": "f9e786664644ef5e584a98d8a1688193844105b1a5cadc63aaaedd863fddef83",
+      "bytes": 2027,
       "license": "MIT"
     },
     {
@@ -8367,8 +8367,8 @@
       "title": "UniformsGroup",
       "original_path": "docs/pages/UniformsGroup.html.md",
       "source_url": "https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/docs/pages/UniformsGroup.html.md",
-      "content_sha256": "a44c5d7e616b21300c98b3a684b7e9d85f0a74d019d520f1a51e2f93949e9424",
-      "bytes": 5855,
+      "content_sha256": "7a43de943b301672bb96e069f28ddb530a004792516dabc68ae90256cfce69aa",
+      "bytes": 6773,
       "license": "MIT"
     },
     {
@@ -9148,8 +9148,8 @@
       "title": "Cleanup",
       "original_path": "manual/pages/cleanup.html",
       "source_url": "https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/cleanup.html",
-      "content_sha256": "cc13e9e7c5415fbc2e4a920402a08dc75fa11de8162942b0390dc18ab8f16a49",
-      "bytes": 12971,
+      "content_sha256": "fdcdb5d8e127fbafae277bf64f152616a23f3d0704584a35ffcc0436a2ea5342",
+      "bytes": 13105,
       "license": "MIT"
     },
     {
@@ -9170,8 +9170,8 @@
       "title": "Fundamentals",
       "original_path": "manual/pages/fundamentals.html",
       "source_url": "https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/fundamentals.html",
-      "content_sha256": "685907edec70af4ac77e073d488bc631a56a89971651b4747855f6c8d7bbd9ff",
-      "bytes": 17274,
+      "content_sha256": "2de42f604ff0b9389a46f243c7ea256e74d1ecadafa65b2f263e48582c734091",
+      "bytes": 18161,
       "license": "MIT"
     },
     {
@@ -9192,8 +9192,8 @@
       "title": "Materials",
       "original_path": "manual/pages/materials.html",
       "source_url": "https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/materials.html",
-      "content_sha256": "cab45c86da044a50d94272aefe8714c07742cabdf7ecaaf5de1272d1ccef80a0",
-      "bytes": 10115,
+      "content_sha256": "fdb0da60b969bfcb5f4e0168f33a721a49e292a3acb35fdc8a5af7292fb3e223",
+      "bytes": 10249,
       "license": "MIT"
     },
     {
@@ -9203,8 +9203,8 @@
       "title": "Primitives",
       "original_path": "manual/pages/primitives.html",
       "source_url": "https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/primitives.html",
-      "content_sha256": "859e04cbaefaa4f406aa4636ea6343fb6b2968f1a3e34b055872914ed54d0cf0",
-      "bytes": 14040,
+      "content_sha256": "c0c3610338967798d716376bbf54b27b2cd1752809517078b6758e679818e87d",
+      "bytes": 14576,
       "license": "MIT"
     },
     {
@@ -9214,8 +9214,8 @@
       "title": "Responsive Design",
       "original_path": "manual/pages/responsive.html",
       "source_url": "https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/responsive.html",
-      "content_sha256": "c07afd0575af26a297662e35a5cc77a2f768337cb7e6912d03b1cf0a3808fde4",
-      "bytes": 11102,
+      "content_sha256": "93adaeb39686140db6842311b156ef3db1502f09adae61545203345d5a31cae4",
+      "bytes": 11225,
       "license": "MIT"
     },
     {
@@ -9225,8 +9225,8 @@
       "title": "Scene Graph",
       "original_path": "manual/pages/scenegraph.html",
       "source_url": "https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/scenegraph.html",
-      "content_sha256": "bdf4a9effac8e32c31d366c7acc21efee02752108905a8f284faab8274b11d78",
-      "bytes": 18703,
+      "content_sha256": "2cc924a8396c693ccdfda880bddc05427fa6ed3f3b8ab064b6d49cfaf2383bec",
+      "bytes": 18689,
       "license": "MIT"
     },
     {
@@ -9236,8 +9236,8 @@
       "title": "Textures",
       "original_path": "manual/pages/textures.html",
       "source_url": "https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/textures.html",
-      "content_sha256": "492d6e4b17237281a9c0c33f7c781269dd623bd5384125fcf0702338557ed23b",
-      "bytes": 20467,
+      "content_sha256": "fbee685616d0ef033bffd236e9de549bd0d6d67e7e1500b1f2dcf500eb6b68c9",
+      "bytes": 20995,
       "license": "MIT"
     },
     {

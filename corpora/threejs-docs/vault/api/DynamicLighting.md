@@ -69,7 +69,7 @@ Creates a new dynamic lights node for the given array of lights.
 
 The lights to bind to the node.
 
-**Overrides:** [Lighting#createNode](Lighting.md#createNode)
+**Overrides:** [Lighting#createNode](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/src/renderers/common/Lighting.js) (upstream; outside the offline vault)
 
 **Returns:** The dynamic lights node.
 
@@ -81,7 +81,7 @@ Returns a lights node for the given scene.
 
 The scene.
 
-**Overrides:** [Lighting#getNode](Lighting.md#getNode)
+**Overrides:** [Lighting#getNode](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/src/renderers/common/Lighting.js) (upstream; outside the offline vault)
 
 **Returns:** The lights node.
 

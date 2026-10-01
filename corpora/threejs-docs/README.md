@@ -4,6 +4,8 @@ This directory contains the normalized source corpus for the documentation explo
 
 `vault/` contains ordinary Markdown. The same deterministic preparation command emits the same-origin browser pack and manifest under `modules/browser-rag-ts/demo/public/corpora/`. API Markdown is retained; TSL sections and selected manual lessons are converted without scripts, embeds, images, or page chrome.
 
+Links to bundled documents stay local. References to unbundled lessons, supporting files, or undocumented types point to verified public source at the same pinned revision and are labeled **upstream; outside the offline vault**. Those destinations are not indexed or fetched by the application. Copied source keeps the same link text and provenance.
+
 To regenerate, provide an existing local checkout of the pinned Three.js revision:
 
 ```text

@@ -47,7 +47,7 @@ for [TextGeometry](/docs/#examples/en/geometries/TextGeometry).
  A helper object that takes another geometry as input and generates edges only if the angle between faces is greater than some threshold. For example if you look at the box at the top it shows a line going through each face showing every triangle that makes the box. Using an [EdgesGeometry](../api/EdgesGeometry.md) instead the middle lines are removed. Adjust the thresholdAngle below and you'll see the edges below that threshold disappear.
  Generates geometry that contains one line segment (2 points) per edge in the given geometry. Without this you'd often be missing edges or get extra edges since WebGL generally requires 2 points per line segment. For example if all you had was a single triangle there would only be 3 points. If you tried to draw it using a material with `wireframe: true` you would only get a single line. Passing that triangle geometry to a [WireframeGeometry](../api/WireframeGeometry.md) will generate a new geometry that has 3 lines segments using 6 points..
 
-We'll go over creating custom geometry in [another article](custom-buffergeometry.md). For now
+We'll go over creating custom geometry in [another article](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/custom-buffergeometry.html) (upstream; outside the offline vault). For now
 let's make an example creating each type of primitive. We'll start
 with the [examples from the previous article](responsive.md).
 
@@ -333,9 +333,9 @@ memory they'll take. You'll have to decide for yourself what the correct
 tradeoff is for your particular situation.
 
 If none of the shapes above fit your use case you can load
-geometry for example from a [.obj file](load-obj.md)
-or a [.gltf file](load-gltf.md).
-You can also create your own [custom BufferGeometry](custom-buffergeometry.md).
+geometry for example from a [.obj file](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/load-obj.html) (upstream; outside the offline vault)
+or a [.gltf file](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/load-gltf.html) (upstream; outside the offline vault).
+You can also create your own [custom BufferGeometry](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/custom-buffergeometry.html) (upstream; outside the offline vault).
 
 Next up let's go over [how three's scene graph works and how
 to use it](scenegraph.md).

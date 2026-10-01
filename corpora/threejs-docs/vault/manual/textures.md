@@ -2,7 +2,7 @@
 
           This article is one in a series of articles about three.js.
 The first article was [about three.js fundamentals](fundamentals.md).
-The [previous article](setup.md) was about setting up for this article.
+The [previous article](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/setup.html) (upstream; outside the offline vault) was about setting up for this article.
 If you haven't read that yet you might want to start there.
 
 Textures are a kind of large topic in Three.js and
@@ -108,7 +108,7 @@ each triangle in your geometry.
 
 What are texture coordinates? They are data added to each vertex of a piece of geometry
 that specify what part of the texture corresponds to that specific vertex.
-We'll go over them when we start [building custom geometry](custom-buffergeometry.md).
+We'll go over them when we start [building custom geometry](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/custom-buffergeometry.html) (upstream; outside the offline vault).
 
 ## Loading Textures
 
@@ -271,7 +271,7 @@ high. For example let's say I was making a scene of a house. Inside the house th
 and I decide to put this wood texture on the top surface of the table
 
 That image is only 157k so it will download relatively quickly but [it is actually
-3024 x 3761 pixels in size](resources/images/compressed-but-large-wood-texture.jpg).
+3024 x 3761 pixels in size](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/resources/images/compressed-but-large-wood-texture.jpg) (upstream; outside the offline vault).
 Following the equation above that's
 
 ```
@@ -556,4 +556,4 @@ This is only one step into the topic of textures. At some point we'll go over
 texture coordinates as well as 9 other types of textures that can be applied
 to materials.
 
-For now let's move on to [lights](lights.md).
+For now let's move on to [lights](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/manual/pages/lights.html) (upstream; outside the offline vault).

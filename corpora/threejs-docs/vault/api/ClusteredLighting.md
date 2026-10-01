@@ -65,7 +65,7 @@ This method is called internally by the renderer and must be overwritten by all 
 
 The lights.
 
-**Overrides:** [Lighting#createNode](Lighting.md#createNode)
+**Overrides:** [Lighting#createNode](https://github.com/mrdoob/three.js/blob/1a1c86699f9c38d4bef1cf51652e5f0e0680d745/src/renderers/common/Lighting.js) (upstream; outside the offline vault)
 
 **Returns:** The clustered lights node.
 
