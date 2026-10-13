@@ -15,7 +15,7 @@ h1 { max-width: 11ch; margin: .7rem 0 1.4rem; font: 500 clamp(3.2rem, 6.6vw, 7re
 .landing-actions a { min-height: 2.75rem; display: inline-flex; align-items: center; padding: .75rem 1.1rem; color: var(--aurel-muted); font-weight: 700; }
 .landing-actions .primary { border: 1px solid var(--aurel-gold-high); background: linear-gradient(145deg, var(--aurel-gold-high), #b89155); color: #181208; text-decoration: none; }
 figure { min-width: 0; margin: 0; }
-figure img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: center; border: 1px solid rgb(var(--aurel-gold-rgb) / 28%); box-shadow: 0 2rem 7rem rgb(0 0 0 / 65%); }
+figure img { display: block; width: 100%; height: auto; object-fit: contain; border: 1px solid rgb(var(--aurel-gold-rgb) / 28%); box-shadow: 0 2rem 7rem rgb(0 0 0 / 65%); }
 figcaption, footer { color: var(--aurel-subtle); font: .66rem/1.4 var(--aurel-mono); }
 figcaption { margin-top: .65rem; text-align: right; }
 footer { min-height: 4rem; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--aurel-line); text-transform: uppercase; letter-spacing: .08em; }
