@@ -25,10 +25,20 @@ jobs:
             read -r project label <<< "$pair"
             npm --prefix "$project" audit --package-lock-only --json > ".artifacts/dependency-review/$label/audit-before.json" || true
             npm --prefix "$project" install --save-dev --save-exact vite@7.3.7 --ignore-scripts
+            npm --prefix "$project" update source-map-js nanoid --ignore-scripts
             npm --prefix "$project" audit --json > ".artifacts/dependency-review/$label/audit-after.json" || true
             cp "$project/package.json" "$project/package-lock.json" ".artifacts/dependency-review/$label/"
           done
           tar -C modules/browser-rag-ts -czf .artifacts/dependency-review/browser-dependencies.tar.gz node_modules
+      - name: Require clean audit responses
+        run: |
+          node --input-type=module - <<'JS'
+          import { readFileSync } from 'node:fs';
+          for (const label of ['browser', 'frontend']) {
+            const audit = JSON.parse(readFileSync(`.artifacts/dependency-review/${label}/audit-after.json`));
+            if (audit.error || audit.metadata?.vulnerabilities?.total !== 0) throw new Error(`${label}: advisory or invalid audit response`);
+          }
+          JS
       - name: Qualify browser patch
         run: |
           node run.mjs test-browser-unit
