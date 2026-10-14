@@ -179,7 +179,15 @@ try {
     await page.locator('#fit-graph').click();
     await page.evaluate(() => scrollTo(0, 0));
     await layout(page, `${viewport.width}x${viewport.height}`, viewport.width > 1000 && viewport.height >= 768);
-    if (viewport.width === 390) await capture(page, 'atlas-mobile', 'Mobile evidence graph and complete Search controls; natural page scroll.', true);
+    if (viewport.width === 390) {
+      await capture(page, 'atlas-mobile', 'Mobile evidence graph and complete Search controls; natural page scroll.', true);
+      const settings = page.locator('details.retrieval-options');
+      await settings.locator(':scope > summary').click();
+      const expanded = await settings.locator('.query-grid').isVisible();
+      const outsideGraph = await page.evaluate(() => document.querySelector('.query-grid').getBoundingClientRect().top >= document.querySelector('.graph-pane').getBoundingClientRect().bottom);
+      await settings.locator(':scope > summary').click();
+      check('mobile retrieval settings open and close without covering the graph', expanded && outsideGraph && !await settings.evaluate(element => element.open));
+    }
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });

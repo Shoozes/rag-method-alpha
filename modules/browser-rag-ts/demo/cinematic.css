@@ -141,8 +141,9 @@
 .shell[data-presentation="atlas"] .suggested-questions button:hover { color: var(--gold-high); }
 .shell[data-presentation="atlas"] .query-meta { grid-column: 1 / -1; grid-row: 3; gap: .3rem .65rem; align-items: center; }
 .shell[data-presentation="atlas"] .retrieval-options > summary { min-height: 44px; padding: .45rem 0; font: 12px/1.4 var(--aurel-sans); }
-.shell[data-presentation="atlas"] .retrieval-options[open] { position: absolute; bottom: calc(100% + .5rem); left: 1rem; max-height: min(30rem, 60svh); overflow: auto; width: min(32rem, calc(100% - 2rem)); padding: .8rem; border: 1px solid var(--rule); background: #0d0c0a; box-shadow: 0 1rem 3rem #0008; }
-.shell[data-presentation="atlas"] .query-grid { width: 100%; }
+/* Keep the native disclosure control anchored; only its body floats on desktop. */
+.shell[data-presentation="atlas"] .retrieval-options { position: relative; }
+.shell[data-presentation="atlas"] .query-grid { position: absolute; bottom: calc(100% + .5rem); left: 0; width: min(32rem, calc(100vw - 2.5rem)); max-height: min(30rem, 60svh); overflow: auto; background: #0d0c0a; }
 .shell[data-presentation="atlas"] #query-state { margin-left: auto; font: 12px/1.4 var(--aurel-sans); max-width: 24rem; }
 .shell[data-presentation="atlas"] #replay-trace, .shell[data-presentation="atlas"] #skip-trace { min-height: 44px; padding: .35rem .6rem; font: 12px/1.4 var(--aurel-sans); }
 .motion-disclosure { position: relative; }
@@ -188,6 +189,7 @@
   .shell[data-presentation="atlas"] .suggested-questions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .shell[data-presentation="atlas"] .suggested-questions button { min-height: 44px; }
   .shell[data-presentation="atlas"] .query-meta { gap: .3rem .6rem; }
+  .shell[data-presentation="atlas"] .query-grid { position: static; width: 100%; max-height: none; overflow: visible; }
   .shell[data-presentation="atlas"] #query-state { flex-basis: 100%; max-width: none; margin-left: 0; }
   .shell[data-presentation="atlas"] .graph-legend { top: .7rem; left: .7rem; max-width: calc(100% - 1.4rem); gap: .5rem .7rem; font-size: 11px; }
   .shell[data-presentation="atlas"] .graph-legend span[data-kind="family"] { display: none; }
