@@ -4,6 +4,8 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
+import socket
 import tempfile
 import sys
 import unittest
@@ -29,9 +31,43 @@ def _load(name: str):
 
 RUN = _load("browser_rag_run")
 SMOKE = _load("browser_rag_smoke")
+import local_runtime as LOCAL_RUNTIME
 
 
 class BrowserRagRunnerTests(unittest.TestCase):
+    def test_real_listener_is_never_admitted_as_available(self) -> None:
+        with socket.socket() as listener:
+            if os.name != "nt":
+                listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            listener.bind(("127.0.0.1", 0))
+            listener.listen(1)
+            port = listener.getsockname()[1]
+            self.assertFalse(LOCAL_RUNTIME.port_available(port))
+            self.assertFalse(LOCAL_RUNTIME.wait_port_release(port, .02))
+        self.assertTrue(LOCAL_RUNTIME.wait_port_release(port))
+
+    @unittest.skipIf(os.name == "nt", "POSIX TIME_WAIT rebinding semantics")
+    def test_closed_connection_allows_a_real_replacement_listener(self) -> None:
+        with socket.socket() as listener:
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            listener.bind(("127.0.0.1", 0))
+            listener.listen(1)
+            listener.settimeout(2)
+            port = listener.getsockname()[1]
+            with socket.create_connection(("127.0.0.1", port), timeout=2) as client:
+                connection, _ = listener.accept()
+                with connection:
+                    connection.settimeout(2)
+                    connection.shutdown(socket.SHUT_WR)
+                    self.assertEqual(client.recv(1), b"")
+                    client.shutdown(socket.SHUT_WR)
+                    self.assertEqual(connection.recv(1), b"")
+            self.assertFalse(LOCAL_RUNTIME.port_available(port))
+        self.assertTrue(LOCAL_RUNTIME.wait_port_release(port))
+        with socket.create_server(("127.0.0.1", port)) as replacement:
+            self.assertFalse(LOCAL_RUNTIME.port_available(port))
+
+
     def test_occupied_explicit_port_fails_before_server_creation(self) -> None:
         with patch.object(RUN, "port_available", return_value=False), patch.object(
             RUN, "spawn_process"

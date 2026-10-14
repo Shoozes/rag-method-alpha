@@ -32,7 +32,14 @@ def free_port() -> int:
 def port_available(port: int) -> bool:
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+            if os.name == "nt":
+                listener.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            else:
+                # Match normal server rebinding after closed TCP connections.
+                listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             listener.bind(("127.0.0.1", port))
+            # Reuse must never mistake another active listener for a free port.
+            listener.listen(1)
         return True
     except OSError:
         return False
