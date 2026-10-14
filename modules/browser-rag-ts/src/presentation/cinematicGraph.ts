@@ -1,5 +1,7 @@
 import type { PositionedGraph } from "../application/layoutGraph.js";
 import type { RagGraphRenderer } from "../application/graphRenderer.js";
+import { evidenceCurve } from "./evidenceCurve.js";
+import { graphFamilyKey } from "../application/graphPalette.js";
 
 const SVG = "http://www.w3.org/2000/svg";
 type Point = Readonly<{ x:number; y:number; visible:boolean }>;
@@ -21,11 +23,13 @@ export class CinematicGraphPresentation {
  private readonly labels:HTMLDivElement;
  private readonly metrics:HTMLDivElement;
  private readonly refresh=()=>this.schedule();
+ private readonly resizeObserver:ResizeObserver;
  constructor(private readonly options:CinematicGraphOptions) {
   this.layer=document.createElementNS(SVG,"svg");this.layer.classList.add("cinematic-layer");this.layer.setAttribute("aria-hidden","true");
   this.labels=document.createElement("div");this.labels.className="atlas-labels";this.labels.setAttribute("aria-hidden","true");
   this.metrics=document.createElement("div");this.metrics.className="atlas-metrics";
   options.surface.append(this.layer,this.labels,this.metrics);
+  this.resizeObserver=new ResizeObserver(this.refresh);this.resizeObserver.observe(options.surface);
   options.canvas.addEventListener("pointerup",this.refresh);
   options.canvas.addEventListener("rag-camera-frame",this.refresh);
   options.canvas.addEventListener("wheel",this.refresh,{passive:true});
@@ -73,13 +77,17 @@ export class CinematicGraphPresentation {
   const points=this.points();
   const labelPriority=(id:string)=>id===this.selected?3:this.hits.has(id)?2:1;
   const labelLimit=width<=720?12:18;
-  const occupied:DOMRect[]=[];
+  const occupied:DOMRect[]=[...this.options.surface.querySelectorAll<HTMLElement>(".graph-legend,.atlas-metrics,.graph-status")]
+   .filter(element=>getComputedStyle(element).display!=="none").map(element=>element.getBoundingClientRect());
   const surfaceBounds=this.options.surface.getBoundingClientRect();
-  const labelNodes=this.graph.nodes.filter(node=>node.id===this.selected||this.hits.has(node.id)||node.kind==="folder").sort((a,b)=>labelPriority(b.id)-labelPriority(a.id)).slice(0,54);
+  const familyAnchors=new Map<string,string>();
+  for(const node of this.graph.nodes){if(node.kind==="source"&&!familyAnchors.has(graphFamilyKey(node.path)))familyAnchors.set(graphFamilyKey(node.path),node.id);}
+  const anchors=new Set(familyAnchors.values());
+  const labelNodes=this.graph.nodes.filter(node=>node.id===this.selected||this.hits.has(node.id)||node.kind==="folder"||anchors.has(node.id)).sort((a,b)=>labelPriority(b.id)-labelPriority(a.id)).slice(0,54);
   for(const node of labelNodes){
    if(this.labels.childElementCount>=labelLimit)break;
    const point=points.get(node.id);if(!point?.visible)continue;
-   const label=document.createElement("span");label.className="atlas-label";label.textContent=node.label;label.style.left=point.x+"px";label.style.top=point.y+"px";label.dataset.selected=String(node.id===this.selected);this.labels.append(label);
+   const label=document.createElement("span");label.className="atlas-label";label.textContent=anchors.has(node.id)&&node.id!==this.selected&&!this.hits.has(node.id)?graphFamilyKey(node.path):node.label;label.style.left=point.x+"px";label.style.top=point.y+"px";label.dataset.selected=String(node.id===this.selected);this.labels.append(label);
    const initial=label.getBoundingClientRect();
    label.style.left=Math.max(initial.width/2+6,Math.min(width-initial.width/2-6,point.x))+"px";
    label.style.top=Math.max(initial.height*1.3+6,Math.min(height-6,point.y))+"px";
@@ -90,7 +98,7 @@ export class CinematicGraphPresentation {
   }
   const token=JSON.stringify([this.selected,[...this.hits],this.options.motionEnabled()]);
   if(token===this.flowToken){
-   for(const line of this.layer.querySelectorAll<SVGPathElement>("path[data-source-node-id]")){const from=points.get(line.dataset.sourceNodeId!),to=points.get(line.dataset.targetNodeId!);if(from&&to)line.setAttribute("d",`M ${from.x} ${from.y} L ${to.x} ${to.y}`);}
+   for(const line of this.layer.querySelectorAll<SVGPathElement>("path[data-source-node-id]")){const from=points.get(line.dataset.sourceNodeId!),to=points.get(line.dataset.targetNodeId!);const path=from&&to?evidenceCurve(from,to,line.dataset.linkId??""):null;if(path)line.setAttribute("d",path);line.style.visibility=path&&from?.visible&&to?.visible?"visible":"hidden";}
    for(const halo of this.layer.querySelectorAll<SVGCircleElement>("[data-node-id]")){const point=points.get(halo.dataset.nodeId!);if(point){halo.setAttribute("cx",String(point.x));halo.setAttribute("cy",String(point.y));}}
    return;
   }
@@ -98,8 +106,9 @@ export class CinematicGraphPresentation {
   const links=this.graph.links.filter(link=>this.hits.has(link.source)||this.hits.has(link.target)).slice(0,24);
   for(const [index,link]of links.entries()){
    const from=points.get(link.source),to=points.get(link.target);if(!from?.visible||!to?.visible)continue;
+   const path=evidenceCurve(from,to,link.id);if(!path)continue;
    const create=(className:string)=>{
-    const line=document.createElementNS(SVG,"path");line.setAttribute("d",`M ${from.x} ${from.y} L ${to.x} ${to.y}`);line.setAttribute("pathLength","100");line.classList.add(className);line.dataset.sourceNodeId=link.source;line.dataset.targetNodeId=link.target;this.layer.append(line);return line;
+    const line=document.createElementNS(SVG,"path");line.setAttribute("d",path);line.dataset.linkId=link.id;line.setAttribute("pathLength","100");line.classList.add(className);line.dataset.sourceNodeId=link.source;line.dataset.targetNodeId=link.target;this.layer.append(line);return line;
    };
    create("evidence-connection");
    if(this.options.motionEnabled()){
@@ -116,7 +125,7 @@ export class CinematicGraphPresentation {
   this.stop();this.graph=null;this.selected=null;this.hits.clear();this.layer.replaceChildren();this.labels.replaceChildren();this.metrics.textContent="";
  }
  dispose():void {
-  this.clear();if(this.frame)cancelAnimationFrame(this.frame);this.frame=0;
+  this.resizeObserver.disconnect();this.clear();if(this.frame)cancelAnimationFrame(this.frame);this.frame=0;
   this.options.canvas.removeEventListener("pointerup",this.refresh);this.options.canvas.removeEventListener("rag-camera-frame",this.refresh);this.options.canvas.removeEventListener("wheel",this.refresh);window.removeEventListener("resize",this.refresh);
   this.layer.remove();this.labels.remove();this.metrics.remove();
  }

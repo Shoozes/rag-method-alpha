@@ -4,7 +4,9 @@ An inspectable retrieval method and two working applications for exploring sourc
 
 The repository owns the language-neutral `rag-indexing-v1` and `rag-behavior-v2` contracts, a Python reference implementation, and a browser-native TypeScript implementation. Graph layout and rendering come from the separately reusable `@ours/forcegraph-tsl` library; a graph view never changes retrieval scores.
 
-![Knowledge Atlas with exact source inspection](docs/media/rag-method-evidence-workbench.png)
+![Complete Knowledge Atlas overview with the query controls fully visible](docs/media/rag-method-evidence-workbench.png)
+
+A real browser capture of the documentation vault, with the inspector closed so the whole workspace is visible. The [source-reader view](docs/media/rag-method-source-reader.png), [evidence graph](docs/media/rag-method-evidence-graph.png), and [mobile layout](docs/media/rag-method-evidence-mobile.png) are captured separately. Renderer, source revision, viewport checks, and image hashes are recorded in the [capture receipt](docs/media/atlas-presentation.json).
 
 ## Explore Knowledge Atlas
 
@@ -21,6 +23,14 @@ Open the loopback URL printed by Vite, then choose **Open Atlas**. The root menu
 
 **Motion Studio → Replay build** replays the accepted graph with bounded node growth and camera motion. Quiet mode and reduced-motion preferences take priority. Animation presents actual ranked matches and source relationships; it does not measure retrieval speed. Open **Evidence** to inspect a complete source or copy the ordered context packet.
 
+## Graphs and the search-scan companion
+
+Atlas packs real path families into distinct neighborhoods, highlights accepted relationships with smooth curves, and docks evidence beside the desktop graph instead of covering Search. On narrow screens, the graph, query, and evidence stack in normal page flow. The landing preview retains its original image ratio.
+
+The separate [TSL Search scan example](https://github.com/Shoozes/tsl-smooth-graph-alpha/tree/caa8b5033fcca94dd2d0292628c49851ec4f38b3/examples/showcase/examples/search-scan) demonstrates the spider-like scanner, planted contacts, seekable replay, and camera handoffs. It is a **synthetic presentation example**, not a screenshot of RAG Method and not part of the pinned package's public exports.
+
+RAG still owns search, ranked order, source IDs, and context. A future scanner integration must consume already accepted IDs, preserve repeated group visits and cancellation guards, and never delay results behind animation. The current Atlas improvements do not claim that the scanner prefab is integrated.
+
 ## Explore the local Lab
 
 RAG Method Lab pairs a bounded FastAPI backend with a React frontend. Load its built-in synthetic collection, compare retrieval modes, inspect backend-owned scores and source provenance, select evidence in the graph, and export a validated query report. Advanced tools disclose detailed controls while the initial view stays focused on the query and evidence.
@@ -35,7 +45,16 @@ The locked backend setup is tested with **Python 3.12**. NumPy `2.5.1` in `requi
 - [Release and redistribution](docs/RELEASE.md): source fingerprints, public-surface policy, and licenses.
 - [Backend integration contract](docs/dev/RAG_CONTRACT.md): routes, limits, authentication, and storage.
 
-`node run.mjs test-browser-unit` checks the browser implementation; `node run.mjs test-method` runs the frozen Python conformance cases. Browser journeys are explicit tasks and use an installed local Chromium browser when available. Run/test/build tasks do not install packages, fetch documentation, or download models.
+`node run.mjs test-browser-unit` checks the browser implementation; `node run.mjs test-method` runs the frozen Python conformance cases. The focused Atlas capture journey uses the built static application and an installed Chromium browser:
+
+```text
+node run.mjs build-browser
+node scripts/atlas_presentation.mjs
+```
+
+Use `--update-media` only to replace public screenshots after that journey passes, then review the actual images. The script does not install dependencies or download a browser. See [presentation verification](docs/DEVELOPMENT.md#atlas-presentation-and-public-media) for coverage and remaining legacy smoke-test drift.
+
+Browser journeys are explicit tasks and use an installed local Chromium browser when available. Run/test/build tasks do not install packages, fetch documentation, or download models.
 
 The default demonstrations are model-free. They show real retrieval and context assembly rather than generated answers. Semantic model setup, authenticated remote browser access, persistence in the browser explorer, and large-corpus performance are outside this release's demonstrated scope.
 

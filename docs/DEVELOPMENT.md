@@ -8,7 +8,7 @@ Use `node run.mjs --list` to inspect the app-focused task declarations in `proje
 | `test-lab` | Active backend unit/failure/API/launcher tests and frontend type/build checks. | Prepared Python 3.12 environment and frontend npm dependencies. |
 | `test-browser-unit` | Contract synchronization, core boundaries, Unicode-table admission, typecheck, and browser unit tests. | Browser module npm dependencies. |
 | `build-browser` | Compile the core, build Vite assets, stage notice-complete static output, and verify payload/HTML/MIME boundaries. | Prepared browser dependencies. |
-| `test-browser` | Explicit 44-check application journey and Python/Node/Worker comparisons. | Python, browser dependencies, and an installed compatible Chromium browser. |
+| `test-browser` | Legacy 44-check application journey and Python/Node/Worker comparisons; see the Atlas drift note below. | Python, browser dependencies, and an installed compatible Chromium browser. |
 | `test-lab-browser` | Explicit local Lab browser journey, imports, report, cancellation, and cleanup. | Lab dependencies and a compatible Chromium browser. |
 
 Direct commands remain available:
@@ -29,6 +29,22 @@ python -B scripts/browser_smoke.py
 The backend tests run from `source/backend`; the menu supplies that directory, so no editable install is needed.
 
 The browser proof discovers prepared Playwright Chromium or supported local Chrome/Edge. `BROWSER_RAG_CHROMIUM_PATH` (explorer) or `RAG_METHOD_CHROMIUM_PATH` (Lab) can select an explicit executable. It never downloads a browser. Viewport emulation is useful responsive proof; it is not physical-device or all-GPU qualification.
+
+## Atlas presentation and public media
+
+Build first, then run the current Atlas journey:
+
+```text
+node run.mjs build-browser
+node scripts/atlas_presentation.mjs
+node scripts/atlas_presentation.mjs --update-media
+```
+
+The default run writes candidates and a fail-closed receipt under `.artifacts/proof/atlas-presentation/`. The optional last command copies public media only after all checks pass. Review the overview, docked source reader, evidence graph, and mobile image before committing them. Do not reuse a selected-source screenshot as the overview hero.
+
+The script owns a loopback-only static server, uses the prepared browser selected by `BROWSER_RAG_CHROMIUM_PATH` or Playwright, and closes both afterward. It verifies the real 921-document import, accepted IDs, verbatim context, pinned source reader, separate panes, responsive sizes, text zoom, reduced motion, SVG fallback, and uncropped landing preview. Public media provenance includes the implementation commit, browser/backend, viewport, and image hashes. `LOCAL_BROWSER_SOFTWARE_WEBGL=1` explicitly records software WebGL; this is not native-GPU or performance proof.
+
+The older `browser_rag_smoke.mjs` still contains pre-Atlas heading, status-text, and mobile-tab expectations. Its 44-check receipt is not a claim about this refresh. Migrating that full contract-and-failure journey remains separate work; the focused presentation receipt does not replace Python/Node/Worker conformance, device-loss testing, or release acceptance. Use the capture command above, not the legacy `BROWSER_RAG_UPDATE_PUBLIC_MEDIA` route, for current public images.
 
 ## Build and distribute the browser application
 
