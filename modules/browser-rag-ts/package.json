@@ -15,7 +15,7 @@
     "tool:info": "node scripts/tool-info.mjs",
     "typecheck": "node scripts/tsc.mjs",
     "build": "node scripts/build.mjs",
-    "test": "node scripts/check-vendor.mjs && node --test tests/artifact/static-artifact.test.mjs tests/artifact/public-source.test.mjs tests/presentation/node-spawn-motion.test.mjs tests/artifact/threejs-doc-links.test.mjs && node scripts/test.mjs",
+    "test": "node scripts/check-vendor.mjs && node --test tests/artifact/capture-source.test.mjs tests/artifact/static-artifact.test.mjs tests/artifact/public-source.test.mjs tests/presentation/node-spawn-motion.test.mjs tests/artifact/threejs-doc-links.test.mjs && node scripts/test.mjs",
     "test:indexing": "node scripts/test.mjs indexing",
     "test:retrieval": "node scripts/test.mjs retrieval",
     "test:shared": "node scripts/test.mjs shared",
@@ -30,7 +30,7 @@
     "@types/three": "0.185.0",
     "playwright": "1.62.0",
     "typescript": "5.9.3",
-    "vite": "7.3.6"
+    "vite": "7.3.7"
   },
   "dependencies": {
     "@ours/forcegraph-tsl": "file:vendor/ours-forcegraph-tsl-0.3.0-alpha.1.tgz",

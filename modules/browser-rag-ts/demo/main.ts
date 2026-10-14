@@ -325,7 +325,7 @@ let startupLocked = true;
 let foregroundOperation: ForegroundOperation | null = null;
 let terminalShutdown: Promise<void> | null = null;
 let rendererStarted = false;
-const motionEnabled = () => !motionPreference.matches && motionStyle.value !== "quiet";
+const motionEnabled = () => !document.hidden && !motionPreference.matches && motionStyle.value !== "quiet";
 const presentation = new CinematicGraphPresentation({ surface:graphSurface, svg:graphCanvas, canvas:graphTslCanvas, renderer:()=>graphRenderer, motionEnabled, isDemo:()=>runtimeSource!=="local" });
 function setInspector(open:boolean):void { const opening=open&&evidencePane.hidden;evidencePane.hidden=!open;inspectorButton.setAttribute("aria-expanded",String(open));if(open){collectionDisclosure.open=false;retrievalOptions.open=false;if(opening)closeInspectorButton.focus();} }
 
@@ -1424,6 +1424,11 @@ cancelQueryButton.addEventListener("click", cancelCurrentOperation);
 cancelWelcomeImportButton.addEventListener("click", cancelCurrentOperation);
 skipTraceButton.addEventListener("click", stopTrace);
 motionPreference.addEventListener("change", () => { stopTrace();graphRenderer?.setMotionEnabled(motionEnabled()); });
+// Returning to a tab never restarts a superseded or hidden-time replay.
+document.addEventListener("visibilitychange", () => {
+  graphRenderer?.setMotionEnabled(motionEnabled());
+  if (document.hidden) stopTrace();
+});
 motionStyle.addEventListener("change", () => { stopTrace();app.querySelector<HTMLElement>(".shell")!.dataset.motion=motionStyle.value;graphRenderer?.setMotionEnabled(motionEnabled());updateGraphSelection(); });
 inspectorButton.addEventListener("click", () => setInspector(evidencePane.hidden));
 closeInspectorButton.addEventListener("click", () => { setInspector(false);inspectorButton.focus(); });

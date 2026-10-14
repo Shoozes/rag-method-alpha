@@ -35,7 +35,7 @@ export async function verifyDemoPolish(context, applicationUrl) {
             if (event.data.status === 'ok') {
               if (request?.operation === 'get-context') window.polish.context = event.data.result;
               if (request?.operation === 'get-graph') {
-                window.polish.graph = event.data.result.nodes.map((node) => node.record_id);
+                window.polish.graph = event.data.result.nodes.map(({ id, kind, record_id, source_id }) => ({ id, kind, record_id, source_id }));
                 window.polish.graphRevision = (window.polish.graphRevision ?? 0) + 1;
               }
             }
@@ -56,7 +56,16 @@ export async function verifyDemoPolish(context, applicationUrl) {
       const watch = () => new MutationObserver(() => {
         if (document.querySelector('#graph-surface')?.dataset.traceActive !== 'true') return;
         const state = window.polish;
-        if (!state.context || state.context.chunks.some(({ id }) => !state.graph.includes(id))) state.violations.push('trace before matching graph');
+        // The vault view represents chunks through their actual source nodes.
+        // Check both the Worker projection and the currently rendered identities.
+        const rendered = [...document.querySelectorAll('#graph-canvas circle[data-graph-node-id]')].map(node => ({
+          kind: node.dataset.kind, record_id: node.dataset.recordId, source_id: node.dataset.sourceId
+        }));
+        const represents = (nodes, chunk) => nodes.some(node => node.record_id === chunk.id ||
+          (node.kind === 'source' && node.source_id === chunk.source_id));
+        const missing = state.context?.chunks.filter(chunk => !represents(state.graph, chunk) || !represents(rendered, chunk));
+        if (!state.context || missing.length) state.violations.push({ issue: 'trace before matching graph',
+          view: document.querySelector('#graph-view')?.value, missing: missing?.map(chunk => chunk.id) });
         if (document.querySelector('#app')?.dataset.operationOwner !== 'idle') state.violations.push('trace holds foreground');
       }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['data-trace-active'] });
       if (document.body) watch(); else addEventListener('DOMContentLoaded', watch, { once: true });
@@ -71,6 +80,7 @@ export async function verifyDemoPolish(context, applicationUrl) {
     assert.deepEqual(await page.evaluate(() => window.polish.searches), ['TextureLoader loadAsync']);
     assert.equal(await page.locator('#run-query').isEnabled(), true);
     await page.locator('#skip-trace').click();
+    await page.locator('#toggle-inspector').click();
     await page.locator('#context-packet summary').click();
     await page.locator('#copy-context').click();
     const packet = await page.evaluate(() => ({ packet: window.polish.context, displayed: document.querySelector('#context-content').textContent, copied: window.polish.copied }));
@@ -165,6 +175,7 @@ export async function verifyDemoPolish(context, applicationUrl) {
     assert.equal(await page.locator('#query-state').textContent(), cancelledStatus);
     assert.equal(await page.locator('#active-collection').textContent(), acceptedVault);
     await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.locator('#graph-view').selectOption('evidence');
     await page.locator('#query-text').fill('Local marker');
     await page.locator('#run-query').click();
     await page.locator('#copy-query-report:enabled').waitFor({ state: 'attached' });

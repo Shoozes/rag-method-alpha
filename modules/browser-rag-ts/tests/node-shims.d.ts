@@ -1,5 +1,11 @@
 declare module "node:test" {
-  export default function test(name: string, callback: () => void | Promise<void>): void;
+  interface TestContext {
+    mock: { timers: {
+      enable(options: { apis: readonly ["setTimeout"] }): void;
+      tick(milliseconds: number): void;
+    } };
+  }
+  export default function test(name: string, callback: (context: TestContext) => void | Promise<void>): void;
 }
 
 declare module "node:assert/strict" {

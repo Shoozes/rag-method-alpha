@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 940" role="img" aria-labelledby="title desc">
+<title id="title">RAG Method: from your files to inspectable context</title>
+<desc id="desc">Selected Markdown and text are indexed in a local browser Worker. A scoped query produces deterministic ranked results and an ordered verbatim context packet. A separate graph presentation consumes indexed relationships and accepted result IDs; it cannot change ranking. Python and TypeScript share frozen method fixtures. The default browser demonstration has no file upload, backend, vault persistence or model call.</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="none" stroke="#e8c991" stroke-width="1.4"/></marker></defs>
+<rect width="1280" height="940" rx="18" fill="#080807"/>
+<g font-family="Arial, Helvetica, sans-serif">
+<text x="52" y="55" fill="#e8c991" font-size="17" letter-spacing="3" font-weight="700">RAG METHOD / KNOWLEDGE ATLAS</text>
+<text x="52" y="115" fill="#f1eadf" font-size="43" font-weight="700">From your files to inspectable context.</text>
+<text x="52" y="159" fill="#c2b9aa" font-size="23">See what was selected. Read its source. Keep the method separate from the show.</text>
+<rect x="52" y="208" width="270" height="295" rx="12" fill="#12110e" stroke="#343026"/><rect x="52" y="208" width="270" height="5" rx="2" fill="#e8c991"/>
+<text x="74" y="276" fill="#e8c991" font-size="47" font-weight="700">01</text><text x="74" y="326" fill="#f1eadf" font-size="21" font-weight="700">OPEN A VAULT</text>
+<text x="74" y="375" fill="#c2b9aa" font-size="19">Markdown + plain text</text><text x="74" y="412" fill="#c2b9aa" font-size="19">Demo or your own files</text><text x="74" y="449" fill="#c2b9aa" font-size="19">No file upload</text>
+<path d="M328 353 H346" stroke="#e8c991" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="354" y="208" width="270" height="295" rx="12" fill="#12110e" stroke="#343026"/><rect x="354" y="208" width="270" height="5" rx="2" fill="#93bdb2"/>
+<text x="376" y="276" fill="#93bdb2" font-size="47" font-weight="700">02</text><text x="376" y="326" fill="#f1eadf" font-size="21" font-weight="700">INDEX IN WORKER</text>
+<text x="376" y="375" fill="#c2b9aa" font-size="19">Decode and normalize</text><text x="376" y="412" fill="#c2b9aa" font-size="19">Split into bounded chunks</text><text x="376" y="449" fill="#c2b9aa" font-size="19">Preserve source identity</text>
+<path d="M630 353 H648" stroke="#e8c991" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="656" y="208" width="270" height="295" rx="12" fill="#12110e" stroke="#343026"/><rect x="656" y="208" width="270" height="5" rx="2" fill="#b8a5ca"/>
+<text x="678" y="276" fill="#b8a5ca" font-size="47" font-weight="700">03</text><text x="678" y="326" fill="#f1eadf" font-size="21" font-weight="700">RETRIEVE + RANK</text>
+<text x="678" y="375" fill="#c2b9aa" font-size="19">Apply query and scopes</text><text x="678" y="412" fill="#c2b9aa" font-size="19">Order matching records</text><text x="678" y="449" fill="#c2b9aa" font-size="19">Select bounded context</text>
+<path d="M932 353 H950" stroke="#e8c991" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="958" y="208" width="270" height="295" rx="12" fill="#12110e" stroke="#343026"/><rect x="958" y="208" width="270" height="5" rx="2" fill="#e8c991"/>
+<text x="980" y="276" fill="#e8c991" font-size="47" font-weight="700">04</text><text x="980" y="326" fill="#f1eadf" font-size="21" font-weight="700">INSPECT CONTEXT</text>
+<text x="980" y="375" fill="#c2b9aa" font-size="19">Read ordered excerpts</text><text x="980" y="412" fill="#c2b9aa" font-size="19">Open the exact source</text><text x="980" y="449" fill="#c2b9aa" font-size="19">Copy the verbatim packet</text>
+<path d="M489 505 V535 H342 V570" fill="none" stroke="#93bdb2" stroke-width="2" stroke-dasharray="5 5"/><path d="M791 505 V535 H342" fill="none" stroke="#b8a5ca" stroke-width="2" stroke-dasharray="5 5"/>
+<rect x="52" y="576" width="573" height="216" rx="12" fill="#101410" stroke="#34443c"/>
+<text x="78" y="614" fill="#93bdb2" font-size="17" letter-spacing="1.5" font-weight="700">PRESENTATION, NOT RANKING</text><text x="78" y="655" fill="#f1eadf" font-size="25" font-weight="700">Explore the graph.</text>
+<text x="78" y="694" fill="#c2b9aa" font-size="20">Indexed relationships + accepted result IDs.</text><text x="78" y="730" fill="#c2b9aa" font-size="20">Layout, curves, replay and camera movement.</text><text x="78" y="766" fill="#93bdb2" font-size="20" font-weight="700">Never changes scores or delays context.</text>
+<rect x="655" y="576" width="573" height="216" rx="12" fill="#141117" stroke="#433947"/>
+<text x="681" y="614" fill="#b8a5ca" font-size="17" letter-spacing="1.5" font-weight="700">ONE METHOD / TWO RUNTIMES</text><text x="681" y="655" fill="#f1eadf" font-size="25" font-weight="700">Python + browser TypeScript</text>
+<text x="681" y="694" fill="#c2b9aa" font-size="20">Shared frozen indexing and retrieval fixtures.</text><text x="681" y="730" fill="#c2b9aa" font-size="20">Compare actual observations, not screenshots.</text><text x="681" y="766" fill="#b8a5ca" font-size="20" font-weight="700">Animation is not retrieval-speed evidence.</text>
+<rect x="52" y="827" width="1176" height="60" rx="8" fill="#1d1912" stroke="#5b4930"/>
+<text x="78" y="865" fill="#ffe6b6" font-size="21" font-weight="700">BROWSER DEMO</text><text x="313" y="865" fill="#d8cfbf" font-size="21">Local Worker · No backend · No vault persistence · No model call</text>
+<text x="52" y="917" fill="#a79d8d" font-size="16">Architecture illustration, not a runtime screenshot. Scope: the default model-free browser application.</text>
+</g></svg>

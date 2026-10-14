@@ -385,11 +385,17 @@ def _validate_driver_report(path: Path, *, require_server_cleanup: bool = True) 
 
 
 def _record_server_cleanup(path: Path, lifecycle: dict[str, bool]) -> None:
-    _validate_driver_report(path, require_server_cleanup=False)
     if lifecycle != {"vite_process_tree_terminated": True, "port_released": True}:
         raise RuntimeError("browser-rag-ts server lifecycle proof is incomplete")
     report = _read_object(path)
-    termination = _object(report["termination"], "browser smoke termination")
+    if report.get("schema") != "browser-rag-ts-smoke-v10" or report.get("status") not in ("pass", "fail"):
+        raise RuntimeError("browser smoke cleanup received an invalid report envelope")
+    termination = _exact(report.get("termination"), TERMINATION_KEYS, "browser smoke termination")
+    if any(type(value) is not bool for value in termination.values()):
+        raise RuntimeError("browser smoke termination values must be boolean")
+    if report["status"] == "pass":
+        _validate_driver_report(path, require_server_cleanup=False)
+    # A functional failure must retain truthful cleanup without becoming a pass.
     termination.update(lifecycle)
     path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
@@ -458,7 +464,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 lifecycle = stop_server(server, port)
                 if output.is_file():
                     _record_server_cleanup(output, lifecycle)
-                    _validate_driver_report(output)
+                    if result == 0:
+                        _validate_driver_report(output)
             except RuntimeError as exc:
                 print(f"browser-rag-ts smoke cleanup failed: {exc}", file=sys.stderr)
                 result = 1

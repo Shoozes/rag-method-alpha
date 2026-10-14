@@ -7,6 +7,7 @@ import { copyFile, mkdir, readFile, realpath, writeFile } from 'node:fs/promises
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { launchChromium } from './browser_runtime.mjs';
+import { assertCaptureSource } from './capture_source.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MODULE = join(ROOT, 'modules/browser-rag-ts');
@@ -19,6 +20,7 @@ if (process.argv.slice(2).some(arg => arg !== '--update-media')) throw new Error
 const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml' };
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 await realpath(SITE);
+const sourceIdentity = await assertCaptureSource(ROOT, SITE);
 await mkdir(OUTPUT, { recursive: true });
 const server = createServer(async (request, response) => {
   try {
@@ -62,7 +64,8 @@ async function capture(page, name, state, fullPage = false) {
   const bytes = await page.screenshot({ path, fullPage, animations: 'disabled' });
   captures.push({ name, state, file: `${name}.png`, viewport: page.viewportSize(), full_page: fullPage,
     renderer: await page.locator('#graph-surface').getAttribute('data-renderer'),
-    backend: await page.locator('#renderer-state').textContent(), sha256: sha256(bytes), bytes: bytes.length });
+    backend: await page.locator('#graph-tsl-canvas').evaluate(canvas => JSON.parse(canvas.dataset.rendererDiagnostics ?? '{}').selected_backend ?? 'svg'),
+    backend_status: await page.locator('#renderer-state').textContent(), sha256: sha256(bytes), bytes: bytes.length });
 }
 async function layout(page, name, desktop = false) {
   await frames(page);
@@ -128,12 +131,63 @@ try {
   check('graph view and quiet effects preserve complete context', packet === await page.locator('#context-content').textContent());
   await page.locator('#fit-graph').click();
   await capture(page, 'atlas-evidence-graph', 'Accepted evidence neighborhood with curved relationship highlights.');
+  // Exercise projection changes independently of retrieval state.
+  const overlays = await page.evaluate(async () => {
+    const canvas = document.querySelector('#graph-tsl-canvas');
+    const path = document.querySelector('.evidence-connection');
+    if (!path) return false;
+    const saved = canvas.dataset.nodeTargets;
+    const id = path.dataset.sourceNodeId;
+    const token = path.dataset.linkId;
+    const wait = () => new Promise(ok => requestAnimationFrame(() => requestAnimationFrame(ok)));
+    const show = async visible => {
+      canvas.dataset.nodeTargets = JSON.stringify(JSON.parse(saved).map(point => point.node_id === id ? { ...point, visible } : point));
+      canvas.dispatchEvent(new Event('rag-camera-frame'));
+      await wait();
+    };
+    try {
+      await show(false);
+      const hidden = path.style.visibility === 'hidden';
+      await show(true);
+      return hidden && path.style.visibility === 'visible' && [...document.querySelectorAll('.evidence-connection')].filter(p => p.dataset.linkId === token).length === 1;
+    } finally { canvas.dataset.nodeTargets = saved; canvas.dispatchEvent(new Event('rag-camera-frame')); }
+  });
+  check('camera visibility restores existing evidence curves without duplicate paths', overlays);
+  await page.locator('.motion-disclosure summary').click();
+  await page.locator('#motion-style').selectOption('full');
+  await page.locator('#replay-build').click();
+  await page.waitForFunction(() => Number(document.querySelector('#graph-tsl-canvas')?.dataset.spawnActive) > 0);
+  await page.locator('.motion-disclosure summary').click();
+  await page.locator('#fit-graph').click();
+  await frames(page);
+  check('Overview settles transient node growth as well as camera motion', await page.locator('#graph-tsl-canvas').getAttribute('data-spawn-active') === '0');
+  await page.locator('#replay-trace').click();
+  await page.locator('#graph-surface[data-trace-active="true"]').waitFor();
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await frames(page);
+  check('hidden-tab signal cancels replay without changing accepted context',
+    await page.locator('#graph-surface').getAttribute('data-trace-active') !== 'true' && packet === await page.locator('#context-content').textContent());
+  await page.evaluate(() => { delete document.hidden; document.dispatchEvent(new Event('visibilitychange')); });
+  check('returning to a tab does not auto-restart a cancelled replay', await page.locator('#graph-surface').getAttribute('data-trace-active') !== 'true');
+  await quiet(page);
+
   for (const viewport of [{ width: 1366, height: 768 }, { width: 1024, height: 768 }, { width: 390, height: 844 }, { width: 844, height: 390 }, { width: 1920, height: 1080 }]) {
     await page.setViewportSize(viewport);
     await page.locator('#fit-graph').click();
     await page.evaluate(() => scrollTo(0, 0));
     await layout(page, `${viewport.width}x${viewport.height}`, viewport.width > 1000 && viewport.height >= 768);
-    if (viewport.width === 390) await capture(page, 'atlas-mobile', 'Mobile evidence graph and complete Search controls; natural page scroll.', true);
+    if (viewport.width === 390) {
+      await capture(page, 'atlas-mobile', 'Mobile evidence graph and complete Search controls; natural page scroll.', true);
+      const settings = page.locator('details.retrieval-options');
+      await settings.locator(':scope > summary').click();
+      const expanded = await settings.locator('.query-grid').isVisible();
+      const outsideGraph = await page.evaluate(() => document.querySelector('.query-grid').getBoundingClientRect().top >= document.querySelector('.graph-pane').getBoundingClientRect().bottom);
+      await settings.locator(':scope > summary').click();
+      check('mobile retrieval settings open and close without covering the graph', expanded && outsideGraph && !await settings.evaluate(element => element.open));
+    }
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
@@ -175,10 +229,11 @@ try {
 let sourceCommit = 'unavailable';
 try { sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { /* Archive verification has no Git metadata. */ }
 const manifest = { schema: 'rag-method-atlas-presentation-v1', status: failure ? 'fail' : 'pass',
-  source_commit: sourceCommit, runtime, checks, responsive_matrix: matrix, captures, errors, ...(failure ? { failure } : {}) };
+  source_commit: sourceCommit, source_identity: sourceIdentity, runtime, checks, responsive_matrix: matrix, captures, errors, ...(failure ? { failure } : {}) };
 await writeFile(join(OUTPUT, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 if (failure) process.exitCode = 1;
 else if (updateMedia) {
+  await assertCaptureSource(ROOT, SITE);
   const media = join(ROOT, 'docs/media');
   await mkdir(media, { recursive: true });
   for (const [source, destination] of [['atlas-overview', 'rag-method-evidence-workbench'], ['atlas-evidence', 'rag-method-source-reader'], ['atlas-mobile', 'rag-method-evidence-mobile'], ['atlas-evidence-graph', 'rag-method-evidence-graph']]) {

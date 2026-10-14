@@ -99,16 +99,16 @@ export class CinematicGraphPresentation {
   const token=JSON.stringify([this.selected,[...this.hits],this.options.motionEnabled()]);
   if(token===this.flowToken){
    for(const line of this.layer.querySelectorAll<SVGPathElement>("path[data-source-node-id]")){const from=points.get(line.dataset.sourceNodeId!),to=points.get(line.dataset.targetNodeId!);const path=from&&to?evidenceCurve(from,to,line.dataset.linkId??""):null;if(path)line.setAttribute("d",path);line.style.visibility=path&&from?.visible&&to?.visible?"visible":"hidden";}
-   for(const halo of this.layer.querySelectorAll<SVGCircleElement>("[data-node-id]")){const point=points.get(halo.dataset.nodeId!);if(point){halo.setAttribute("cx",String(point.x));halo.setAttribute("cy",String(point.y));}}
+   for(const halo of this.layer.querySelectorAll<SVGCircleElement>("[data-node-id]")){const point=points.get(halo.dataset.nodeId!);if(point){halo.setAttribute("cx",String(point.x));halo.setAttribute("cy",String(point.y));halo.style.visibility=point.visible?"visible":"hidden";}else halo.style.visibility="hidden";}
    return;
   }
   this.flowToken=token;for(const animation of this.beamAnimations)animation.cancel();this.beamAnimations=[];this.layer.replaceChildren();
   const links=this.graph.links.filter(link=>this.hits.has(link.source)||this.hits.has(link.target)).slice(0,24);
   for(const [index,link]of links.entries()){
-   const from=points.get(link.source),to=points.get(link.target);if(!from?.visible||!to?.visible)continue;
+   const from=points.get(link.source),to=points.get(link.target);if(!from||!to)continue;
    const path=evidenceCurve(from,to,link.id);if(!path)continue;
    const create=(className:string)=>{
-    const line=document.createElementNS(SVG,"path");line.setAttribute("d",path);line.dataset.linkId=link.id;line.setAttribute("pathLength","100");line.classList.add(className);line.dataset.sourceNodeId=link.source;line.dataset.targetNodeId=link.target;this.layer.append(line);return line;
+    const line=document.createElementNS(SVG,"path");line.setAttribute("d",path);line.dataset.linkId=link.id;line.setAttribute("pathLength","100");line.classList.add(className);line.style.visibility=from.visible&&to.visible?"visible":"hidden";line.dataset.sourceNodeId=link.source;line.dataset.targetNodeId=link.target;this.layer.append(line);return line;
    };
    create("evidence-connection");
    if(this.options.motionEnabled()){
@@ -117,8 +117,8 @@ export class CinematicGraphPresentation {
    }
   }
   for(const id of this.hits){
-   const point=points.get(id);if(!point?.visible)continue;
-   const halo=document.createElementNS(SVG,"circle");halo.setAttribute("cx",String(point.x));halo.setAttribute("cy",String(point.y));halo.setAttribute("r","9");halo.classList.add("arrival-halo");halo.dataset.nodeId=id;this.layer.append(halo);
+   const point=points.get(id);if(!point)continue;
+   const halo=document.createElementNS(SVG,"circle");halo.setAttribute("cx",String(point.x));halo.setAttribute("cy",String(point.y));halo.setAttribute("r","9");halo.classList.add("arrival-halo");halo.dataset.nodeId=id;halo.style.visibility=point.visible?"visible":"hidden";this.layer.append(halo);
   }
  }
  clear():void {

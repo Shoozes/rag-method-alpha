@@ -12,6 +12,7 @@ const config = {
     strictPort: true,
     fs: {
       strict: true,
+      deny: [".env", ".env.*", "*.{crt,pem,key,p12,pfx}", "**/.git/**", "**/.npmrc", "**/.yarnrc*", "**/.secrets/**"],
       allow: [moduleRoot],
     },
   },

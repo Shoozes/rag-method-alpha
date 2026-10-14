@@ -1,7 +1,13 @@
 {
   "schema": "rag-method-atlas-presentation-v1",
   "status": "pass",
-  "source_commit": "d0a7f1afe0f8935d82a10419b99173341c87a719",
+  "source_commit": "98800b702c20e4f4ba3937534436101d5b1b1773",
+  "source_identity": {
+    "kind": "working-source",
+    "review_status": "unreviewed",
+    "fingerprint_sha256": "9d45b3dcd5e69bcc2ebc0992c3cb53c352debda320cbcfe49dd2efb210398d52",
+    "artifact_identity_sha256": "2d209140abd9b51a75174146cb81ca5f7336c8a54150489fe6804be74fb084ca"
+  },
   "runtime": {
     "browser": "151.0.7922.34",
     "executable": "playwright-bundled:software-webgl",
@@ -24,6 +30,10 @@
     "close evidence returns keyboard focus",
     "graph view and quiet effects preserve ranking",
     "graph view and quiet effects preserve complete context",
+    "camera visibility restores existing evidence curves without duplicate paths",
+    "Overview settles transient node growth as well as camera motion",
+    "hidden-tab signal cancels replay without changing accepted context",
+    "returning to a tab does not auto-restart a cancelled replay",
     "1366x768: no overlapping panes",
     "1366x768: no horizontal overflow",
     "1366x768: graph and Search remain usable",
@@ -35,6 +45,7 @@
     "390x844: no overlapping panes",
     "390x844: no horizontal overflow",
     "390x844: graph and Search remain usable",
+    "mobile retrieval settings open and close without covering the graph",
     "844x390: no overlapping panes",
     "844x390: no horizontal overflow",
     "844x390: graph and Search remain usable",
@@ -86,18 +97,18 @@
           "x": 0,
           "y": 139.15625,
           "right": 1600,
-          "bottom": 793.25,
+          "bottom": 777.25,
           "width": 1600,
-          "height": 654.09375,
+          "height": 638.09375,
           "shown": true
         },
         ".command-panel": {
           "x": 0,
-          "y": 793.25,
+          "y": 777.25,
           "right": 1600,
           "bottom": 959,
           "width": 1600,
-          "height": 165.75,
+          "height": 181.75,
           "shown": true
         },
         ".evidence-pane": {
@@ -111,9 +122,9 @@
         },
         "#run-query": {
           "x": 1484,
-          "y": 808.640625,
+          "y": 792.640625,
           "right": 1580,
-          "bottom": 858.234375,
+          "bottom": 842.234375,
           "width": 96,
           "height": 49.59375,
           "shown": true
@@ -152,18 +163,18 @@
           "x": 0,
           "y": 139.15625,
           "right": 1152,
-          "bottom": 793.25,
+          "bottom": 777.25,
           "width": 1152,
-          "height": 654.09375,
+          "height": 638.09375,
           "shown": true
         },
         ".command-panel": {
           "x": 0,
-          "y": 793.25,
+          "y": 777.25,
           "right": 1152,
           "bottom": 959,
           "width": 1152,
-          "height": 165.75,
+          "height": 181.75,
           "shown": true
         },
         ".evidence-pane": {
@@ -177,9 +188,9 @@
         },
         "#run-query": {
           "x": 1036,
-          "y": 808.640625,
+          "y": 792.640625,
           "right": 1132,
-          "bottom": 858.234375,
+          "bottom": 842.234375,
           "width": 96,
           "height": 49.59375,
           "shown": true
@@ -218,18 +229,18 @@
           "x": 0,
           "y": 139.15625,
           "right": 1366,
-          "bottom": 561.25,
+          "bottom": 545.25,
           "width": 1366,
-          "height": 422.09375,
+          "height": 406.09375,
           "shown": true
         },
         ".command-panel": {
           "x": 0,
-          "y": 561.25,
+          "y": 545.25,
           "right": 1366,
           "bottom": 727,
           "width": 1366,
-          "height": 165.75,
+          "height": 181.75,
           "shown": true
         },
         ".evidence-pane": {
@@ -243,9 +254,9 @@
         },
         "#run-query": {
           "x": 1250,
-          "y": 576.640625,
+          "y": 560.640625,
           "right": 1346,
-          "bottom": 626.234375,
+          "bottom": 610.234375,
           "width": 96,
           "height": 49.59375,
           "shown": true
@@ -284,18 +295,18 @@
           "x": 0,
           "y": 139.15625,
           "right": 1024,
-          "bottom": 561.25,
+          "bottom": 545.25,
           "width": 1024,
-          "height": 422.09375,
+          "height": 406.09375,
           "shown": true
         },
         ".command-panel": {
           "x": 0,
-          "y": 561.25,
+          "y": 545.25,
           "right": 1024,
           "bottom": 727,
           "width": 1024,
-          "height": 165.75,
+          "height": 181.75,
           "shown": true
         },
         ".evidence-pane": {
@@ -309,9 +320,9 @@
         },
         "#run-query": {
           "x": 908,
-          "y": 576.640625,
+          "y": 560.640625,
           "right": 1004,
-          "bottom": 626.234375,
+          "bottom": 610.234375,
           "width": 96,
           "height": 49.59375,
           "shown": true
@@ -325,7 +336,7 @@
       "width": 390,
       "height": 844,
       "scrollWidth": 390,
-      "scrollHeight": 957,
+      "scrollHeight": 973,
       "overlaps": [],
       "parts": {
         ".hero": {
@@ -359,9 +370,9 @@
           "x": 0,
           "y": 636.234375,
           "right": 390,
-          "bottom": 915.546875,
+          "bottom": 931.546875,
           "width": 390,
-          "height": 279.3125,
+          "height": 295.3125,
           "shown": true
         },
         ".evidence-pane": {
@@ -416,18 +427,18 @@
           "x": 0,
           "y": 171.4375,
           "right": 844,
-          "bottom": 497.25,
+          "bottom": 481.25,
           "width": 844,
-          "height": 325.8125,
+          "height": 309.8125,
           "shown": true
         },
         ".command-panel": {
           "x": 0,
-          "y": 497.25,
+          "y": 481.25,
           "right": 844,
           "bottom": 663,
           "width": 844,
-          "height": 165.75,
+          "height": 181.75,
           "shown": true
         },
         ".evidence-pane": {
@@ -441,9 +452,9 @@
         },
         "#run-query": {
           "x": 728,
-          "y": 512.640625,
+          "y": 496.640625,
           "right": 824,
-          "bottom": 562.234375,
+          "bottom": 546.234375,
           "width": 96,
           "height": 49.59375,
           "shown": true
@@ -482,18 +493,18 @@
           "x": 0,
           "y": 139.15625,
           "right": 1920,
-          "bottom": 873.25,
+          "bottom": 857.25,
           "width": 1920,
-          "height": 734.09375,
+          "height": 718.09375,
           "shown": true
         },
         ".command-panel": {
           "x": 0,
-          "y": 873.25,
+          "y": 857.25,
           "right": 1920,
           "bottom": 1039,
           "width": 1920,
-          "height": 165.75,
+          "height": 181.75,
           "shown": true
         },
         ".evidence-pane": {
@@ -507,9 +518,9 @@
         },
         "#run-query": {
           "x": 1804,
-          "y": 888.640625,
+          "y": 872.640625,
           "right": 1900,
-          "bottom": 938.234375,
+          "bottom": 922.234375,
           "width": 96,
           "height": 49.59375,
           "shown": true
@@ -548,18 +559,18 @@
           "x": 0,
           "y": 315.5625,
           "right": 1440,
-          "bottom": 1055.6875,
+          "bottom": 1050.859375,
           "width": 1440,
-          "height": 740.125,
+          "height": 735.296875,
           "shown": true
         },
         ".command-panel": {
           "x": 0,
-          "y": 1055.6875,
+          "y": 1050.859375,
           "right": 1440,
           "bottom": 1327,
           "width": 1440,
-          "height": 271.3125,
+          "height": 276.140625,
           "shown": true
         },
         ".evidence-pane": {
@@ -573,9 +584,9 @@
         },
         "#run-query": {
           "x": 1208,
-          "y": 1085.484375,
+          "y": 1080.65625,
           "right": 1400,
-          "bottom": 1184.671875,
+          "bottom": 1179.84375,
           "width": 192,
           "height": 99.1875,
           "shown": true
@@ -614,18 +625,18 @@
           "x": 0,
           "y": 139.15625,
           "right": 1600,
-          "bottom": 793.25,
+          "bottom": 777.25,
           "width": 1600,
-          "height": 654.09375,
+          "height": 638.09375,
           "shown": true
         },
         ".command-panel": {
           "x": 0,
-          "y": 793.25,
+          "y": 777.25,
           "right": 1600,
           "bottom": 959,
           "width": 1600,
-          "height": 165.75,
+          "height": 181.75,
           "shown": true
         },
         ".evidence-pane": {
@@ -639,9 +650,9 @@
         },
         "#run-query": {
           "x": 1484,
-          "y": 808.640625,
+          "y": 792.640625,
           "right": 1580,
-          "bottom": 858.234375,
+          "bottom": 842.234375,
           "width": 96,
           "height": 49.59375,
           "shown": true
@@ -662,9 +673,10 @@
       },
       "full_page": false,
       "renderer": "tsl",
-      "backend": "Graph fitted to the current viewport.",
-      "sha256": "d8505db6116a88fa99f7d5cbdca256af404cd0200375cdf5f0763f4a6b6d2712",
-      "bytes": 641961
+      "backend": "webgl2",
+      "backend_status": "Graph fitted to the current viewport.",
+      "sha256": "3c9fd601a09fa96eb16ae17579388001bb4627d9029627f939c0ed54cf72ab01",
+      "bytes": 627480
     },
     {
       "name": "atlas-evidence",
@@ -676,9 +688,10 @@
       },
       "full_page": false,
       "renderer": "tsl",
-      "backend": "Graph fitted to the current viewport.",
-      "sha256": "827755e244077adef611e36d5a27687a6bd3d98f71b472358015fb35e8704bd7",
-      "bytes": 701244
+      "backend": "webgl2",
+      "backend_status": "Graph fitted to the current viewport.",
+      "sha256": "0089f1d4cf848ca22c62f44283b75964b12a42b47df03d0e5c5bdbf320fc930b",
+      "bytes": 687115
     },
     {
       "name": "atlas-evidence-graph",
@@ -690,9 +703,10 @@
       },
       "full_page": false,
       "renderer": "tsl",
-      "backend": "Graph fitted to the current viewport.",
-      "sha256": "a37e9d0fe1eb20f0f08ab9394b91f19684fc4637f5168ea68d5facb0f3613e45",
-      "bytes": 419299
+      "backend": "webgl2",
+      "backend_status": "Graph fitted to the current viewport.",
+      "sha256": "da506d244a4aaec50967d00b82b68477ccc653c59328a6fbd75d0dd8a2b6687c",
+      "bytes": 412390
     },
     {
       "name": "atlas-mobile",
@@ -704,9 +718,10 @@
       },
       "full_page": true,
       "renderer": "tsl",
-      "backend": "Graph fitted to the current viewport.",
-      "sha256": "7779015fe4e8e8f612386f7ed35105528aee6a027306b492e2f921cda0064d16",
-      "bytes": 161537
+      "backend": "webgl2",
+      "backend_status": "Graph fitted to the current viewport.",
+      "sha256": "81fd836c905db32c543b59d58392b37367cd34a6ba0f3f59c306b0bc529010cf",
+      "bytes": 162005
     }
   ],
   "errors": []

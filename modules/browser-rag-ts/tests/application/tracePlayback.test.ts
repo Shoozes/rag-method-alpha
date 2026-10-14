@@ -23,3 +23,36 @@ test("a new trace supersedes the old trace", async () => {
   assert.equal(await next, false);
   assert.deepEqual(seen, ["old-1", "new"]);
 });
+
+
+test("reentrant stop and replacement cannot leave an old timer behind", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const trace = new TracePlayback();
+  const seen: string[] = [];
+  const stopped = trace.play(["one", "two"], (_, id) => { seen.push(id); trace.stop(); }, false);
+  assert.equal(await stopped, false);
+  let replacement: Promise<boolean> | undefined;
+  const old = trace.play(["old", "obsolete"], (_, id) => {
+    seen.push(id);
+    replacement = trace.play(["new"], (_, id) => { seen.push(id); trace.stop(); }, false);
+  }, false);
+  assert.equal(await old, false);
+  assert.equal(await replacement, false);
+  t.mock.timers.tick(5000);
+  assert.deepEqual(seen, ["one", "old", "new"]);
+});
+
+test("replay snapshots accepted IDs and callback exceptions release ownership", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const trace = new TracePlayback();
+  const input = ["first", "second"];
+  const seen: string[] = [];
+  const playing = trace.play(input, (_, id) => { seen.push(id); input[1] = "replaced"; }, false);
+  t.mock.timers.tick(360);
+  await Promise.resolve();
+  t.mock.timers.tick(360);
+  assert.equal(await playing, true);
+  assert.deepEqual(seen, ["first", "second"]);
+  await assert.rejects(trace.play(["error"], () => { throw new Error("callback failed"); }, false), /callback failed/u);
+  assert.equal(await trace.play(["quiet"], () => { throw new Error("quiet replay emitted"); }, true), true);
+});
