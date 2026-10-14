@@ -58,7 +58,7 @@ node run.mjs build-browser
 node scripts/atlas_presentation.mjs
 ```
 
-Use `--update-media` only to replace public screenshots after that journey passes, then review the actual images. The script does not install dependencies or download a browser. See [presentation verification](docs/DEVELOPMENT.md#atlas-presentation-and-public-media) for coverage and remaining legacy smoke-test drift.
+Use `--update-media` only to replace public screenshots after that journey passes, then review the actual images. The command rejects stale builds and edited payloads; rebuild after source or media changes. The script does not install dependencies or download a browser. See [presentation verification](docs/DEVELOPMENT.md#atlas-presentation-and-public-media) for capture provenance, replay checks, and the full three-runtime browser journey.
 
 Browser journeys are explicit tasks and use an installed local Chromium browser when available. Run/test/build tasks do not install packages, fetch documentation, or download models.
 

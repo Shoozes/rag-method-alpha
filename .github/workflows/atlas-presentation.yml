@@ -1,8 +1,8 @@
-name: Atlas presentation proof
+name: Atlas acceptance
 
 on:
   push:
-    branches: [main, work/atlas-presentation-20261013]
+    branches: [main, work/atlas-hardening-20261013]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: atlas-presentation-${{ github.ref }}
+  group: atlas-acceptance-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -26,33 +26,67 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Install pinned browser dependencies
-        run: npm --prefix modules/browser-rag-ts ci --ignore-scripts
+      - name: Install locked application dependencies
+        run: |
+          npm --prefix modules/browser-rag-ts ci --ignore-scripts
+          npm --prefix source/frontend ci --ignore-scripts
+      - name: Audit both dependency trees
+        run: |
+          mkdir -p .artifacts/atlas-proof
+          npm --prefix modules/browser-rag-ts audit --json > .artifacts/atlas-proof/browser-audit.json
+          npm --prefix source/frontend audit --json > .artifacts/atlas-proof/frontend-audit.json
       - name: Prepare explicit CI browser
         working-directory: modules/browser-rag-ts
         run: npx --no-install playwright install --with-deps chromium
-      - name: Frozen method conformance
-        run: node run.mjs test-method
-      - name: Browser unit checks
-        run: node run.mjs test-browser-unit
-      - name: Build static browser application
+      - name: Frozen method and portable lifecycle checks
+        run: |
+          node run.mjs test-method
+          python -B -m unittest discover -s source/backend/tests -p test_browser_rag_runner.py -v
+          python -B -m unittest discover -s source/backend/tests -p test_visual_run.py -v
+          python -B -m unittest discover -s source/backend/tests -p test_portable_runner.py -v
+      - name: Browser implementation and Lab frontend checks
+        run: |
+          node run.mjs test-browser-unit
+          npm --prefix source/frontend run typecheck
+          npm --prefix source/frontend run build
+      - name: Full Atlas journey and Python/Node/Worker comparisons
+        env:
+          LOCAL_BROWSER_SOFTWARE_WEBGL: '1'
+        run: |
+          set -o pipefail
+          python -B scripts/browser_rag_smoke.py 2>&1 | tee .artifacts/atlas-proof/browser-driver.log
+      - name: Build static application
         run: node run.mjs build-browser
-      - name: Capture and verify the shipped Atlas
+      - name: Verify source-bound presentation captures
         env:
           LOCAL_BROWSER_SOFTWARE_WEBGL: '1'
         run: node scripts/atlas_presentation.mjs
-      - name: Retain exact source and visual proof
+      - name: Retain exact source and verification evidence
         if: always()
         run: |
           mkdir -p .artifacts/atlas-proof
           git rev-parse HEAD > .artifacts/atlas-proof/source-commit.txt
           git archive --format=tar HEAD | gzip > .artifacts/atlas-proof/source.tar.gz
-          if [ -d .artifacts/proof/atlas-presentation ]; then
-            cp -R .artifacts/proof/atlas-presentation .artifacts/atlas-proof/
+          if [ -d .artifacts/proof ]; then
+            cp -R .artifacts/proof .artifacts/atlas-proof/
           fi
-      - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
-          name: atlas-presentation-proof
+          name: atlas-acceptance-proof
           path: .artifacts/atlas-proof
           retention-days: 7
+          if-no-files-found: error
+
+  windows-lifecycle:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Check Windows port ownership and launcher contracts
+        run: |
+          python -B -m unittest discover -s source/backend/tests -p test_browser_rag_runner.py -v
+          python -B -m unittest discover -s source/backend/tests -p test_visual_run.py -v
+          python -B -m unittest discover -s source/backend/tests -p test_portable_runner.py -v

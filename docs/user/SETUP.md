@@ -13,12 +13,14 @@ node run.mjs run-browser
 
 `setup-browser` explicitly runs locked npm installation for this application. No other task installs dependencies. Open the URL printed by Vite and choose **Open Atlas**. Stop the server with Ctrl+C.
 
-1. Choose **Explore the Three.js demo vault** to index the bundled Three.js/TSL documentation.
-2. Run a suggested question or enter your own query.
-3. Select ranked evidence and inspect the matching graph node.
+1. Choose **Explore demo vault** to index the bundled Three.js/TSL documentation.
+2. Run a suggested question or enter your own query and choose **Search**. The demo offers a guided first trace; personal vaults never trigger an automatic query.
+3. Open **Evidence**, select a ranked result, and inspect the matching graph node.
 4. Read the complete source and follow its upstream documentation link.
-5. Inspect **What does the LLM receive?** to see the selected text a model would receive.
+5. Expand **Complete context · verbatim** to read or copy the exact ordered text a model would receive.
 6. Use the local-file/folder action to explore your own Markdown/text files. An interrupted or invalid replacement keeps the previously accepted corpus.
+
+Use **Overview** to stop a replay and frame the graph. **Motion Studio → Quiet** settles transient effects; reduced-motion preferences take priority. Hiding the tab stops playback, and returning does not automatically restart it. On narrow screens the graph stays visible, retrieval settings expand inline, and evidence stacks below the query controls.
 
 Files selected in this application remain in the current browser Worker session. Refreshing ends that session. The bundled example is served from the local application; startup does not fetch upstream documentation. No model is invoked.
 
