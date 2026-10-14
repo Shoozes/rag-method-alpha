@@ -47,13 +47,8 @@ export function composeRagConstellations(graph: PositionedGraph): PositionedGrap
   const orderedGroups = [...groups.entries()].sort(([leftKey, left], [rightKey, right]) =>
     right.length - left.length || compareText(leftKey, rightKey));
   const positions = new Map<string, Readonly<{ x: number; y: number }>>();
-  for (const [groupIndex, [key, members]] of orderedGroups.entries()) {
-    const groupAngle = groupIndex * GOLDEN_ANGLE - 0.62;
-    const groupDistance = groupIndex === 0 ? 0 : 310 * Math.sqrt(groupIndex);
-    const center = {
-      x: Math.cos(groupAngle) * groupDistance * 1.28,
-      y: Math.sin(groupAngle) * groupDistance,
-    };
+  const placed: { x: number; y: number; radius: number }[] = [];
+  for (const [key, members] of orderedGroups) {
     const bySource = new Map<string, PositionedGraphNode[]>();
     for (const node of members) {
       const source = sourceKey(node);
@@ -63,7 +58,25 @@ export function composeRagConstellations(graph: PositionedGraph): PositionedGrap
     }
     const sources = [...bySource.entries()].sort(([left], [right]) => compareText(left, right));
     // Source neighborhoods occupy the group, rather than collapsing into its center.
-    const sourceRadius = Math.max(96, 50 + Math.sqrt(sources.length) * 66);
+    const sourceRadius = Math.max(72, 36 + Math.sqrt(sources.length) * 32);
+    const satelliteRadius = Math.max(0, ...sources.map(([, nodes]) =>
+      nodes.length > 1 ? 42 + Math.sqrt(nodes.length - 1) * 13 : 0));
+    const radius = sourceRadius + satelliteRadius + 28;
+    // Pack bounding circles, not fixed centers that overlap when one family is large.
+    // The bounded visual window limits this deterministic search to 500 nodes.
+    let center = { x: 0, y: 0 };
+    const stride = Math.max(24, radius * 0.3);
+    let found = placed.length === 0;
+    for (let candidate = 1; !found && candidate <= 4096; candidate++) {
+      const angle = candidate * GOLDEN_ANGLE;
+      const distance = stride * Math.sqrt(candidate);
+      center = { x: Math.cos(angle) * distance * 1.25, y: Math.sin(angle) * distance };
+      found = placed.every((other) => Math.hypot(center.x - other.x, center.y - other.y) >= radius + other.radius + 48);
+    }
+    if (!found) {
+      center = { x: Math.max(...placed.map((other) => other.x + other.radius)) + radius + 48, y: 0 };
+    }
+    placed.push({ ...center, radius });
     for (const [sourceIndex, [source, sourceMembers]] of sources.entries()) {
       const sourceOffset = localPoint(sourceIndex, sources.length, sourceRadius, hashPhase(key));
       const sourceCenter = { x: center.x + sourceOffset.x, y: center.y + sourceOffset.y };
