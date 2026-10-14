@@ -1,0 +1,45 @@
+name: Dependency maintenance proof
+on:
+  push:
+    branches: [work/atlas-hardening-20261013]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Inspect and stage maintenance patch
+        shell: bash
+        run: |
+          mkdir -p .artifacts/dependency-review/browser .artifacts/dependency-review/frontend
+          for pair in 'modules/browser-rag-ts browser' 'source/frontend frontend'; do
+            read -r project label <<< "$pair"
+            npm --prefix "$project" audit --package-lock-only --json > ".artifacts/dependency-review/$label/audit-before.json" || true
+            npm --prefix "$project" install --save-dev --save-exact vite@7.3.7 --ignore-scripts
+            npm --prefix "$project" audit --json > ".artifacts/dependency-review/$label/audit-after.json" || true
+            cp "$project/package.json" "$project/package-lock.json" ".artifacts/dependency-review/$label/"
+          done
+          tar -C modules/browser-rag-ts -czf .artifacts/dependency-review/browser-dependencies.tar.gz node_modules
+      - name: Qualify browser patch
+        run: |
+          node run.mjs test-browser-unit
+          node run.mjs build-browser
+      - name: Qualify Lab frontend patch
+        run: |
+          npm --prefix source/frontend run typecheck
+          npm --prefix source/frontend run build
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: dependency-maintenance-proof
+          path: .artifacts/dependency-review
+          retention-days: 3
