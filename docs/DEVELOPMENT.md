@@ -1,6 +1,6 @@
 # Development and verification
 
-Use `node run.mjs --list` to inspect the app-focused task declarations in `project.tasks.json`. `--dry-run` prints exact command arguments without executing them. The menu dispatches the existing Python scripts and package commands from one portable catalog. Setup is explicit; missing dependencies are reported.
+Verification runs locally while this project is in progress. Use `node run.mjs --list` to inspect the app-focused task declarations in `project.tasks.json`. `--dry-run` prints exact command arguments without executing them. The menu dispatches the existing Python scripts and package commands from one portable catalog. Setup is explicit; missing dependencies are reported.
 
 | Task | Purpose | Prerequisites |
 | --- | --- | --- |
@@ -40,7 +40,7 @@ node scripts/atlas_presentation.mjs
 node scripts/atlas_presentation.mjs --update-media
 ```
 
-The default run writes candidates and a fail-closed receipt under `.artifacts/proof/atlas-presentation/`. The optional last command copies public media only after all checks pass. Review the overview, docked source reader, evidence graph, and mobile image before committing them. Do not reuse a selected-source screenshot as the overview hero.
+The default run writes candidates and a fail-closed receipt under `.artifacts/proof/atlas-presentation/`. The optional last command copies public media only after all checks pass. Review the overview, docked source reader, evidence graph, and mobile image before committing them. Do not reuse a selected-source screenshot as the overview hero. Checked-in presentation receipts describe the captured source revision; they do not qualify a later source change.
 
 The script first validates the built payload and compares its source fingerprint with the current checkout. Stale builds and edited payloads fail before browser startup; the source is checked again before any public-media update. Rebuild after changing source or public media. The receipt binds the actual artifact identity and source fingerprint, not just a Git HEAD label.
 
@@ -52,7 +52,13 @@ The full `browser_rag_smoke.mjs` journey uses current Atlas controls and real Wo
 
 A failed browser journey keeps its failing status while recording independently verified server shutdown and port release. Cleanup success never converts failed functional evidence into acceptance.
 
-The portable lifecycle tests also open real loopback sockets. An active listener remains unavailable. POSIX cleanup checks actual rebinding after TCP `TIME_WAIT`; Windows uses exclusive address ownership instead of reuse. Windows and Linux CI lanes run the launcher contracts separately from browser rendering.
+The portable lifecycle tests also open real loopback sockets. An active listener remains unavailable. POSIX cleanup checks actual rebinding after TCP `TIME_WAIT`; Windows uses exclusive address ownership instead of reuse. Run the launcher contracts locally on the platform being checked:
+
+```text
+python -B -m unittest discover -s source/backend/tests -p test_browser_rag_runner.py -v
+python -B -m unittest discover -s source/backend/tests -p test_visual_run.py -v
+python -B -m unittest discover -s source/backend/tests -p test_portable_runner.py -v
+```
 
 ## Dependency checks
 
@@ -65,7 +71,7 @@ npm --prefix source/frontend run typecheck
 npm --prefix source/frontend run build
 ```
 
-The CI workflow uses read-only repository permissions and retains audit output with test receipts. Audit results are timestamped observations of the advisory service, not a guarantee that every vulnerability is known. Keep the Vite development server loopback-only; its explicit filesystem deny rules block Git metadata, common key/environment-file patterns, `.secrets` directories, and local npm/yarn configuration within an allowed development root. These declared patterns are not a general secret detector.
+Run dependency audits locally alongside the relevant tests and retain any needed output with local test receipts. Audit results are timestamped observations of the advisory service, not a guarantee that every vulnerability is known. Keep the Vite development server loopback-only; its explicit filesystem deny rules block Git metadata, common key/environment-file patterns, `.secrets` directories, and local npm/yarn configuration within an allowed development root. These declared patterns are not a general secret detector.
 
 ## Build and distribute the browser application
 
