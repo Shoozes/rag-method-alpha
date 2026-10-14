@@ -137,14 +137,14 @@
 .shell[data-presentation="atlas"] .suggested-field { grid-column: 1 / -1; grid-row: 2; display: block; padding: 0; border: 0; }
 .shell[data-presentation="atlas"] .suggested-field .field-label { display: none; }
 .shell[data-presentation="atlas"] .suggested-questions { gap: .3rem; }
-.shell[data-presentation="atlas"] .suggested-questions button { min-height: 36px; padding: .35rem .6rem; font: 12px/1.4 var(--aurel-sans); background: none; border: 0; color: var(--muted); }
+.shell[data-presentation="atlas"] .suggested-questions button { min-height: 44px; padding: .35rem .6rem; font: 12px/1.4 var(--aurel-sans); background: none; border: 0; color: var(--muted); }
 .shell[data-presentation="atlas"] .suggested-questions button:hover { color: var(--gold-high); }
 .shell[data-presentation="atlas"] .query-meta { grid-column: 1 / -1; grid-row: 3; gap: .3rem .65rem; align-items: center; }
-.shell[data-presentation="atlas"] .retrieval-options > summary { min-height: 36px; padding: .45rem 0; font: 12px/1.4 var(--aurel-sans); }
+.shell[data-presentation="atlas"] .retrieval-options > summary { min-height: 44px; padding: .45rem 0; font: 12px/1.4 var(--aurel-sans); }
 .shell[data-presentation="atlas"] .retrieval-options[open] { position: absolute; bottom: calc(100% + .5rem); left: 1rem; max-height: min(30rem, 60svh); overflow: auto; width: min(32rem, calc(100% - 2rem)); padding: .8rem; border: 1px solid var(--rule); background: #0d0c0a; box-shadow: 0 1rem 3rem #0008; }
 .shell[data-presentation="atlas"] .query-grid { width: 100%; }
 .shell[data-presentation="atlas"] #query-state { margin-left: auto; font: 12px/1.4 var(--aurel-sans); max-width: 24rem; }
-.shell[data-presentation="atlas"] #replay-trace, .shell[data-presentation="atlas"] #skip-trace { min-height: 36px; padding: .35rem .6rem; font: 12px/1.4 var(--aurel-sans); }
+.shell[data-presentation="atlas"] #replay-trace, .shell[data-presentation="atlas"] #skip-trace { min-height: 44px; padding: .35rem .6rem; font: 12px/1.4 var(--aurel-sans); }
 .motion-disclosure { position: relative; }
 .motion-disclosure > summary { cursor: pointer; min-height: 44px; padding: .85rem; border: 1px solid var(--rule); background: #100e0b; font: 13px/1.2 var(--aurel-sans); }
 .motion-menu { position: absolute; top: calc(100% + .4rem); right: 0; width: min(20rem, calc(100vw - 2rem)); max-height: 60svh; overflow: auto; padding: 1rem; border: 1px solid var(--rule); background: #0d0c0a; box-shadow: 0 1rem 3rem #0008; }

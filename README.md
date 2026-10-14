@@ -23,6 +23,12 @@ Open the loopback URL printed by Vite, then choose **Open Atlas**. The root menu
 
 **Motion Studio → Replay build** replays the accepted graph with bounded node growth and camera motion. Quiet mode and reduced-motion preferences take priority. Animation presents actual ranked matches and source relationships; it does not measure retrieval speed. Open **Evidence** to inspect a complete source or copy the ordered context packet.
 
+## How the browser pipeline works
+
+![RAG Method infographic: selected files, local Worker indexing, scoped ranking, and ordered context; graph presentation is a separate consumer](docs/media/retrieval-flow.svg)
+
+The diagram describes the default browser application, not model inference. The graph presents indexed relationships and accepted result IDs. It does not determine retrieval scores or hold back the context packet. [Text explanation and boundaries](docs/METHOD.md).
+
 ## Graphs and the search-scan companion
 
 Atlas packs real path families into distinct neighborhoods, highlights accepted relationships with smooth curves, and docks evidence beside the desktop graph instead of covering Search. On narrow screens, the graph, query, and evidence stack in normal page flow. The landing preview retains its original image ratio.

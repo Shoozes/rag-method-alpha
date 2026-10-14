@@ -369,7 +369,7 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
     },
     setMotionEnabled(enabled:boolean):void { motionEnabled=enabled;if(!enabled){stopCamera();nodeMotion.cancelAll(true);}options.canvas.dataset.motionEnabled=String(enabled); },
     replaySpawn():void { if(!motionEnabled)return;spawn(visibleNodeIds);if(graph&&!userAdjusted){const to=graph.getCameraPose();if(to){const from={position:{x:to.position.x,y:to.position.y,z:to.position.z*1.12},target:to.target};graph.setCameraPose(from);fly(from,to,1200);}} },
-    stopMotion():void {stopCamera();},
+    stopMotion():void {stopCamera();nodeMotion.cancelAll(true);},
     refreshViewport(): void {
       scheduleViewportUpdate();
     },

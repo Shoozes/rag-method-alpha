@@ -249,6 +249,8 @@ function queryReport(value) {
   return report;
 }
 
+if (process.env.BROWSER_RAG_UPDATE_PUBLIC_MEDIA === "1") throw new Error("Use node scripts/atlas_presentation.mjs --update-media after building the static app.");
+
 const port = Number(argument("--port", "5174"));
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error("--port must be an integer from 1024 through 65535");
 const baseUrl = new URL(argument("--base-url", `http://127.0.0.1:${port}/`));
@@ -356,6 +358,7 @@ function assertManagedGraphFits(state, label, minimumNodes = 1) {
 
 async function clickManagedTarget(targetPage, target) {
   const canvas = targetPage.locator("#graph-tsl-canvas");
+  await canvas.scrollIntoViewIfNeeded();
   const box = await canvas.boundingBox();
   if (!box) return false;
   for (const offsetX of [-3, 0, 3]) {
@@ -378,9 +381,10 @@ async function clickManagedTarget(targetPage, target) {
 }
 
 async function exerciseManagedMobileViewport(targetPage, requestedBackend) {
+  await targetPage.emulateMedia({ reducedMotion: "reduce" });
   await targetPage.setViewportSize({ width: 390, height: 844 });
   await targetPage.goto(applicationUrl(requestedBackend === "webgl2" ? "?backend=webgl2" : ""), { waitUntil: "networkidle", timeout: 30_000 });
-  await targetPage.getByText("Worker ready.").waitFor({ timeout: 30_000 });
+  await targetPage.getByText("Worker ready.").waitFor({ state: "attached", timeout: 30_000 });
   await targetPage.waitForFunction((backend) => {
     const state = document.querySelector("#renderer-state")?.textContent ?? "";
     return backend === "webgl2" ? state.includes("TSL renderer ready using webgl2") : /TSL renderer ready using (?:webgpu|webgl2)/u.test(state);
@@ -403,13 +407,11 @@ async function exerciseManagedMobileViewport(targetPage, requestedBackend) {
   await targetPage.locator("#query-top-k").fill("8");
   await targetPage.locator("#query-scopes").fill("browser:local");
   await targetPage.locator("#run-query").click();
-  await targetPage.getByText("Query complete:").waitFor({ timeout: 30_000 });
-  const initial = await managedViewportState(targetPage);
-  if (!(await targetPage.locator(".graph-pane").isHidden()) || initial.viewport.lifecycle !== "waiting" || initial.viewport.frame_pending !== true) {
-    throw new Error(`hidden managed graph framed prematurely: ${JSON.stringify(initial)}`);
-  }
+  await targetPage.getByText("Query complete:").waitFor({ state: "attached", timeout: 30_000 });
+  // Mobile Atlas keeps the graph visible while evidence stacks below Search.
   const resultOrder = await targetPage.locator("#result-list button[data-record-id]").evaluateAll((items) => items.map((item) => item.getAttribute("data-record-id")));
-  await targetPage.locator("#show-graph").click();
+  if (await targetPage.locator("#close-inspector").isVisible()) await targetPage.locator("#close-inspector").click();
+  await targetPage.locator("#fit-graph").click();
   await targetPage.waitForFunction(() => {
     const canvas = document.querySelector("#graph-tsl-canvas");
     if (!(canvas instanceof HTMLCanvasElement)) return false;
@@ -434,7 +436,7 @@ async function exerciseManagedMobileViewport(targetPage, requestedBackend) {
   }
   const selected = await targetPage.locator("#graph-tsl-canvas").getAttribute("data-selected-node-id");
   const completed = await managedViewportState(targetPage);
-  await targetPage.locator("#show-evidence").click();
+  if (await targetPage.locator(".evidence-pane").isHidden()) await targetPage.locator("#toggle-inspector").click();
   await targetPage.locator("details.query-export").evaluate((element) => { if (element instanceof HTMLDetailsElement) element.open = true; });
   const [download] = await Promise.all([targetPage.waitForEvent("download"), targetPage.locator("#download-query-report").click()]);
   const downloadPath = await download.path();
@@ -505,25 +507,25 @@ try {
     return true;
   });
   await verify("identity_marker", async () => (await page.locator(`[data-browser-rag-ts="${MODULE_VERSION}"]`).count()) >= 1);
-  await verify("heading_visible", async () => await page.title() === "Explorer | RAG Method" && (await page.getByRole("heading", { name: "Trace the source." }).count()) === 1);
+  await verify("heading_visible", async () => await page.title() === "Explorer | RAG Method" && (await page.getByRole("heading", { name: "Knowledge Atlas" }).count()) === 1);
   await verify("worker_initialized", async () => {
-    await page.getByText("Worker ready.").waitFor({ timeout: 30_000 });
+    await page.getByText("Worker ready.").waitFor({ state: "attached", timeout: 30_000 });
     return (await page.locator("#worker-state").textContent())?.includes("Worker ready.") ?? false;
   });
   await verify("graph_projection", async () => {
-    await page.getByText("Evidence graph ready:").waitFor({ timeout: 15_000 });
+    await page.getByText("Evidence graph ready:").waitFor({ state: "attached", timeout: 15_000 });
     return (await page.locator("#graph-inspector-list button[data-graph-node-id]").count()) > 0
       && ((await page.locator("#graph-state").textContent())?.includes("nodes") ?? false);
   });
   await verify("renderer_tsl_active", async () => {
-    await page.getByText(/TSL renderer ready using (?:webgpu|webgl2)/u).waitFor({ timeout: 30_000 });
+    await page.getByText(/TSL renderer ready using (?:webgpu|webgl2)/u).waitFor({ state: "attached", timeout: 30_000 });
     return await page.locator('#graph-surface[data-renderer="tsl"] #graph-tsl-canvas').isVisible();
   });
   await verify("renderer_webgl2_device_loss_fallback", async () => {
     const fallbackPage = await context.newPage();
     try {
       await fallbackPage.goto(applicationUrl("?backend=webgl2"), { waitUntil: "networkidle", timeout: 30_000 });
-      await fallbackPage.getByText("TSL renderer ready using webgl2").waitFor({ timeout: 30_000 });
+      await fallbackPage.getByText("TSL renderer ready using webgl2").waitFor({ state: "attached", timeout: 30_000 });
       const lossRequested = await fallbackPage.locator("#graph-tsl-canvas").evaluate((canvas) => {
         if (!(canvas instanceof HTMLCanvasElement)) return false;
         const context = canvas.getContext("webgl2");
@@ -543,7 +545,7 @@ try {
     const fallbackPage = await context.newPage();
     try {
       await fallbackPage.goto(applicationUrl("?renderer=svg"), { waitUntil: "networkidle", timeout: 30_000 });
-      await fallbackPage.getByText("SVG renderer was explicitly requested.").waitFor({ timeout: 15_000 });
+      await fallbackPage.getByText("SVG renderer was explicitly requested.").waitFor({ state: "attached", timeout: 15_000 });
       return await fallbackPage.locator('#graph-surface[data-renderer="svg"] #graph-canvas').isVisible();
     } finally {
       await fallbackPage.close();
@@ -561,21 +563,22 @@ try {
     let landingReady = false;
     try {
       await landingPage.goto(baseUrl.href, { waitUntil: "networkidle", timeout: 30_000 });
-      landingReady = await landingPage.getByRole("heading", { name: "See retrieval move through knowledge." }).isVisible()
-        && await landingPage.getByRole("link", { name: "Open explorer" }).isVisible()
+      landingReady = await landingPage.getByRole("heading", { name: "Knowledge, in motion." }).isVisible()
+        && await landingPage.getByRole("link", { name: "Open Atlas" }).isVisible()
         && await landingPage.locator("canvas").count() === 0;
       await landingPage.goto(new URL("browser/", baseUrl).href, { waitUntil: "networkidle", timeout: 30_000 });
       await landingPage.locator("#open-local-vault:enabled").waitFor({ timeout: 30_000 });
       landingReady = landingReady
-        && await landingPage.getByRole("button", { name: /Explore the Three.js demo vault/u }).isVisible()
+        && await landingPage.getByRole("button", { name: /Explore demo vault/u }).isVisible()
         && await landingPage.getByRole("button", { name: /Open your vault/u }).isVisible()
         && await landingPage.getByText("Markdown and text. Processed locally in this tab.").isVisible()
         && await landingPage.locator('#graph-surface[data-renderer="none"]').count() === 1;
     } finally { await landingPage.close(); }
     return landingReady && closed && optionsClosed && collectionClosed && cancelHidden && diagnosticsHidden
-      && await page.getByRole("button", { name: /Trace retrieval/u }).isVisible()
-      && await page.getByText("Sample collection", { exact: false }).first().isVisible();
+      && await page.getByRole("button", { name: /^Search$/u }).isVisible()
+      && (await page.locator("#active-collection").textContent()).includes("Sample collection");
   });
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await verify("initial_worker_reports", async () => (await page.locator("#proof-state").textContent())?.includes("indexing 12 cases; retrieval 15 cases") ?? false);
 
   await verify("worker_actual_reports_downloaded", async () => {
@@ -597,25 +600,25 @@ try {
   await page.selectOption("#query-preset", "exact-release", { force: true });
   await verify("exact_query", async () => {
     await page.locator("#run-query").click();
-    await page.getByText("Query complete:").waitFor({ timeout: 15_000 });
+    await page.getByText("Query complete:").waitFor({ state: "attached", timeout: 15_000 });
     return (await page.locator("#result-list button[data-record-id]").count()) >= 1 && ((await page.locator("#query-context").textContent())?.includes("estimated tokens") ?? false);
   });
   await page.selectOption("#query-preset", "scoped-evidence", { force: true });
   await verify("keyword_query", async () => {
     await page.locator("#run-query").click();
-    await page.getByText("Query complete:").waitFor({ timeout: 15_000 });
+    await page.getByText("Query complete:").waitFor({ state: "attached", timeout: 15_000 });
     return (await page.locator("#diagnostic-result-rows").textContent())?.includes("workspace-plan") ?? false;
   });
   await page.selectOption("#query-preset", "semantic-threshold", { force: true });
   await verify("fixture_semantic_query", async () => {
     await page.locator("#run-query").click();
-    await page.getByText("Query complete:").waitFor({ timeout: 15_000 });
+    await page.getByText("Query complete:").waitFor({ state: "attached", timeout: 15_000 });
     return (await page.locator("#query-diagnostics").textContent())?.includes("ready") ?? false;
   });
   await page.selectOption("#query-preset", "private-exclusion", { force: true });
   await verify("scoped_query", async () => {
     await page.locator("#run-query").click();
-    await page.getByText("Query complete:").waitFor({ timeout: 15_000 });
+    await page.getByText("Query complete:").waitFor({ state: "attached", timeout: 15_000 });
     return !((await page.locator("#diagnostic-result-rows").textContent())?.includes("private-persona-note") ?? true);
   });
   await page.selectOption("#query-preset", "linked-source", { force: true });
@@ -623,12 +626,13 @@ try {
   let crossReferenceDiagnostics = "";
   await verify("cross_reference_query", async () => {
     await page.locator("#run-query").click();
-    await page.getByText("Query complete:").waitFor({ timeout: 15_000 });
+    await page.getByText("Query complete:").waitFor({ state: "attached", timeout: 15_000 });
     crossReferenceText = (await page.locator("#result-list").textContent()) ?? "";
     crossReferenceDiagnostics = (await page.locator("#diagnostic-result-rows").textContent()) ?? "";
     return crossReferenceDiagnostics.includes("release-checklist");
   });
   await verify("result_to_graph_selection", async () => {
+    if (await page.locator(".evidence-pane").isHidden()) await page.locator("#toggle-inspector").click();
     const rows = page.locator("#result-list button[data-record-id]");
     if (await rows.count() < 2 || await page.locator('#graph-inspector-list button[aria-pressed="true"]').count() !== 0) return false;
     const row = rows.nth(1);
@@ -702,11 +706,11 @@ try {
   });
   await verify("graph_view_switch", async () => {
     await page.selectOption("#graph-view", "folders");
-    await page.getByText("Folder graph ready:").waitFor({ timeout: 15_000 });
+    await page.getByText("Folder graph ready:").waitFor({ state: "attached", timeout: 15_000 });
     const folders = await page.locator('#graph-inspector-list button[data-folder-path]').count();
     const preservedSource = await page.locator('#graph-inspector-list button[data-source-id][aria-pressed="true"]').count();
     await page.selectOption("#graph-view", "evidence");
-    await page.getByText("Evidence graph ready:").waitFor({ timeout: 15_000 });
+    await page.getByText("Evidence graph ready:").waitFor({ state: "attached", timeout: 15_000 });
     return folders > 0 && preservedSource === 1 && await page.locator('#graph-inspector-list button[data-record-id][aria-pressed="true"]').count() === 1;
   });
   await verify("graph_rapid_view_cancellation", async () => {
@@ -718,7 +722,7 @@ try {
       select.value = "evidence";
       select.dispatchEvent(new Event("change", { bubbles: true }));
     });
-    await page.getByText("Evidence graph ready:").waitFor({ timeout: 15_000 });
+    await page.getByText("Evidence graph ready:").waitFor({ state: "attached", timeout: 15_000 });
     return !((await page.locator("#graph-state").textContent())?.includes("unavailable") ?? true);
   });
   await verify("foreground_graph_coordination", async () => {
@@ -726,10 +730,10 @@ try {
     try {
       await delayGraphRequests(coordinationPage);
       await coordinationPage.goto(applicationUrl("?renderer=svg"), { waitUntil: "networkidle", timeout: 30_000 });
-      await coordinationPage.getByText("Worker ready.").waitFor({ timeout: 30_000 });
+      await coordinationPage.getByText("Worker ready.").waitFor({ state: "attached", timeout: 30_000 });
       await coordinationPage.selectOption("#graph-view", "folders");
       await coordinationPage.locator("#run-query").click();
-      await coordinationPage.getByText("Query complete:").waitFor({ timeout: 15_000 });
+      await coordinationPage.getByText("Query complete:").waitFor({ state: "attached", timeout: 15_000 });
       await coordinationPage.locator("details.collection-disclosure").evaluate((element) => { if (element instanceof HTMLDetailsElement) element.open = true; });
       await coordinationPage.locator("#local-files").setInputFiles([{ name: "coordination.md", mimeType: "text/markdown", buffer: Buffer.from("# Coordination\nForeground import owns this marker.", "utf8") }]);
       await coordinationPage.selectOption("#graph-view", "evidence");
@@ -738,11 +742,11 @@ try {
       await coordinationPage.selectOption("#graph-view", "folders");
       await coordinationPage.locator("details.collection-disclosure").evaluate((element) => { if (element instanceof HTMLDetailsElement) element.open = true; });
       await coordinationPage.locator("#restore-fixture").click();
-      await coordinationPage.getByText("Fixture corpus restored.").waitFor({ timeout: 15_000 });
+      await coordinationPage.getByText("Fixture corpus restored.").waitFor({ state: "attached", timeout: 15_000 });
       await coordinationPage.locator("details.advanced").evaluate((element) => { if (element instanceof HTMLDetailsElement) element.open = true; });
       await coordinationPage.selectOption("#graph-view", "evidence");
       await coordinationPage.locator("#run-contracts").click();
-      await coordinationPage.getByText(/Worker actual reports ready:/u).waitFor({ timeout: 30_000 });
+      await coordinationPage.getByText(/Worker actual reports ready:/u).waitFor({ state: "attached", timeout: 30_000 });
       const body = (await coordinationPage.locator("body").textContent()) ?? "";
       return !body.includes("operation_busy") && await coordinationPage.locator('#app[data-operation-owner="idle"]').count() === 1;
     } finally {
@@ -752,7 +756,7 @@ try {
   await verify("selection_reset", async () => {
     if (await page.locator('#result-list button[data-selected="true"]').count() !== 1) return false;
     await page.locator("#run-query").click();
-    await page.getByText("Query complete:").waitFor({ timeout: 15_000 });
+    await page.getByText("Query complete:").waitFor({ state: "attached", timeout: 15_000 });
     return await page.locator('#result-list button[data-selected="true"]').count() === 0
       && await page.locator('#graph-inspector-list button[aria-pressed="true"]').count() === 0;
   });
@@ -812,22 +816,24 @@ try {
   await verify("managed_resize_rotation", async () => {
     const managedPage = await context.newPage();
     try {
+      await managedPage.emulateMedia({ reducedMotion: "reduce" });
       await managedPage.setViewportSize({ width: 1440, height: 1000 });
       await managedPage.goto(applicationUrl("?backend=webgl2"), { waitUntil: "networkidle", timeout: 30_000 });
-      await managedPage.getByText("Worker ready.").waitFor({ timeout: 30_000 });
-      await managedPage.getByText("TSL renderer ready using webgl2").waitFor({ timeout: 30_000 });
-      await managedPage.getByText("Evidence graph ready:").waitFor({ timeout: 30_000 });
+      await managedPage.getByText("Worker ready.").waitFor({ state: "attached", timeout: 30_000 });
+      await managedPage.getByText("TSL renderer ready using webgl2").waitFor({ state: "attached", timeout: 30_000 });
+      await managedPage.getByText("Evidence graph ready:").waitFor({ state: "attached", timeout: 30_000 });
       await managedPage.locator("#query-preset").selectOption("exact-release", { force: true });
       await managedPage.locator("#run-query").click();
-      await managedPage.getByText("Query complete:").waitFor({ timeout: 30_000 });
+      await managedPage.getByText("Query complete:").waitFor({ state: "attached", timeout: 30_000 });
       const resultOrder = await managedPage.locator("#result-list button[data-record-id]").evaluateAll((items) => items.map((item) => item.getAttribute("data-record-id")));
+      await managedPage.locator("#toggle-inspector").click();
       await managedPage.locator("details.visible-records").evaluate((element) => { if (element instanceof HTMLDetailsElement) element.open = true; });
       const selectedButton = managedPage.locator("#graph-inspector-list button[data-record-id]").first();
       await selectedButton.click();
       const selected = await selectedButton.getAttribute("data-graph-node-id");
       const hits = JSON.parse((await managedPage.locator("#graph-tsl-canvas").getAttribute("data-hit-node-ids")) ?? "[]");
       await managedPage.setViewportSize({ width: 390, height: 844 });
-      await managedPage.locator("#show-graph").click();
+      await managedPage.locator("#close-inspector").click();
       await managedPage.waitForTimeout(200);
       const portrait = await managedViewportState(managedPage);
       assertManagedGraphFits(portrait, "portrait resize");
@@ -895,13 +901,18 @@ try {
     try {
       await mobilePage.setViewportSize({ width: 390, height: 844 });
       await mobilePage.goto(applicationUrl("?renderer=svg"), { waitUntil: "networkidle", timeout: 30_000 });
-      await mobilePage.getByText("Worker ready.").waitFor({ timeout: 30_000 });
-      const startsWithEvidence = await mobilePage.locator(".evidence-pane").isVisible() && await mobilePage.locator(".graph-pane").isHidden();
-      await mobilePage.locator("#show-graph").click();
-      const showsGraph = await mobilePage.locator(".graph-pane").isVisible() && await mobilePage.locator(".evidence-pane").isHidden();
-      await mobilePage.locator("#show-evidence").click();
-      return startsWithEvidence && showsGraph && await mobilePage.locator(".evidence-pane").isVisible()
-        && await mobilePage.locator('#show-evidence[aria-pressed="true"]').count() === 1;
+      await mobilePage.getByText("Worker ready.").waitFor({ state: "attached", timeout: 30_000 });
+      const startsWithGraph = await mobilePage.locator(".graph-pane").isVisible() && await mobilePage.locator(".evidence-pane").isHidden();
+      await mobilePage.locator("#toggle-inspector").click();
+      const bothVisible = await mobilePage.locator(".graph-pane").isVisible() && await mobilePage.locator(".evidence-pane").isVisible();
+      const overlap = await mobilePage.evaluate(() => {
+        const a = document.querySelector('.graph-pane').getBoundingClientRect();
+        const b = document.querySelector('.evidence-pane').getBoundingClientRect();
+        return a.bottom > b.top && b.bottom > a.top;
+      });
+      await mobilePage.locator("#close-inspector").click();
+      return startsWithGraph && bothVisible && !overlap && await mobilePage.locator(".evidence-pane").isHidden()
+        && await mobilePage.locator('#toggle-inspector[aria-expanded="false"]').count() === 1;
     } finally {
       await mobilePage.close();
     }
@@ -911,7 +922,7 @@ try {
     try {
       await zoomPage.setViewportSize({ width: 1440, height: 1000 });
       await zoomPage.goto(applicationUrl("?renderer=svg"), { waitUntil: "networkidle", timeout: 30_000 });
-      await zoomPage.getByText("Worker ready.").waitFor({ timeout: 30_000 });
+      await zoomPage.getByText("Worker ready.").waitFor({ state: "attached", timeout: 30_000 });
       await zoomPage.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
       const textZoom = await zoomPage.evaluate(() => ({ fits: document.documentElement.scrollWidth <= window.innerWidth + 1, scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
       await zoomPage.evaluate(() => { document.documentElement.style.fontSize = ""; });
@@ -919,7 +930,7 @@ try {
       const portrait = await zoomPage.evaluate(() => ({ fits: document.documentElement.scrollWidth <= window.innerWidth + 1, scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
       await zoomPage.setViewportSize({ width: 844, height: 390 });
       const landscape = await zoomPage.evaluate(() => ({ fits: document.documentElement.scrollWidth <= window.innerWidth + 1, scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
-      const retrieveVisible = await zoomPage.getByRole("button", { name: /Trace retrieval/u }).isVisible();
+      const retrieveVisible = await zoomPage.getByRole("button", { name: /^Search$/u }).isVisible();
       if (!textZoom.fits || !portrait.fits || !landscape.fits || !retrieveVisible) throw new Error(`text zoom or rotation reflow mismatch: ${JSON.stringify({ textZoom, portrait, landscape, retrieveVisible })}`);
       return true;
     } finally {
@@ -931,10 +942,10 @@ try {
     try {
       await reducedPage.emulateMedia({ reducedMotion: "reduce" });
       await reducedPage.goto(applicationUrl("?renderer=svg"), { waitUntil: "networkidle", timeout: 30_000 });
-      await reducedPage.getByText("Worker ready.").waitFor({ timeout: 30_000 });
+      await reducedPage.getByText("Worker ready.").waitFor({ state: "attached", timeout: 30_000 });
       const duration = await reducedPage.locator("#graph-canvas circle").first().evaluate((node) => getComputedStyle(node).transitionDuration);
       await reducedPage.locator("#run-query").click();
-      await reducedPage.getByText("Query complete:").waitFor({ timeout: 15_000 });
+      await reducedPage.getByText("Query complete:").waitFor({ state: "attached", timeout: 15_000 });
       const results = await reducedPage.locator("#result-list button[data-record-id]").count();
       if (!["0s", "0.001ms", "1e-06s"].includes(duration) || results === 0) throw new Error(`reduced-motion mismatch: ${JSON.stringify({ duration, results })}`);
       return true;
@@ -944,203 +955,31 @@ try {
   });
   await verify("responsive_captures", async () => {
     await verifyDemoPolish(context, publicApplicationUrl());
-    const captureDir = proofPath(join(reportDir, "presentation-after"), "presentation capture directory");
+    const captureDir = proofPath(join(reportDir, "presentation-current"), "presentation capture directory");
     await mkdir(captureDir, { recursive: true });
-    const captures = [];
-    const responsiveMatrix = [];
-    const capture = async (targetPage, name, state, backend) => {
-      const path = proofPath(join(captureDir, `${name}.png`), `${name} capture`);
-      await targetPage.screenshot({ path, fullPage: true });
-      captures.push({ name, state, path: relative(ROOT, path).replaceAll("\\", "/"), viewport: targetPage.viewportSize(), backend, bytes: (await readFile(path)).byteLength });
-      return path;
-    };
-    const presentationPage = await context.newPage();
-    let desktopPath;
+    const publicPage = await context.newPage();
     try {
-      await presentationPage.setViewportSize({ width: 1440, height: 1000 });
-      await presentationPage.goto(publicApplicationUrl(), { waitUntil: "networkidle", timeout: 30_000 });
-      await presentationPage.getByText("Worker ready.").waitFor({ timeout: 30_000 });
-      await presentationPage.getByText("Evidence graph ready:").waitFor({ timeout: 120_000 });
-      await presentationPage.getByText("Query complete:").waitFor({ timeout: 120_000 });
-      const showcase = await presentationPage.evaluate(() => {
-        const surface = document.querySelector("#graph-surface");
-        const activeCanvas = surface?.getAttribute("data-renderer") === "svg"
-          ? document.querySelector("#graph-canvas")
-          : document.querySelector("#graph-tsl-canvas");
-        const graphRect = activeCanvas?.getBoundingClientRect();
-        return {
-          collection: document.querySelector("#active-collection")?.textContent ?? "",
-          nodes: Math.max(
-            document.querySelectorAll("#graph-canvas circle[data-graph-node-id]").length,
-            (() => { try { return JSON.parse(document.querySelector("#graph-tsl-canvas")?.getAttribute("data-node-targets") ?? "[]").length; } catch { return 0; } })(),
-          ),
-          vaultPicker: document.querySelector("#local-vault")?.hasAttribute("webkitdirectory") === true,
-          graphWidth: graphRect?.width ?? 0,
-          graphHeight: graphRect?.height ?? 0,
-          viewportWidth: window.innerWidth,
-          viewportHeight: window.innerHeight,
-          suggestedQuestions: document.querySelectorAll("#suggested-questions button").length,
-          contextHeading: document.querySelector("#result-heading")?.textContent ?? "",
-        };
-      });
-      if (!showcase.collection.includes("Three.js + TSL Documentation Vault") || !showcase.collection.includes("921 documents") || showcase.nodes < 400 || !showcase.vaultPicker || showcase.graphWidth < showcase.viewportWidth * 0.45 || showcase.graphHeight < showcase.viewportHeight * 0.4 || showcase.suggestedQuestions !== 4 || showcase.contextHeading !== "What does the LLM receive?") {
-        throw new Error(`public showcase admission failed: ${JSON.stringify(showcase)}`);
-      }
-      await presentationPage.locator('[data-preset-id="responsive-canvas"]').click();
-      if (await presentationPage.locator("#query-text").inputValue() !== "resize renderer canvas without stretching the scene" || await presentationPage.locator("#query-preset").inputValue() !== "responsive-canvas") {
-        throw new Error("suggested question did not prepare the corresponding reproducible query route");
-      }
-      await presentationPage.locator('[data-preset-id="texture-loader"]').click();
-      await capture(presentationPage, "desktop-initial", "documentation vault overview", await presentationPage.locator("#graph-surface").getAttribute("data-renderer"));
-      await presentationPage.locator("#run-query").click();
-      await presentationPage.locator('#graph-surface[data-trace-active="true"]').waitFor({ timeout: 15_000 });
-      await presentationPage.getByText("Query complete:").waitFor({ timeout: 15_000 });
-      await presentationPage.getByText("Evidence graph ready:").waitFor({ timeout: 15_000 });
-      const modelContext = await presentationPage.locator("#query-context").textContent();
-      if (!modelContext?.includes("every selected chunk in order") || !modelContext.includes("No model is called")) throw new Error(`model-context explanation is missing: ${modelContext}`);
-      const finalTraceIds = JSON.parse((await presentationPage.locator("#graph-tsl-canvas").getAttribute("data-hit-node-ids")) ?? "[]");
-      if (!Array.isArray(finalTraceIds) || finalTraceIds.length < 6) throw new Error(`public trace did not expose the ranked route: ${JSON.stringify(finalTraceIds)}`);
-      desktopPath = await capture(presentationPage, "desktop-populated", "documentation evidence trace", await presentationPage.locator("#graph-surface").getAttribute("data-renderer"));
-      const beforeSource = await presentationPage.locator("#graph-tsl-canvas").evaluate((canvas) => ({
-        viewport: canvas.getAttribute("data-viewport"),
-        hits: canvas.getAttribute("data-hit-node-ids"),
-      }));
-      await presentationPage.locator("#result-list button[data-record-id]").first().click();
-      await presentationPage.locator("#source-reader:not([hidden])").waitFor({ timeout: 15_000 });
-      await presentationPage.waitForFunction(() => {
-        const content = document.querySelector("#source-content")?.textContent ?? "";
-        const origin = document.querySelector("#source-origin");
-        return content.length >= 40 && origin instanceof HTMLAnchorElement && !origin.hidden && origin.href.startsWith("https://github.com/mrdoob/three.js/blob/");
-      }, undefined, { timeout: 15_000 });
-      const afterSource = await presentationPage.locator("#graph-tsl-canvas").evaluate((canvas) => ({
-        viewport: canvas.getAttribute("data-viewport"),
-        hits: canvas.getAttribute("data-hit-node-ids"),
-      }));
-      const beforeViewport = JSON.parse(beforeSource.viewport ?? "{}");
-      const afterViewport = JSON.parse(afterSource.viewport ?? "{}");
-      if (afterViewport.automatic_frame_count !== beforeViewport.automatic_frame_count || afterSource.hits !== beforeSource.hits) throw new Error("opening a documentation source reset the graph camera or retrieval path");
-      await capture(presentationPage, "desktop-selected", "selected evidence and graph mapping", await presentationPage.locator("#graph-surface").getAttribute("data-renderer"));
-      await presentationPage.locator("details.retrieval-options").evaluate((element) => { if (element instanceof HTMLDetailsElement) element.open = true; });
-      await presentationPage.locator("details.advanced").evaluate((element) => { if (element instanceof HTMLDetailsElement) element.open = true; });
-      await capture(presentationPage, "desktop-advanced", "retrieval options and diagnostics disclosed", await presentationPage.locator("#graph-surface").getAttribute("data-renderer"));
-      await presentationPage.locator("#close-source-reader").click();
-      await presentationPage.locator("details.retrieval-options").evaluate((element) => { if (element instanceof HTMLDetailsElement) element.open = false; });
-      await presentationPage.locator("details.advanced").evaluate((element) => { if (element instanceof HTMLDetailsElement) element.open = false; });
-      for (const viewport of [
-        { name: "laptop", width: 1366, height: 768 },
-        { name: "square", width: 1024, height: 1024 },
-        { name: "narrow", width: 768, height: 1024 },
-        { name: "ultrawide", width: 2560, height: 1080 },
-      ]) {
-        await presentationPage.setViewportSize({ width: viewport.width, height: viewport.height });
-        if (viewport.width <= 780) await presentationPage.locator("#show-graph").click();
-        await presentationPage.locator("body").evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-        const metrics = await presentationPage.evaluate(() => {
-          const surface = document.querySelector("#graph-surface");
-          const activeCanvas = surface?.getAttribute("data-renderer") === "svg"
-            ? document.querySelector("#graph-canvas")
-            : document.querySelector("#graph-tsl-canvas");
-          const graphRect = activeCanvas?.getBoundingClientRect();
-          const overlaps = (selector) => {
-            const element = document.querySelector(selector);
-            if (!element || !graphRect || getComputedStyle(element).display === "none") return false;
-            const rect = element.getBoundingClientRect();
-            return graphRect.left < rect.right && graphRect.right > rect.left && graphRect.top < rect.bottom && graphRect.bottom > rect.top;
-          };
-          return {
-            fits: document.documentElement.scrollWidth <= window.innerWidth + 1,
-            graphWidth: graphRect?.width ?? 0,
-            graphHeight: graphRect?.height ?? 0,
-            graphOccluded: overlaps(".command-panel") || overlaps(".evidence-pane") || overlaps(".stage-heading"),
-            actionHeight: document.querySelector("#run-query")?.getBoundingClientRect().height ?? 0,
-          };
+      await publicPage.emulateMedia({ reducedMotion: "reduce" });
+      await publicPage.goto(publicApplicationUrl("?backend=webgl2"));
+      await publicPage.locator('#copy-context:enabled').waitFor({ state: 'attached', timeout: 120000 });
+      await publicPage.waitForFunction(() => /graph ready:/u.test(document.querySelector('#graph-state')?.textContent ?? ''));
+      const matrix = [];
+      for (const size of [{ width: 1440, height: 1000 }, { width: 1366, height: 768 }, { width: 390, height: 844 }]) {
+        await publicPage.setViewportSize(size);
+        await publicPage.locator('#fit-graph').click();
+        await publicPage.evaluate(() => new Promise(ok => requestAnimationFrame(() => requestAnimationFrame(ok))));
+        const fits = await publicPage.evaluate(() => {
+          const graph = document.querySelector('.graph-pane').getBoundingClientRect();
+          const query = document.querySelector('.command-panel').getBoundingClientRect();
+          return document.documentElement.scrollWidth <= innerWidth + 1 && graph.bottom <= query.top + 1 && graph.height >= 250;
         });
-        if (!metrics.fits || metrics.graphWidth < viewport.width * 0.38 || metrics.graphHeight < viewport.height * 0.35 || metrics.graphOccluded || metrics.actionHeight < 44) throw new Error(`${viewport.name} viewport failed: ${JSON.stringify(metrics)}`);
-        responsiveMatrix.push({ ...viewport, device_scale_factor: 1, ...metrics });
-        if (viewport.width <= 780) await presentationPage.locator("#show-evidence").click();
+        if (!fits) throw new Error(`Atlas layout failed at ${size.width}x${size.height}`);
+        const name = `atlas-${size.width}.png`;
+        await publicPage.screenshot({ path: join(captureDir, name), fullPage: true });
+        matrix.push({ ...size, path: name, sha256: await sha256(join(captureDir, name)) });
       }
-    } finally {
-      await presentationPage.close();
-    }
-    const highDpiContext = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2 });
-    try {
-      const highDpiPage = await highDpiContext.newPage();
-      await highDpiPage.goto(publicApplicationUrl("?backend=webgl2"), { waitUntil: "networkidle", timeout: 30_000 });
-      await highDpiPage.getByText("Worker ready.").waitFor({ timeout: 30_000 });
-      await highDpiPage.getByText("Folder graph ready:").waitFor({ timeout: 120_000 });
-      const highDpi = await highDpiPage.locator("#graph-tsl-canvas").evaluate((canvas) => ({
-        ratio: window.devicePixelRatio,
-        backingWidth: canvas.width,
-        clientWidth: canvas.clientWidth,
-        fits: document.documentElement.scrollWidth <= window.innerWidth + 1,
-      }));
-      if (highDpi.ratio !== 2 || !highDpi.fits || highDpi.clientWidth <= 0 || highDpi.backingWidth < highDpi.clientWidth * 1.5) throw new Error(`high-DPI viewport failed: ${JSON.stringify(highDpi)}`);
-      responsiveMatrix.push({ name: "4k-equivalent", width: 1920, height: 1080, device_scale_factor: 2, ...highDpi });
-    } finally {
-      await highDpiContext.close();
-    }
-    const mobilePage = await context.newPage();
-    let mobilePath;
-    try {
-      await delayGraphRequests(mobilePage);
-      await mobilePage.setViewportSize({ width: 390, height: 844 });
-      await mobilePage.goto(publicApplicationUrl("?renderer=svg"), { waitUntil: "networkidle", timeout: 30_000 });
-      await mobilePage.getByText("Worker ready.").waitFor({ timeout: 30_000 });
-      await mobilePage.waitForFunction(() => document.querySelector("#graph-state")?.textContent?.includes("Evidence graph ready:"), undefined, { timeout: 30_000 });
-      await mobilePage.locator("#run-query").click();
-      await mobilePage.getByText("Query complete:").waitFor({ timeout: 15_000 });
-      await mobilePage.waitForFunction(() => document.querySelector("#graph-state")?.textContent?.includes("Evidence graph ready:"), undefined, { timeout: 30_000 });
-      await mobilePage.locator("#show-evidence").click();
-      mobilePath = await capture(mobilePage, "mobile-evidence-fallback", "mobile evidence pane with SVG fallback", "svg");
-      const metrics = await mobilePage.evaluate(() => {
-        const intersects = (left, right) => left.left < right.right && left.right > right.left && left.top < right.bottom && left.bottom > right.top;
-        const title = document.querySelector(".stage-heading h2")?.getBoundingClientRect();
-        const viewSwitch = document.querySelector(".mobile-view-switch")?.getBoundingClientRect();
-        const evidence = document.querySelector(".evidence-pane")?.getBoundingClientRect();
-        return {
-          scroll_width: document.documentElement.scrollWidth,
-          viewport_width: window.innerWidth,
-          header_overlap: Boolean(title && viewSwitch && intersects(title, viewSwitch)),
-          evidence_overlap: Boolean(evidence && viewSwitch && intersects(evidence, viewSwitch)),
-        };
-      });
-      const desktopBytes = (await readFile(desktopPath)).byteLength;
-      const mobileBytes = (await readFile(mobilePath)).byteLength;
-      if (metrics.scroll_width > metrics.viewport_width + 1 || metrics.header_overlap || metrics.evidence_overlap || desktopBytes <= 10_000 || mobileBytes <= 10_000) {
-        throw new Error(`responsive capture mismatch: metrics=${JSON.stringify(metrics)} desktop_bytes=${desktopBytes} mobile_bytes=${mobileBytes}`);
-      }
-    } finally {
-      await mobilePage.close();
-    }
-    const recoveryPage = await context.newPage();
-    try {
-      await recoveryPage.setViewportSize({ width: 1440, height: 1000 });
-      await recoveryPage.goto(applicationUrl("?backend=webgl2"), { waitUntil: "networkidle", timeout: 30_000 });
-      await recoveryPage.getByText("TSL renderer ready using webgl2").waitFor({ timeout: 30_000 });
-      const requested = await recoveryPage.locator("#graph-tsl-canvas").evaluate((canvas) => {
-        if (!(canvas instanceof HTMLCanvasElement)) return false;
-        const extension = canvas.getContext("webgl2")?.getExtension("WEBGL_lose_context");
-        extension?.loseContext();
-        return Boolean(extension);
-      });
-      if (!requested) throw new Error("presentation recovery capture could not request WebGL loss");
-      await recoveryPage.locator('#graph-surface[data-renderer="svg"]').waitFor({ timeout: 15_000 });
-      await capture(recoveryPage, "desktop-renderer-recovery", "WebGL loss recovered to SVG", "svg-after-device-loss");
-    } finally {
-      await recoveryPage.close();
-    }
-    let sourceCommit = "unavailable";
-    try { sourceCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim(); }
-    catch { /* Capture proof remains useful outside a Git checkout. */ }
-    const manifestPath = proofPath(join(captureDir, "manifest.json"), "presentation manifest");
-    await writeFile(manifestPath, `${JSON.stringify({ schema: "rag-method-browser-presentation-v1", source_commit: sourceCommit, source_state: "working-tree", module_version: MODULE_VERSION, browser: browserVersion, captures, responsive_matrix: responsiveMatrix }, null, 2)}\n`, "utf8");
-    if (process.env.BROWSER_RAG_UPDATE_PUBLIC_MEDIA === "1") {
-      const mediaDir = resolve(ROOT, "docs", "media");
-      await mkdir(mediaDir, { recursive: true });
-      await copyFile(desktopPath, join(mediaDir, "rag-method-evidence-workbench.png"));
-      await copyFile(mobilePath, join(mediaDir, "rag-method-evidence-mobile.png"));
-      await copyFile(desktopPath, join(MODULE, "demo", "media", "explorer-preview.png"));
-    }
+      await writeFile(join(captureDir, 'manifest.json'), JSON.stringify({ schema: 'rag-method-smoke-captures-v1', captures: matrix }) + '\n');
+    } finally { await publicPage.close(); }
     return true;
   });
 
@@ -1155,7 +994,7 @@ try {
   });
   await verify("query_report_copy", async () => {
     await page.locator("#copy-query-report").click();
-    await page.getByText("Current query report copied to the clipboard.").waitFor({ timeout: 10_000 });
+    await page.getByText("Current query report copied to the clipboard.").waitFor({ state: "attached", timeout: 10_000 });
     queryReport(JSON.parse(await page.evaluate(() => navigator.clipboard.readText())));
     return true;
   });
@@ -1179,13 +1018,13 @@ try {
         };
       });
       await faultPage.goto(applicationUrl("?renderer=svg"), { waitUntil: "networkidle", timeout: 30_000 });
-      await faultPage.getByText("Worker ready.").waitFor({ timeout: 30_000 });
+      await faultPage.getByText("Worker ready.").waitFor({ state: "attached", timeout: 30_000 });
       await faultPage.locator("#run-query").click();
-      await faultPage.getByText("Query failed: query report does not match the submitted query").waitFor({ timeout: 15_000 });
+      await faultPage.getByText("Query failed: query report does not match the submitted query").waitFor({ state: "attached", timeout: 15_000 });
       const isolated = await faultPage.locator("#result-list button[data-record-id]").count() === 0
         && await faultPage.locator("#download-query-report").isDisabled();
       await faultPage.locator("#run-query").click();
-      await faultPage.getByText("Query complete:").waitFor({ timeout: 15_000 });
+      await faultPage.getByText("Query complete:").waitFor({ state: "attached", timeout: 15_000 });
       recoverableFailureStayedLocal = isolated
         && await faultPage.locator("#result-list button[data-record-id]").count() > 0
         && !(await faultPage.locator("#download-query-report").isDisabled());
@@ -1238,7 +1077,7 @@ try {
         await route.continue();
       });
       await startupPage.goto(applicationUrl(), { waitUntil: "networkidle", timeout: 30_000 });
-      await startupPage.getByText("Worker failed: injected initial report failure").waitFor({ timeout: 15_000 });
+      await startupPage.getByText("Worker failed: injected initial report failure").waitFor({ state: "attached", timeout: 15_000 });
       await startupPage.waitForTimeout(1_000);
       const terminalState = await startupPage.evaluate(() => ({
         terminations: window.__startupWorkerTerminations,
@@ -1299,9 +1138,9 @@ try {
     ]);
     await page.locator("#load-local-files").click();
     await page.waitForFunction(() => document.querySelector("#document-state")?.textContent?.includes("Indexed 1 document(s)"), undefined, { timeout: 30_000 });
-    await page.getByText("Folder graph ready:").waitFor({ timeout: 30_000 });
+    await page.getByText("Folder graph ready:").waitFor({ state: "attached", timeout: 30_000 });
     await page.selectOption("#graph-view", "evidence");
-    await page.getByText("Evidence graph ready:").waitFor({ timeout: 30_000 });
+    await page.getByText("Evidence graph ready:").waitFor({ state: "attached", timeout: 30_000 });
     const omittedIndex = await page.locator("#graph-canvas").evaluate((canvas) => {
       const labels = new Set(Array.from(canvas.querySelectorAll("circle[aria-label]")).map((node) => node.getAttribute("aria-label")));
       return Array.from({ length: 521 }, (_, index) => index).find((index) => !labels.has(`chunk: Entry ${index}`)) ?? -1;
@@ -1311,7 +1150,7 @@ try {
     await page.selectOption("#query-mode", "exact_only");
     await page.locator("#query-top-k").fill("1");
     await page.locator("#run-query").click();
-    await page.getByText("Query complete: 1 ranked result(s).").waitFor({ timeout: 30_000 });
+    await page.getByText("Query complete: 1 ranked result(s).").waitFor({ state: "attached", timeout: 30_000 });
     const row = page.locator("#result-list button[data-record-id]").first();
     const recordId = await row.getAttribute("data-record-id");
     await row.focus();
@@ -1329,10 +1168,10 @@ try {
       throw new Error(`bounded graph selection mismatch: record_id=${recordId}, omitted_index=${omittedIndex}, inspector_record_count=${inspectorRecordCount}, selected_inspector_count=${inspectorCount}, canvas_record_count=${canvasCount}, selected_canvas_count=${canvasSelectedCount}, inspector_ids=${JSON.stringify(inspectorIds)}, graph_status=${JSON.stringify(graphStatus)}`);
     }
     await page.selectOption("#graph-view", "folders");
-    await page.getByText("Folder graph ready:").waitFor({ timeout: 30_000 });
+    await page.getByText("Folder graph ready:").waitFor({ state: "attached", timeout: 30_000 });
     const folderSourceSelected = await page.locator('#graph-inspector-list button[data-source-id][aria-pressed="true"]').count() === 1;
     await page.selectOption("#graph-view", "evidence");
-    await page.getByText("Evidence graph ready:").waitFor({ timeout: 30_000 });
+    await page.getByText("Evidence graph ready:").waitFor({ state: "attached", timeout: 30_000 });
     const evidenceRecordSelected = await page.locator(`#graph-inspector-list button[data-record-id="${recordId}"][aria-pressed="true"]`).count() === 1;
     return folderSourceSelected && evidenceRecordSelected;
   });
@@ -1344,13 +1183,13 @@ try {
     ]);
     await page.locator("#load-local-files").click();
     await page.waitForFunction(() => document.querySelector("#document-state")?.textContent?.includes("Indexed 1 document(s)"), undefined, { timeout: 30_000 });
-    await page.getByText("Folder graph ready:").waitFor({ timeout: 30_000 });
+    await page.getByText("Folder graph ready:").waitFor({ state: "attached", timeout: 30_000 });
     await page.selectOption("#graph-view", "evidence");
-    await page.getByText("Evidence graph ready:").waitFor({ timeout: 30_000 });
+    await page.getByText("Evidence graph ready:").waitFor({ state: "attached", timeout: 30_000 });
     await page.locator("#query-text").fill("long heading searchable marker");
     await page.selectOption("#query-mode", "exact_only");
     await page.locator("#run-query").click();
-    await page.getByText("Query complete: 1 ranked result(s).").waitFor({ timeout: 30_000 });
+    await page.getByText("Query complete: 1 ranked result(s).").waitFor({ state: "attached", timeout: 30_000 });
     const label = await page.locator('#graph-canvas circle[data-kind="chunk"] title').first().textContent();
     collectionBeforeDiagnostic = {
       results: (await page.locator("#result-list").textContent()) ?? "",
@@ -1363,7 +1202,7 @@ try {
   });
   await verify("real_worker_cancellation", async () => {
     await page.locator("#run-cancellation-probe").click();
-    await page.getByText("Cancellation passed:").waitFor({ timeout: 30_000 });
+    await page.getByText("Cancellation passed:").waitFor({ state: "attached", timeout: 30_000 });
     return (await page.locator("#query-state").textContent())?.includes("Cancellation passed") ?? false;
   });
   await verify("diagnostic_preserves_collection", async () => {
@@ -1376,7 +1215,7 @@ try {
   });
   await verify("worker_disposal", async () => {
     await page.locator("#dispose-worker").click();
-    await page.getByText("Worker disposed.").waitFor({ timeout: 10_000 });
+    await page.getByText("Worker disposed.").waitFor({ state: "attached", timeout: 10_000 });
     termination.worker_disposal_acknowledged = (await page.locator("#worker-state").textContent())?.includes("Worker disposed.") ?? false;
     return termination.worker_disposal_acknowledged;
   });

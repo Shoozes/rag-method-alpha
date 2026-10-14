@@ -71,6 +71,7 @@ export async function verifyDemoPolish(context, applicationUrl) {
     assert.deepEqual(await page.evaluate(() => window.polish.searches), ['TextureLoader loadAsync']);
     assert.equal(await page.locator('#run-query').isEnabled(), true);
     await page.locator('#skip-trace').click();
+    await page.locator('#toggle-inspector').click();
     await page.locator('#context-packet summary').click();
     await page.locator('#copy-context').click();
     const packet = await page.evaluate(() => ({ packet: window.polish.context, displayed: document.querySelector('#context-content').textContent, copied: window.polish.copied }));
