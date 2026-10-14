@@ -27,10 +27,8 @@ jobs:
             python .github/atlas-followup.py
             git rm .github/atlas-followup.py
           fi
-          for project in modules/browser-rag-ts source/frontend; do
-            npm --prefix "$project" install --save-dev --save-exact vite@7.3.7 --ignore-scripts
-            npm --prefix "$project" update source-map-js nanoid --ignore-scripts
-          done
+          npm --prefix modules/browser-rag-ts ci --ignore-scripts
+          npm --prefix source/frontend ci --ignore-scripts
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -u
@@ -48,6 +46,7 @@ jobs:
         run: npx --no-install playwright install --with-deps chromium
       - name: Method and unit checks
         run: |
+          python -B -m unittest discover -s source/backend/tests -p test_browser_rag_runner.py -v
           node run.mjs test-method
           node run.mjs test-browser-unit
           npm --prefix source/frontend run typecheck
@@ -55,9 +54,10 @@ jobs:
       - name: Full browser and three-way acceptance
         env:
           LOCAL_BROWSER_SOFTWARE_WEBGL: '1'
-        run: python -B scripts/browser_rag_smoke.py
+        run: |
+          set -o pipefail
+          python -B scripts/browser_rag_smoke.py 2>&1 | tee .artifacts/followup/browser-driver.log
       - name: Build and verify public presentation
-        if: '!cancelled()'
         env:
           LOCAL_BROWSER_SOFTWARE_WEBGL: '1'
         run: |
