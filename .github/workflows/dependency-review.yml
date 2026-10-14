@@ -1,55 +1,86 @@
-name: Dependency maintenance proof
+name: Atlas hardening candidate
 on:
   push:
     branches: [work/atlas-hardening-20261013]
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: atlas-hardening
+  cancel-in-progress: true
 jobs:
   qualify:
+    if: github.ref == 'refs/heads/work/atlas-hardening-20261013'
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-        with:
-          persist-credentials: false
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Inspect and stage maintenance patch
-        shell: bash
+      - name: Stage bounded source migration
         run: |
-          mkdir -p .artifacts/dependency-review/browser .artifacts/dependency-review/frontend
-          for pair in 'modules/browser-rag-ts browser' 'source/frontend frontend'; do
-            read -r project label <<< "$pair"
-            npm --prefix "$project" audit --package-lock-only --json > ".artifacts/dependency-review/$label/audit-before.json" || true
+          if [ -f .github/atlas-followup.py ]; then
+            python .github/atlas-followup.py
+            git rm .github/atlas-followup.py
+          fi
+          for project in modules/browser-rag-ts source/frontend; do
             npm --prefix "$project" install --save-dev --save-exact vite@7.3.7 --ignore-scripts
             npm --prefix "$project" update source-map-js nanoid --ignore-scripts
-            npm --prefix "$project" audit --json > ".artifacts/dependency-review/$label/audit-after.json" || true
-            cp "$project/package.json" "$project/package-lock.json" ".artifacts/dependency-review/$label/"
           done
-          tar -C modules/browser-rag-ts -czf .artifacts/dependency-review/browser-dependencies.tar.gz node_modules
-      - name: Require clean audit responses
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -u
+          if ! git diff --cached --quiet; then
+            git commit -m 'Prepare Atlas replay, browser proof, dependency, and infographic follow-up'
+            git push origin HEAD:work/atlas-hardening-20261013
+          fi
+      - name: Capture audit receipts
         run: |
-          node --input-type=module - <<'JS'
-          import { readFileSync } from 'node:fs';
-          for (const label of ['browser', 'frontend']) {
-            const audit = JSON.parse(readFileSync(`.artifacts/dependency-review/${label}/audit-after.json`));
-            if (audit.error || audit.metadata?.vulnerabilities?.total !== 0) throw new Error(`${label}: advisory or invalid audit response`);
-          }
-          JS
-      - name: Qualify browser patch
+          mkdir -p .artifacts/followup
+          npm --prefix modules/browser-rag-ts audit --json > .artifacts/followup/browser-audit.json
+          npm --prefix source/frontend audit --json > .artifacts/followup/frontend-audit.json
+      - name: Prepare explicit browser
+        working-directory: modules/browser-rag-ts
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Method and unit checks
         run: |
+          node run.mjs test-method
           node run.mjs test-browser-unit
-          node run.mjs build-browser
-      - name: Qualify Lab frontend patch
-        run: |
           npm --prefix source/frontend run typecheck
           npm --prefix source/frontend run build
+      - name: Full browser and three-way acceptance
+        env:
+          LOCAL_BROWSER_SOFTWARE_WEBGL: '1'
+        run: python -B scripts/browser_rag_smoke.py
+      - name: Build and verify public presentation
+        if: '!cancelled()'
+        env:
+          LOCAL_BROWSER_SOFTWARE_WEBGL: '1'
+        run: |
+          node run.mjs build-browser
+          node scripts/atlas_presentation.mjs --update-media
+      - name: Retain successful candidate media
+        if: success()
+        run: |
+          git add docs/media modules/browser-rag-ts/demo/media
+          if ! git diff --cached --quiet; then
+            git commit -m 'Refresh follow-up media from the qualified Atlas candidate'
+            git push origin HEAD:work/atlas-hardening-20261013
+          fi
+      - name: Retain evidence and source
+        if: always()
+        run: |
+          mkdir -p .artifacts/followup
+          git rev-parse HEAD > .artifacts/followup/source-commit.txt
+          git archive HEAD | gzip > .artifacts/followup/source.tar.gz
+          cp -R .artifacts/proof .artifacts/followup/ || true
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: dependency-maintenance-proof
-          path: .artifacts/dependency-review
-          retention-days: 3
+          name: atlas-hardening-proof
+          path: .artifacts/followup
+          retention-days: 7
