@@ -61,4 +61,5 @@ old='class BrowserRagRunnerTests(unittest.TestCase):';new='''class BrowserRagRun
             self.assertFalse(LOCAL_RUNTIME.port_available(port))
 
 ''';assert old in s;p.write_text(s.replace(old,new))
-p=Path('.github/workflows/dependency-review.yml');s=p.read_text();s=s.replace('          node run.mjs test-method','          python -B -m unittest discover -s source/backend/tests -p test_browser_rag_runner.py -v\n          node run.mjs test-method');p.write_text(s)
+import subprocess
+subprocess.run(['python', '-B', '-m', 'unittest', 'discover', '-s', 'source/backend/tests', '-p', 'test_browser_rag_runner.py', '-v'], check=True)
