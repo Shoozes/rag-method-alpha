@@ -1,0 +1,713 @@
+{
+  "schema": "rag-method-atlas-presentation-v1",
+  "status": "pass",
+  "source_commit": "1f8983f00425efdb99c4dec629833973d66b1e6e",
+  "runtime": {
+    "browser": "151.0.7922.34",
+    "executable": "playwright-bundled:software-webgl",
+    "playwright": "1.62.0",
+    "software_webgl_requested": true
+  },
+  "checks": [
+    "real public vault loaded",
+    "accepted ranked results and verbatim context exist",
+    "desktop overview: no overlapping panes",
+    "desktop overview: no horizontal overflow",
+    "desktop overview: graph and Search remain usable",
+    "desktop overview: entire chrome fits the viewport",
+    "selected result exposes a pinned source",
+    "source text is readable",
+    "desktop evidence: no overlapping panes",
+    "desktop evidence: no horizontal overflow",
+    "desktop evidence: graph and Search remain usable",
+    "desktop evidence: entire chrome fits the viewport",
+    "close evidence returns keyboard focus",
+    "graph view and quiet effects preserve ranking",
+    "graph view and quiet effects preserve complete context",
+    "1366x768: no overlapping panes",
+    "1366x768: no horizontal overflow",
+    "1366x768: graph and Search remain usable",
+    "1366x768: entire chrome fits the viewport",
+    "1024x768: no overlapping panes",
+    "1024x768: no horizontal overflow",
+    "1024x768: graph and Search remain usable",
+    "1024x768: entire chrome fits the viewport",
+    "390x844: no overlapping panes",
+    "390x844: no horizontal overflow",
+    "390x844: graph and Search remain usable",
+    "844x390: no overlapping panes",
+    "844x390: no horizontal overflow",
+    "844x390: graph and Search remain usable",
+    "1920x1080: no overlapping panes",
+    "1920x1080: no horizontal overflow",
+    "1920x1080: graph and Search remain usable",
+    "1920x1080: entire chrome fits the viewport",
+    "200% text zoom: no overlapping panes",
+    "200% text zoom: no horizontal overflow",
+    "200% text zoom: graph and Search remain usable",
+    "reduced motion never starts a trace",
+    "reduced motion preserves complete context",
+    "explicit SVG fallback remains available",
+    "SVG overview: no overlapping panes",
+    "SVG overview: no horizontal overflow",
+    "SVG overview: graph and Search remain usable",
+    "SVG overview: entire chrome fits the viewport",
+    "landing preview retains its complete image ratio",
+    "healthy journeys report no browser errors"
+  ],
+  "responsive_matrix": [
+    {
+      "name": "desktop overview",
+      "width": 1600,
+      "height": 1000,
+      "scrollWidth": 1600,
+      "scrollHeight": 1000,
+      "overlaps": [],
+      "parts": {
+        ".hero": {
+          "x": 0,
+          "y": 0,
+          "right": 1600,
+          "bottom": 70.59375,
+          "width": 1600,
+          "height": 70.59375,
+          "shown": true
+        },
+        ".stage-heading": {
+          "x": 0,
+          "y": 70.59375,
+          "right": 1600,
+          "bottom": 139.15625,
+          "width": 1600,
+          "height": 68.5625,
+          "shown": true
+        },
+        ".graph-pane": {
+          "x": 0,
+          "y": 139.15625,
+          "right": 1600,
+          "bottom": 793.25,
+          "width": 1600,
+          "height": 654.09375,
+          "shown": true
+        },
+        ".command-panel": {
+          "x": 0,
+          "y": 793.25,
+          "right": 1600,
+          "bottom": 959,
+          "width": 1600,
+          "height": 165.75,
+          "shown": true
+        },
+        ".evidence-pane": {
+          "x": 0,
+          "y": 0,
+          "right": 0,
+          "bottom": 0,
+          "width": 0,
+          "height": 0,
+          "shown": false
+        },
+        "#run-query": {
+          "x": 1484,
+          "y": 808.640625,
+          "right": 1580,
+          "bottom": 858.234375,
+          "width": 96,
+          "height": 49.59375,
+          "shown": true
+        }
+      },
+      "offscreenNodes": 0,
+      "nodes": 500
+    },
+    {
+      "name": "desktop evidence",
+      "width": 1600,
+      "height": 1000,
+      "scrollWidth": 1600,
+      "scrollHeight": 1000,
+      "overlaps": [],
+      "parts": {
+        ".hero": {
+          "x": 0,
+          "y": 0,
+          "right": 1600,
+          "bottom": 70.59375,
+          "width": 1600,
+          "height": 70.59375,
+          "shown": true
+        },
+        ".stage-heading": {
+          "x": 0,
+          "y": 70.59375,
+          "right": 1600,
+          "bottom": 139.15625,
+          "width": 1600,
+          "height": 68.5625,
+          "shown": true
+        },
+        ".graph-pane": {
+          "x": 0,
+          "y": 139.15625,
+          "right": 1152,
+          "bottom": 793.25,
+          "width": 1152,
+          "height": 654.09375,
+          "shown": true
+        },
+        ".command-panel": {
+          "x": 0,
+          "y": 793.25,
+          "right": 1152,
+          "bottom": 959,
+          "width": 1152,
+          "height": 165.75,
+          "shown": true
+        },
+        ".evidence-pane": {
+          "x": 1152,
+          "y": 139.15625,
+          "right": 1600,
+          "bottom": 959,
+          "width": 448,
+          "height": 819.84375,
+          "shown": true
+        },
+        "#run-query": {
+          "x": 1036,
+          "y": 808.640625,
+          "right": 1132,
+          "bottom": 858.234375,
+          "width": 96,
+          "height": 49.59375,
+          "shown": true
+        }
+      },
+      "offscreenNodes": 0,
+      "nodes": 500
+    },
+    {
+      "name": "1366x768",
+      "width": 1366,
+      "height": 768,
+      "scrollWidth": 1366,
+      "scrollHeight": 768,
+      "overlaps": [],
+      "parts": {
+        ".hero": {
+          "x": 0,
+          "y": 0,
+          "right": 1366,
+          "bottom": 70.59375,
+          "width": 1366,
+          "height": 70.59375,
+          "shown": true
+        },
+        ".stage-heading": {
+          "x": 0,
+          "y": 70.59375,
+          "right": 1366,
+          "bottom": 139.15625,
+          "width": 1366,
+          "height": 68.5625,
+          "shown": true
+        },
+        ".graph-pane": {
+          "x": 0,
+          "y": 139.15625,
+          "right": 1366,
+          "bottom": 561.25,
+          "width": 1366,
+          "height": 422.09375,
+          "shown": true
+        },
+        ".command-panel": {
+          "x": 0,
+          "y": 561.25,
+          "right": 1366,
+          "bottom": 727,
+          "width": 1366,
+          "height": 165.75,
+          "shown": true
+        },
+        ".evidence-pane": {
+          "x": 0,
+          "y": 0,
+          "right": 0,
+          "bottom": 0,
+          "width": 0,
+          "height": 0,
+          "shown": false
+        },
+        "#run-query": {
+          "x": 1250,
+          "y": 576.640625,
+          "right": 1346,
+          "bottom": 626.234375,
+          "width": 96,
+          "height": 49.59375,
+          "shown": true
+        }
+      },
+      "offscreenNodes": 0,
+      "nodes": 500
+    },
+    {
+      "name": "1024x768",
+      "width": 1024,
+      "height": 768,
+      "scrollWidth": 1024,
+      "scrollHeight": 768,
+      "overlaps": [],
+      "parts": {
+        ".hero": {
+          "x": 0,
+          "y": 0,
+          "right": 1024,
+          "bottom": 70.59375,
+          "width": 1024,
+          "height": 70.59375,
+          "shown": true
+        },
+        ".stage-heading": {
+          "x": 0,
+          "y": 70.59375,
+          "right": 1024,
+          "bottom": 139.15625,
+          "width": 1024,
+          "height": 68.5625,
+          "shown": true
+        },
+        ".graph-pane": {
+          "x": 0,
+          "y": 139.15625,
+          "right": 1024,
+          "bottom": 561.25,
+          "width": 1024,
+          "height": 422.09375,
+          "shown": true
+        },
+        ".command-panel": {
+          "x": 0,
+          "y": 561.25,
+          "right": 1024,
+          "bottom": 727,
+          "width": 1024,
+          "height": 165.75,
+          "shown": true
+        },
+        ".evidence-pane": {
+          "x": 0,
+          "y": 0,
+          "right": 0,
+          "bottom": 0,
+          "width": 0,
+          "height": 0,
+          "shown": false
+        },
+        "#run-query": {
+          "x": 908,
+          "y": 576.640625,
+          "right": 1004,
+          "bottom": 626.234375,
+          "width": 96,
+          "height": 49.59375,
+          "shown": true
+        }
+      },
+      "offscreenNodes": 0,
+      "nodes": 500
+    },
+    {
+      "name": "390x844",
+      "width": 390,
+      "height": 844,
+      "scrollWidth": 390,
+      "scrollHeight": 957,
+      "overlaps": [],
+      "parts": {
+        ".hero": {
+          "x": 0,
+          "y": 0,
+          "right": 390,
+          "bottom": 67.375,
+          "width": 390,
+          "height": 67.375,
+          "shown": true
+        },
+        ".stage-heading": {
+          "x": 0,
+          "y": 67.375,
+          "right": 390,
+          "bottom": 231.125,
+          "width": 390,
+          "height": 163.75,
+          "shown": true
+        },
+        ".graph-pane": {
+          "x": 0,
+          "y": 231.125,
+          "right": 390,
+          "bottom": 636.234375,
+          "width": 390,
+          "height": 405.109375,
+          "shown": true
+        },
+        ".command-panel": {
+          "x": 0,
+          "y": 636.234375,
+          "right": 390,
+          "bottom": 915.546875,
+          "width": 390,
+          "height": 279.3125,
+          "shown": true
+        },
+        ".evidence-pane": {
+          "x": 0,
+          "y": 0,
+          "right": 0,
+          "bottom": 0,
+          "width": 0,
+          "height": 0,
+          "shown": false
+        },
+        "#run-query": {
+          "x": 282.8125,
+          "y": 648.421875,
+          "right": 378.8125,
+          "bottom": 698.015625,
+          "width": 96,
+          "height": 49.59375,
+          "shown": true
+        }
+      },
+      "offscreenNodes": 0,
+      "nodes": 500
+    },
+    {
+      "name": "844x390",
+      "width": 844,
+      "height": 390,
+      "scrollWidth": 844,
+      "scrollHeight": 704,
+      "overlaps": [],
+      "parts": {
+        ".hero": {
+          "x": 0,
+          "y": 0,
+          "right": 844,
+          "bottom": 70.59375,
+          "width": 844,
+          "height": 70.59375,
+          "shown": true
+        },
+        ".stage-heading": {
+          "x": 0,
+          "y": 70.59375,
+          "right": 844,
+          "bottom": 171.4375,
+          "width": 844,
+          "height": 100.84375,
+          "shown": true
+        },
+        ".graph-pane": {
+          "x": 0,
+          "y": 171.4375,
+          "right": 844,
+          "bottom": 497.25,
+          "width": 844,
+          "height": 325.8125,
+          "shown": true
+        },
+        ".command-panel": {
+          "x": 0,
+          "y": 497.25,
+          "right": 844,
+          "bottom": 663,
+          "width": 844,
+          "height": 165.75,
+          "shown": true
+        },
+        ".evidence-pane": {
+          "x": 0,
+          "y": 0,
+          "right": 0,
+          "bottom": 0,
+          "width": 0,
+          "height": 0,
+          "shown": false
+        },
+        "#run-query": {
+          "x": 728,
+          "y": 512.640625,
+          "right": 824,
+          "bottom": 562.234375,
+          "width": 96,
+          "height": 49.59375,
+          "shown": true
+        }
+      },
+      "offscreenNodes": 0,
+      "nodes": 500
+    },
+    {
+      "name": "1920x1080",
+      "width": 1920,
+      "height": 1080,
+      "scrollWidth": 1920,
+      "scrollHeight": 1080,
+      "overlaps": [],
+      "parts": {
+        ".hero": {
+          "x": 0,
+          "y": 0,
+          "right": 1920,
+          "bottom": 70.59375,
+          "width": 1920,
+          "height": 70.59375,
+          "shown": true
+        },
+        ".stage-heading": {
+          "x": 0,
+          "y": 70.59375,
+          "right": 1920,
+          "bottom": 139.15625,
+          "width": 1920,
+          "height": 68.5625,
+          "shown": true
+        },
+        ".graph-pane": {
+          "x": 0,
+          "y": 139.15625,
+          "right": 1920,
+          "bottom": 873.25,
+          "width": 1920,
+          "height": 734.09375,
+          "shown": true
+        },
+        ".command-panel": {
+          "x": 0,
+          "y": 873.25,
+          "right": 1920,
+          "bottom": 1039,
+          "width": 1920,
+          "height": 165.75,
+          "shown": true
+        },
+        ".evidence-pane": {
+          "x": 0,
+          "y": 0,
+          "right": 0,
+          "bottom": 0,
+          "width": 0,
+          "height": 0,
+          "shown": false
+        },
+        "#run-query": {
+          "x": 1804,
+          "y": 888.640625,
+          "right": 1900,
+          "bottom": 938.234375,
+          "width": 96,
+          "height": 49.59375,
+          "shown": true
+        }
+      },
+      "offscreenNodes": 0,
+      "nodes": 500
+    },
+    {
+      "name": "200% text zoom",
+      "width": 1440,
+      "height": 1000,
+      "scrollWidth": 1440,
+      "scrollHeight": 1408,
+      "overlaps": [],
+      "parts": {
+        ".hero": {
+          "x": 0,
+          "y": 0,
+          "right": 1440,
+          "bottom": 136.328125,
+          "width": 1440,
+          "height": 136.328125,
+          "shown": true
+        },
+        ".stage-heading": {
+          "x": 0,
+          "y": 136.328125,
+          "right": 1440,
+          "bottom": 315.5625,
+          "width": 1440,
+          "height": 179.234375,
+          "shown": true
+        },
+        ".graph-pane": {
+          "x": 0,
+          "y": 315.5625,
+          "right": 1440,
+          "bottom": 1055.6875,
+          "width": 1440,
+          "height": 740.125,
+          "shown": true
+        },
+        ".command-panel": {
+          "x": 0,
+          "y": 1055.6875,
+          "right": 1440,
+          "bottom": 1327,
+          "width": 1440,
+          "height": 271.3125,
+          "shown": true
+        },
+        ".evidence-pane": {
+          "x": 0,
+          "y": 0,
+          "right": 0,
+          "bottom": 0,
+          "width": 0,
+          "height": 0,
+          "shown": false
+        },
+        "#run-query": {
+          "x": 1208,
+          "y": 1085.484375,
+          "right": 1400,
+          "bottom": 1184.671875,
+          "width": 192,
+          "height": 99.1875,
+          "shown": true
+        }
+      },
+      "offscreenNodes": 0,
+      "nodes": 500
+    },
+    {
+      "name": "SVG overview",
+      "width": 1600,
+      "height": 1000,
+      "scrollWidth": 1600,
+      "scrollHeight": 1000,
+      "overlaps": [],
+      "parts": {
+        ".hero": {
+          "x": 0,
+          "y": 0,
+          "right": 1600,
+          "bottom": 70.59375,
+          "width": 1600,
+          "height": 70.59375,
+          "shown": true
+        },
+        ".stage-heading": {
+          "x": 0,
+          "y": 70.59375,
+          "right": 1600,
+          "bottom": 139.15625,
+          "width": 1600,
+          "height": 68.5625,
+          "shown": true
+        },
+        ".graph-pane": {
+          "x": 0,
+          "y": 139.15625,
+          "right": 1600,
+          "bottom": 793.25,
+          "width": 1600,
+          "height": 654.09375,
+          "shown": true
+        },
+        ".command-panel": {
+          "x": 0,
+          "y": 793.25,
+          "right": 1600,
+          "bottom": 959,
+          "width": 1600,
+          "height": 165.75,
+          "shown": true
+        },
+        ".evidence-pane": {
+          "x": 0,
+          "y": 0,
+          "right": 0,
+          "bottom": 0,
+          "width": 0,
+          "height": 0,
+          "shown": false
+        },
+        "#run-query": {
+          "x": 1484,
+          "y": 808.640625,
+          "right": 1580,
+          "bottom": 858.234375,
+          "width": 96,
+          "height": 49.59375,
+          "shown": true
+        }
+      },
+      "offscreenNodes": 0,
+      "nodes": 0
+    }
+  ],
+  "captures": [
+    {
+      "name": "atlas-overview",
+      "state": "Accepted documentation query; Quiet motion; complete graph overview; evidence closed.",
+      "file": "atlas-overview.png",
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "full_page": false,
+      "renderer": "tsl",
+      "backend": "Graph fitted to the current viewport.",
+      "sha256": "d7860f47689370f3b6728b6730e51be8964f0ee84fb3d219966e1c031f4f37bb",
+      "bytes": 620636
+    },
+    {
+      "name": "atlas-evidence",
+      "state": "First accepted result opened in the docked source reader.",
+      "file": "atlas-evidence.png",
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "full_page": false,
+      "renderer": "tsl",
+      "backend": "Graph fitted to the current viewport.",
+      "sha256": "3dd6e61960c97b39a8fc0a8e195591fa4427ee5e0213d182c0bc25e02f287159",
+      "bytes": 675838
+    },
+    {
+      "name": "atlas-evidence-graph",
+      "state": "Accepted evidence neighborhood with curved relationship highlights.",
+      "file": "atlas-evidence-graph.png",
+      "viewport": {
+        "width": 1600,
+        "height": 1000
+      },
+      "full_page": false,
+      "renderer": "tsl",
+      "backend": "Graph fitted to the current viewport.",
+      "sha256": "cdf01a3926af0a00592b5d97c086b842d181b16e051edd7bfd22bda02c298222",
+      "bytes": 393447
+    },
+    {
+      "name": "atlas-mobile",
+      "state": "Mobile evidence graph and complete Search controls; natural page scroll.",
+      "file": "atlas-mobile.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "full_page": true,
+      "renderer": "tsl",
+      "backend": "Graph fitted to the current viewport.",
+      "sha256": "12125a78e22fcb361c5863fee4a47259b0a2ad564f8c476cbf60035653fd7feb",
+      "bytes": 151233
+    }
+  ],
+  "errors": []
+}
