@@ -175,6 +175,7 @@ export async function verifyDemoPolish(context, applicationUrl) {
     assert.equal(await page.locator('#query-state').textContent(), cancelledStatus);
     assert.equal(await page.locator('#active-collection').textContent(), acceptedVault);
     await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.locator('#graph-view').selectOption('evidence');
     await page.locator('#query-text').fill('Local marker');
     await page.locator('#run-query').click();
     await page.locator('#copy-query-report:enabled').waitFor({ state: 'attached' });

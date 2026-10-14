@@ -1237,7 +1237,7 @@ try {
       && await page.locator("#download-indexing-report").isDisabled();
   });
 } catch (error) {
-  failure = error instanceof Error ? error.message : String(error);
+  failure = error instanceof Error ? error.stack ?? error.message : String(error);
   while (checkIndex < CHECK_NAMES.length) {
     const name = CHECK_NAMES[checkIndex];
     recordCheck(name, false, performance.now(), failure || "browser driver did not reach this check");

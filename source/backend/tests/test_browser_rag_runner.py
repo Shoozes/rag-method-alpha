@@ -35,6 +35,27 @@ import local_runtime as LOCAL_RUNTIME
 
 
 class BrowserRagRunnerTests(unittest.TestCase):
+    def test_failed_journey_records_cleanup_without_claiming_acceptance(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "failed.json"
+            payload = {"schema": "browser-rag-ts-smoke-v10", "status": "fail", "failure": "injected check failure",
+                       "termination": {key: False for key in SMOKE.TERMINATION_KEYS}}
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            SMOKE._record_server_cleanup(path, {"vite_process_tree_terminated": True, "port_released": True})
+            recorded = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(recorded["status"], "fail")
+            self.assertEqual(recorded["failure"], "injected check failure")
+            self.assertTrue(recorded["termination"]["port_released"])
+            self.assertTrue(recorded["termination"]["vite_process_tree_terminated"])
+            self.assertFalse(recorded["termination"]["worker_disposal_acknowledged"])
+            with self.assertRaises(RuntimeError):
+                SMOKE._validate_driver_report(path)
+            before = path.read_bytes()
+            with self.assertRaises(RuntimeError):
+                SMOKE._record_server_cleanup(path, {"vite_process_tree_terminated": True, "port_released": False})
+            self.assertEqual(path.read_bytes(), before)
+
+
     def test_real_listener_is_never_admitted_as_available(self) -> None:
         with socket.socket() as listener:
             if os.name != "nt":
