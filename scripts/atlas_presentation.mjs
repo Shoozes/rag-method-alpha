@@ -64,7 +64,8 @@ async function capture(page, name, state, fullPage = false) {
   const bytes = await page.screenshot({ path, fullPage, animations: 'disabled' });
   captures.push({ name, state, file: `${name}.png`, viewport: page.viewportSize(), full_page: fullPage,
     renderer: await page.locator('#graph-surface').getAttribute('data-renderer'),
-    backend: await page.locator('#renderer-state').textContent(), sha256: sha256(bytes), bytes: bytes.length });
+    backend: await page.locator('#graph-tsl-canvas').evaluate(canvas => JSON.parse(canvas.dataset.rendererDiagnostics ?? '{}').selected_backend ?? 'svg'),
+    backend_status: await page.locator('#renderer-state').textContent(), sha256: sha256(bytes), bytes: bytes.length });
 }
 async function layout(page, name, desktop = false) {
   await frames(page);

@@ -408,6 +408,11 @@ async function exerciseManagedMobileViewport(targetPage, requestedBackend) {
   await targetPage.locator("#query-scopes").fill("browser:local");
   await targetPage.locator("#run-query").click();
   await targetPage.getByText("Query complete:").waitFor({ state: "attached", timeout: 30_000 });
+  // Close setup surfaces before exercising actual, unobstructed canvas input.
+  for (const selector of ["details.collection-disclosure", "details.retrieval-options"]) {
+    const disclosure = targetPage.locator(selector);
+    if (await disclosure.evaluate(element => element.open)) await disclosure.locator(":scope > summary").click();
+  }
   // Mobile Atlas keeps the graph visible while evidence stacks below Search.
   const resultOrder = await targetPage.locator("#result-list button[data-record-id]").evaluateAll((items) => items.map((item) => item.getAttribute("data-record-id")));
   if (await targetPage.locator("#close-inspector").isVisible()) await targetPage.locator("#close-inspector").click();
@@ -808,6 +813,9 @@ try {
       try {
         mobileJourneys[requestedBackend] = await exerciseManagedMobileViewport(mobilePage, requestedBackend);
         return true;
+      } catch (error) {
+        await mobilePage.screenshot({ path: join(reportDir, `failed-mobile-${requestedBackend}.png`), fullPage: true }).catch(() => undefined);
+        throw error;
       } finally {
         await mobilePage.close();
       }
