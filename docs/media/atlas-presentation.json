@@ -1,7 +1,7 @@
 {
   "schema": "rag-method-atlas-presentation-v1",
   "status": "pass",
-  "source_commit": "1f8983f00425efdb99c4dec629833973d66b1e6e",
+  "source_commit": "d0a7f1afe0f8935d82a10419b99173341c87a719",
   "runtime": {
     "browser": "151.0.7922.34",
     "executable": "playwright-bundled:software-webgl",
@@ -663,8 +663,8 @@
       "full_page": false,
       "renderer": "tsl",
       "backend": "Graph fitted to the current viewport.",
-      "sha256": "d7860f47689370f3b6728b6730e51be8964f0ee84fb3d219966e1c031f4f37bb",
-      "bytes": 620636
+      "sha256": "d8505db6116a88fa99f7d5cbdca256af404cd0200375cdf5f0763f4a6b6d2712",
+      "bytes": 641961
     },
     {
       "name": "atlas-evidence",
@@ -677,8 +677,8 @@
       "full_page": false,
       "renderer": "tsl",
       "backend": "Graph fitted to the current viewport.",
-      "sha256": "3dd6e61960c97b39a8fc0a8e195591fa4427ee5e0213d182c0bc25e02f287159",
-      "bytes": 675838
+      "sha256": "827755e244077adef611e36d5a27687a6bd3d98f71b472358015fb35e8704bd7",
+      "bytes": 701244
     },
     {
       "name": "atlas-evidence-graph",
@@ -691,8 +691,8 @@
       "full_page": false,
       "renderer": "tsl",
       "backend": "Graph fitted to the current viewport.",
-      "sha256": "cdf01a3926af0a00592b5d97c086b842d181b16e051edd7bfd22bda02c298222",
-      "bytes": 393447
+      "sha256": "a37e9d0fe1eb20f0f08ab9394b91f19684fc4637f5168ea68d5facb0f3613e45",
+      "bytes": 419299
     },
     {
       "name": "atlas-mobile",
@@ -705,8 +705,8 @@
       "full_page": true,
       "renderer": "tsl",
       "backend": "Graph fitted to the current viewport.",
-      "sha256": "12125a78e22fcb361c5863fee4a47259b0a2ad564f8c476cbf60035653fd7feb",
-      "bytes": 151233
+      "sha256": "7779015fe4e8e8f612386f7ed35105528aee6a027306b492e2f921cda0064d16",
+      "bytes": 161537
     }
   ],
   "errors": []
