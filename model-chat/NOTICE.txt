@@ -1,0 +1,12 @@
+RAG Method browser model chat notices
+
+First-party application and Aurel Gold theme: MIT. Complete text: LICENSES/rag-method.txt.
+@wllama/wllama 3.5.1: MIT. Complete retained text: runtime/LICENSE.
+Pinned runtime files retain their verified upstream bytes.
+
+Model: LiquidAI/LFM2.5-230M-GGUF / LFM2.5-230M-Q4_K_M.gguf
+Model revision: fa224d4cb60cffe61eb58726712ef255bb64d0b7
+Model license: LFM Open License v1.0 (distinct from the application/runtime MIT licenses).
+https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF/blob/fa224d4cb60cffe61eb58726712ef255bb64d0b7/LICENSE
+Model weights are not included in this static payload. Download is an explicit browser action.
+The model license applies to model use and redistribution; inspect its pinned terms before deployment.

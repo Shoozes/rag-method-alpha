@@ -1,0 +1,57 @@
+/*
+ * Aurel Gold 1.0.0 application adapter.
+
+ * The workbench owns layout and behavior; this file owns the pinned material tokens.
+ */
+:where([data-aurel-theme="gold"]) {
+  --aurel-bg: #080807;
+  --aurel-surface: #0d0d0b;
+  --aurel-text: #f1eadf;
+  --aurel-muted: #c2b9aa;
+  --aurel-subtle: #a79d8d;
+  --aurel-gold: #e8c991;
+  --aurel-gold-rgb: 232 201 145;
+  --aurel-gold-high: #ffe6b6;
+  --aurel-gold-deep: #705536;
+  --aurel-line: rgb(224 199 153 / 15%);
+  --aurel-soft-line: rgb(224 199 153 / 8%);
+  --aurel-danger: #e5a99d;
+  --aurel-success: #c2cfa9;
+  --aurel-reading: #d8cfbf;
+  --aurel-field-bg: #0b0b09;
+  --aurel-overlay: #14120e;
+  --aurel-sans: "Manrope", "Segoe UI", Arial, sans-serif;
+  --aurel-serif: "Cormorant Garamond", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --aurel-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --aurel-control-height: 2.75rem;
+  color-scheme: dark;
+  accent-color: var(--aurel-gold);
+}
+
+:where([data-aurel-theme="gold"], [data-aurel-theme="gold"] *) {
+  scrollbar-color: rgb(var(--aurel-gold-rgb) / 55%) #0e0d0a;
+  scrollbar-width: thin;
+}
+
+:where([data-aurel-theme="gold"]) ::selection {
+  background: rgb(var(--aurel-gold-rgb) / 27%);
+  color: var(--aurel-gold-high);
+}
+
+@media (forced-colors: active) {
+  :where([data-aurel-theme="gold"]) {
+    --aurel-bg: Canvas;
+    --aurel-surface: Canvas;
+    --aurel-text: CanvasText;
+    --aurel-muted: CanvasText;
+    --aurel-subtle: CanvasText;
+    --aurel-reading: CanvasText;
+    --aurel-gold: LinkText;
+    --aurel-gold-high: LinkText;
+    --aurel-gold-deep: CanvasText;
+    --aurel-line: CanvasText;
+    --aurel-soft-line: CanvasText;
+    --aurel-field-bg: Canvas;
+    --aurel-overlay: Canvas;
+  }
+}
