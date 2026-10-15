@@ -25,6 +25,7 @@ const sourcePaths = [
   'examples/browser-model-chat/index.html', 'examples/browser-model-chat/app.mjs',
   'examples/browser-model-chat/loader-controller.mjs', 'examples/browser-model-chat/style.css',
   'examples/browser-model-chat/runtime-adapter.mjs',
+  'examples/browser-model-chat/runtime-errors.mjs',
   'examples/browser-model-chat/serve.mjs', 'tests/model-chat-browser.mjs',
 ];
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -53,6 +54,7 @@ export function createRuntimeAdapter() {
     fail(message = 'Fixture preparation failed', index = operations.length - 1) {
       operations[index].reject(new Error(message));
     },
+    failUnknown(value, index = operations.length - 1) { operations[index].reject(value); },
     unsupported(capabilities, index = operations.length - 1) {
       operations[index].reject(Object.assign(new Error(capabilities.map(item => item.label).join(', ') + ' is unavailable. No model was downloaded.'), {
         code: 'UNSUPPORTED_BROWSER', retryable: false, capabilities,
@@ -487,8 +489,35 @@ try {
     } finally { await page.close(); }
   });
 
+  await check('structured cached initialization failure has bounded error identity and private-payload-free diagnostic report', async () => {
+    const page = await newPage({ mobile: true });
+    try {
+      await page.locator('#draft').fill('Private fixture draft must never enter diagnostics.');
+      await fixture(page, 'mode', 'cached'); await page.locator('#download').click();
+      await fixture(page, 'progress', { phase: 'initializing', stage: 'runtime-start', detail: 'Verified model bytes; opening the WASM module.', cached: true, runtimeProfile: 'memory32-asyncify' });
+      await phase(page, 'initializing');
+      await fixture(page, 'failUnknown', { name: 'TypeError', message: 'Fixture runtime boundary failure at https://runtime.invalid/private and C:\\private\\model.wasm', prompt: 'UNRELATED PRIVATE VALUE', log: ['UNRELATED PRIVATE VALUE'] });
+      await phase(page, 'error');
+      assert.match(await page.locator('#error').textContent(), /TypeError: Fixture runtime boundary failure/);
+      const report = JSON.parse(await page.locator('#diagnostic-report').inputValue());
+      assert.equal(report.cachedBytesReported, true); assert.equal(report.lastConfirmedStage, 'runtime-start');
+      assert.equal(report.runtimeProfile, 'memory32-asyncify'); assert.equal(report.errorCode, 'LOAD_FAILED');
+      assert.match(report.errorDetail, /TypeError: Fixture runtime boundary failure/);
+      assert.doesNotMatch(JSON.stringify(report), /UNRELATED PRIVATE VALUE|Private fixture draft|runtime\.invalid|C:\\\\private/);
+      assert.equal(await page.locator('#draft').inputValue(), 'Private fixture draft must never enter diagnostics.');
+      await page.locator('#diagnostics').evaluate(node => { node.open = true; });
+      await noOverflow(page); await screenshot(page, 'runtime-abort-fixture.png');
+      await fixture(page, 'mode', 'cached'); await page.locator('#download').click(); await ready(page, true);
+      await page.locator('#unload').click(); await phase(page, 'cancelled');
+      await page.locator('#download').click(); await phase(page, 'checking');
+      const absent = JSON.parse(await page.locator('#diagnostic-report').inputValue());
+      assert.equal(absent.errorDetail, null); assert.equal(absent.stageDetail, null);
+      await page.locator('#cancel').click(); await phase(page, 'cancelled'); await noOverflow(page);
+    } finally { await page.close(); }
+  });
+
   await check('fixture boundary: no engine, runtime, model, external requests or page errors', async () => {
-    assert.equal(adapterReplacements, 9);
+    assert.equal(adapterReplacements, 10);
     assert.deepEqual(unexpectedRequests, []);
     assert.deepEqual(pageErrors, []);
     for (const identity of sourceIdentity) {

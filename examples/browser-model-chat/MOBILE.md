@@ -6,7 +6,8 @@ This is a browser application; installing it as a native app is outside this sli
 
 ## Short iPhone check
 
-1. Record the iPhone model, iOS version and browser/version. Open the HTTPS URL.
+1. Record the iPhone model, iOS version and browser/version, including whether
+   this is a full Safari tab or an in-app browser sheet. Open the HTTPS URL.
    Check portrait, landscape, larger text and pinch zoom; controls should stay usable.
 2. Reload the page after the compatibility update, read the license, then start
    loading once. Missing Memory64 or JSPI should select “Memory32 compatibility /
@@ -41,6 +42,16 @@ and iOS version remain pending. The cause has not been established. Fresh and wa
 OPFS-cache paths pass real Memory32 initialization/chat on desktop Chrome; a fresh
 physical-device test with the new bounded stage report is still required.
 
+A later cached retry showed zero elapsed seconds at "Verified model bytes;
+opening the WASM module", then `message.replace is not a function`. Its browser
+chrome appears to be an in-app sheet, unlike the earlier Safari screenshot.
+Keep these observations separate. The pinned vendor abort receiver assumed a
+string where compatibility WASM initialization can supply an Error object.
+That masking bug is reproduced and guarded without changing vendor bytes;
+`ENGINE_NATIVE_ABORT` now preserves bounded original error detail. The original
+device WASM failure is not established by that repair. Reload the same origin
+without clearing storage and retain a new Copy report, device/iOS and container.
+
 ## Evidence boundary
 
 Run `node tests/model-chat-mobile.mjs` with the existing Playwright/Chrome setup
@@ -59,8 +70,10 @@ this test downloads no model and does not alter browser security settings.
 `node tests/model-chat-init.mjs` uses the same retained-model environment to test
 the production cold OPFS and cache-only Memory32 paths in a disposable profile.
 Only the canonical model URL's transport is redirected to an owned loopback
-stream of existing exact bytes. It also injects a labeled child startup fault to
-verify a structured error and cache-preserving recovery. No external model bytes
+stream of existing exact bytes. It also injects typed abort payloads and a real
+compatibility WASM-instantiation failure to reproduce the old masking exception
+and verify safe errors, plus a labeled child startup fault and cache-preserving
+recovery. No external model bytes
 are downloaded, no existing browser cache is inspected, and vendor files remain
 unchanged. This desktop probe does not identify the physical Safari failure.
 

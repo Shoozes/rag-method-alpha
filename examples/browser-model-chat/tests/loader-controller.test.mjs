@@ -312,3 +312,35 @@ test('completed initialization timing freezes and cannot be mistaken for later g
   assert.equal(controller.getState().initStage, null); assert.equal(controller.getState().initElapsedMs, 0);
   assert.deepEqual(controller.getState().initEvents, []);
 });
+
+test('unknown adapter rejections keep useful safe error identity and remain recoverable', async () => {
+  const hostile = Object.defineProperties({}, {
+    message: { get() { throw new Error('UNRELATED PRIVATE VALUE'); } },
+    name: { get() { throw new Error('UNRELATED PRIVATE VALUE'); } },
+    code: { get() { throw new Error('UNRELATED PRIVATE VALUE'); } },
+    diagnostics: { get() { throw new Error('UNRELATED PRIVATE VALUE'); } },
+    toString: { value() { throw new Error('UNRELATED PRIVATE VALUE'); } },
+  });
+  for (const [cause, expected] of [
+    ['Fixture string failure', /Fixture string failure/],
+    [new TypeError('Fixture typed failure'), /TypeError: Fixture typed failure/],
+    [{ name: 'RuntimeError', message: 'Fixture structured failure at https://runtime.invalid/private', prompt: 'UNRELATED PRIVATE VALUE' }, /RuntimeError: Fixture structured failure/],
+    [null, /\S/], [['UNRELATED PRIVATE VALUE'], /array/i],
+    [{ type: 'abort', reason: { name: 'RangeError', message: 'Fixture abort reason' } }, /RangeError: Fixture abort reason/],
+    [hostile, /\S/],
+  ]) {
+    const adapter = fixtureAdapter(), controller = createLoaderController(adapter);
+    const loading = controller.load({ source: 'remote' });
+    adapter.loads[0].onProgress({ phase: 'initializing', stage: 'runtime-start', cached: true });
+    adapter.loads[0].reject(cause);
+    await assert.rejects(loading, failure => {
+      assert.equal(failure.code, 'LOAD_FAILED'); assert.match(failure.message, expected);
+      assert.doesNotMatch(failure.message, /UNRELATED PRIVATE VALUE|runtime\.invalid|message\.replace/);
+      return true;
+    });
+    const state = controller.getState();
+    assert.equal(state.phase, 'error'); assert.equal(state.cached, true); assert.equal(state.initStage, 'runtime-start');
+    assert.equal(state.retryable, true); assert.equal(adapter.disposals, 1);
+    await loadReady(controller, adapter, { ...prepared, cached: true }); await controller.dispose();
+  }
+});

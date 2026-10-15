@@ -16,7 +16,7 @@ const prefix = '/prefix/model-chat/';
 const hash = value => createHash('sha256').update(value).digest('hex');
 const exists = async path => { try { await lstat(path); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; } };
 const browserFiles = ['index.html', 'style.css', 'app.mjs', 'loader-controller.mjs', 'model-contract.mjs',
-  'runtime-adapter.mjs', 'engine-worker.mjs', 'capabilities.mjs', 'bootstrap.mjs'];
+  'runtime-adapter.mjs', 'engine-worker.mjs', 'runtime-errors.mjs', 'capabilities.mjs', 'bootstrap.mjs'];
 
 async function privateFixture(t) {
   await mkdir(artifacts, { recursive: true });
@@ -92,6 +92,12 @@ test('one retained-runtime site has an exact hashed allowlist, notices, unreview
   for (const [name, contract] of Object.entries({ ...RUNTIME.files, ...COMPAT.files })) {
     assert.equal(hash(await readFile(join(site, 'runtime', name))), contract.sha256, 'retained runtime: ' + name);
   }
+  const helperPath = 'runtime-errors.mjs';
+  const helperSource = await readFile(join(root, 'examples/browser-model-chat', helperPath));
+  const helperManifest = manifest.files.find(file => file.path === helperPath);
+  assert.equal(helperManifest.bytes, helperSource.length);
+  assert.equal(helperManifest.sha256, hash(helperSource));
+  assert.deepEqual(await readFile(join(site, helperPath)), helperSource);
   assert.equal(hash(await readFile(join(site, 'theme/aurel-gold.css'))), hash(await readFile(join(root, 'modules/browser-rag-ts/demo/aurel-gold.css'))));
   assert.equal(hash(await readFile(join(site, 'LICENSES/rag-method.txt'))), hash(await readFile(join(root, 'LICENSE'))));
   const notices = await readFile(join(site, 'NOTICE.txt'), 'utf8');
@@ -115,6 +121,28 @@ test('one retained-runtime site has an exact hashed allowlist, notices, unreview
   await writeFile(join(foreign, '.env'), 'PRIVATE-FIXTURE-KEEP');
   await assert.rejects(stageStatic({ output: foreign }), /extra or foreign content/);
   assert.equal(await readFile(join(foreign, '.env'), 'utf8'), 'PRIVATE-FIXTURE-KEEP');
+});
+
+test('the sole managed site refreshes an exact previous payload without the new helper', async () => {
+  const manifestBytes = await readFile(join(site, 'site-manifest.json'));
+  const manifest = JSON.parse(manifestBytes);
+  const helper = await readFile(join(site, 'runtime-errors.mjs'));
+  const { identitySha256, ...previous } = structuredClone(manifest);
+  previous.files = previous.files.filter(file => file.path !== 'runtime-errors.mjs');
+  previous.source.files = previous.source.files.filter(file => file.path !== 'examples/browser-model-chat/runtime-errors.mjs');
+  previous.source.fingerprintSha256 = hash(JSON.stringify(previous.source.files));
+  const previousManifest = { ...previous, identitySha256: hash(JSON.stringify(previous)) };
+  await rm(join(site, 'runtime-errors.mjs'));
+  await writeFile(join(site, 'site-manifest.json'), JSON.stringify(previousManifest));
+  try {
+    const refreshed = await stageStatic();
+    assert.deepEqual(refreshed.manifest, manifest);
+    assert.deepEqual(await readFile(join(site, 'runtime-errors.mjs')), helper);
+  } finally {
+    // Keep the single intended output recoverable even if this regression fails.
+    await writeFile(join(site, 'runtime-errors.mjs'), helper);
+    await writeFile(join(site, 'site-manifest.json'), manifestBytes);
+  }
 });
 
 test('hard-linked managed files and manifest are refused while linked read-only runtime inputs remain usable', async t => {
@@ -167,6 +195,7 @@ test('staged modules, Worker, theme and WASM serve with correct GET/HEAD MIME un
   // leaves this intended artifact for HTTP checks and operator inspection.
   const server = await listenStatic(site, prefix);
   try {
+    const helperSha256 = hash(await readFile(join(site, 'runtime-errors.mjs')));
     const expected = [
       ['', 'text/html; charset=utf-8'], ...browserFiles.filter(name => name.endsWith('.mjs')).map(name => [name, 'application/javascript; charset=utf-8']),
       ['style.css', 'text/css; charset=utf-8'], ['theme/aurel-gold.css', 'text/css; charset=utf-8'],
@@ -181,7 +210,10 @@ test('staged modules, Worker, theme and WASM serve with correct GET/HEAD MIME un
         assert.equal(response.headers.get('content-type'), mime, method + ' ' + asset);
         assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
         if (method === 'HEAD') assert.equal((await response.arrayBuffer()).byteLength, 0);
-        else await response.arrayBuffer();
+        else {
+          const bytes = await response.arrayBuffer();
+          if (asset === 'runtime-errors.mjs') assert.equal(hash(Buffer.from(bytes)), helperSha256, 'nested helper delivery retains exact source bytes');
+        }
       }
     }
     const html = await (await fetch(server.baseUrl)).text();

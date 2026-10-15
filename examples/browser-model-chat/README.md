@@ -79,6 +79,7 @@ The model has the [LFM Open License v1.0 at the pinned revision](https://hugging
 
 - Download progress uses measured bytes. Integrity checking is a separate phase. Initialization shows elapsed time and the last confirmed runtime stage, without a percentage estimate. Time since a stage update measures silence, not Worker health. After 30 seconds the page explains recovery; after 180 seconds the main thread stops its owned Worker with `INIT_WAIT_LIMIT`. This waiting limit is not a model validation result.
 - Runtime stage messages come from an allowlist of actual pinned-runtime callbacks. Child Worker errors and outer Worker/message errors retain a bounded error code and stage. The on-page Copy report includes model/runtime identity, timing, sanitized error detail and browser identification; it excludes conversation text, raw logs and model contents. Cancel, a waiting limit and runtime failure preserve complete cached model bytes for a fresh cache-first attempt.
+- Unknown error values are normalized from recognized fields before string operations. Arrays and unreadable objects get a type summary; stacks and unrelated fields are excluded. A native `signal.abort` becomes `ENGINE_NATIVE_ABORT` and rejects the owned queues immediately, preserving complete cached bytes. It is distinct from an initialization waiting limit.
 - Cancel, stop, unload, and page teardown terminate the owned model worker. Loading can be retried with a fresh worker; cancelling a reply unloads the model too.
 - Chat is session-only. Reloading clears the transcript and draft; cached model bytes may persist in the browser. Clearing the conversation does not erase the model cache.
 - The send gate bounds accepted history to six completed turns and checks a 6,000-character history/input budget. Individual input is limited to 4,000 characters, generated replies to 160 tokens, and model context to 2,048 tokens. An interrupted attempt remains visible but is excluded from subsequent accepted history.
@@ -99,12 +100,14 @@ The maintained [wllama-compat 3.5.1 package](https://registry.npmjs.org/@wllama%
 
 The first real iPhone test of the earlier Memory64-only preview refused loading before weights: "Memory64 WebAssembly is unavailable." A subsequent Safari screenshot showed the maintained Memory32/Asyncify profile selected and initialization still waiting after the user reported several minutes. It showed no runtime error or internal substage. Device/iOS version and the cause remain unknown; this is not successful iPhone support. The added diagnostics and waiting limit make the next attempt bounded and inspectable. Desktop tests exercise fresh download into OPFS, cache reopening, SHA verification and real Memory32 initialization/chat; they do not reproduce that device stall. Earlier user-reported HTTPS success and HTTP failures around 50 MB remain historical observations, not universal limits. A fresh device retest must record device/browser, exact model/license, memory, loading/cache, cancellation and recovery without changing browser security settings.
 
+A later screenshot of a cached retry showed an immediate `message.replace is not a function` failure at the first WASM stage, with zero displayed elapsed seconds. Its browser chrome appears to be an in-app sheet; it must not be assumed to be the earlier full Safari tab. The exact masking mechanism was reproduced: the pinned compatibility loader can call `abort(reason)` with an Error object before coercion, while the parent vendor receiver calls `message.replace` and `rawStack.replace` as though both fields were strings. The first-party [runtime-errors.mjs](./runtime-errors.mjs) guards the exact pinned instance's configurable `proxy` assignment before the child receiver is bound. It bypasses that abort formatter and stack decoder, preserves only safe name/message/type, and rejects the vendor queues through their existing safe-string `abort` method. Ordinary messages keep their receiver and behavior. A changed pinned interface fails with `ENGINE_BOUNDARY_ERROR`; vendor bytes are unchanged. An injected real WASM-instantiation LinkError proves the masking bug and its repair, not the underlying iPhone cause. Device/iOS, browser container and a fresh report of the original failure remain required.
+
 ## Local verification
 
 Run the focused built-in Node tests from the repository root:
 
 ```sh
-node --test examples/browser-model-chat/tests/loader-controller.test.mjs examples/browser-model-chat/tests/runtime-adapter.test.mjs examples/browser-model-chat/tests/capabilities.test.mjs tests/server.test.mjs tests/model-chat-static.test.mjs tests/model-chat-prepare.test.mjs
+node --test examples/browser-model-chat/tests/runtime-errors.test.mjs examples/browser-model-chat/tests/loader-controller.test.mjs examples/browser-model-chat/tests/runtime-adapter.test.mjs examples/browser-model-chat/tests/capabilities.test.mjs tests/server.test.mjs tests/model-chat-static.test.mjs tests/model-chat-prepare.test.mjs
 ```
 
 The server/static tests use real HTTP requests for nested-prefix GET/HEAD routes, executable module/WASM MIME types, missing routes, excluded files, traversal/dotfile rejection, link escape/refresher rejection, loopback binding and CLI port parsing. Capability tests cover missing features and tiny writable-cache cleanup. Controller/adapter tests use injected fixtures; they do not establish real-model inference or device support.
@@ -135,8 +138,10 @@ node tests/model-chat-compat.mjs --existing-cache
 
 The focused initialization probe uses that same retained GGUF and Playwright
 setup, redirects only model transport to owned loopback, and tests fresh OPFS
-loading, cache-only loading, a labeled child startup fault and fresh-Worker
-recovery without requesting external weights:
+loading, cache-only loading, a labeled child startup fault, typed abort values,
+the real compatibility WASM-instantiation failure producer, and fresh-Worker
+recovery without requesting external weights. Its historical baseline proves
+the masking TypeError separately from the safe structured failure:
 
 ```sh
 node tests/model-chat-init.mjs

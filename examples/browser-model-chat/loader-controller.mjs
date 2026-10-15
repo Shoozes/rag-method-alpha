@@ -1,3 +1,5 @@
+import { normalizeRuntimeError, formatRuntimeError } from './runtime-errors.mjs';
+
 /** Generic lifecycle only. The injected adapter owns model bytes, runtime and cache. */
 export function createLoaderController(adapter, onState = () => {}, {
   now = Date.now, setIntervalFn = setInterval, clearIntervalFn = clearInterval,
@@ -25,7 +27,9 @@ export function createLoaderController(adapter, onState = () => {}, {
   const clearInit = { initStage: null, initDetail: null, initElapsedMs: 0, lastProgressAgeMs: 0, initEvents: [] };
   const error = (message, code) => Object.assign(new Error(message), { code });
   const aborted = () => Object.assign(error('The operation was cancelled. Load the model again to continue.', 'CANCELLED'), { name: 'AbortError' });
-  const messageOf = cause => cause instanceof Error && cause.message ? cause.message : String(cause || 'Unknown adapter failure');
+  const messageOf = formatRuntimeError;
+  const read = (value, key) => { try { return value?.[key]; } catch { return undefined; } };
+  const diagnosticText = value => typeof value === 'string' ? normalizeRuntimeError(value).message.slice(0, 240) : null;
   const deferred = () => {
     let resolve, reject;
     const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
@@ -95,7 +99,7 @@ export function createLoaderController(adapter, onState = () => {}, {
       lastProgressAt = now();
       initialization = { ...initTiming(),
         ...(stages.has(event.stage) ? { initStage: event.stage } : {}),
-        ...(typeof event.detail === 'string' ? { initDetail: event.detail.slice(0, 240) } : {}),
+        ...(typeof event.detail === 'string' ? { initDetail: diagnosticText(event.detail) } : {}),
       };
       if (stages.has(event.stage) && (event.stage !== state.initStage || initialization.initDetail !== state.initDetail)) {
         initialization.initEvents = [...state.initEvents, { stage: event.stage, detail: initialization.initDetail || null, atMs: Math.max(0, now() - initStarted) }].slice(-8);
@@ -122,23 +126,26 @@ export function createLoaderController(adapter, onState = () => {}, {
     let detail = messageOf(cause);
     if (cleanup) try { await unload(); } catch (failure) { detail += ` Cleanup also failed: ${messageOf(failure)}`; }
     if (disposed || generation !== operation.id) throw aborted();
-    const blocked = cause?.code === 'UNSUPPORTED_BROWSER' && cause?.retryable === false;
-    const capabilities = blocked && Array.isArray(cause.capabilities) ? cause.capabilities
+    const causeCode = read(cause, 'code');
+    const blocked = causeCode === 'UNSUPPORTED_BROWSER' && read(cause, 'retryable') === false;
+    const causeCapabilities = read(cause, 'capabilities');
+    const capabilities = blocked && Array.isArray(causeCapabilities) ? causeCapabilities
       .filter(item => item && typeof item.id === 'string' && typeof item.label === 'string')
       .map(({ id, label, detail }) => ({ id, label, ...(typeof detail === 'string' ? { detail } : {}) })) : [];
-    const diagnosticCode = typeof cause?.code === 'string' && /^(?:INIT_WAIT_LIMIT|WORKER_ERROR|WORKER_MESSAGE_ERROR|ENGINE_[A-Z_]+|UNHANDLED_REJECTION)$/.test(cause.code) ? cause.code : null;
+    const diagnosticCode = typeof causeCode === 'string' && /^(?:INIT_WAIT_LIMIT|WORKER_ERROR|WORKER_MESSAGE_ERROR|ENGINE_[A-Z_]+|UNHANDLED_REJECTION)$/.test(causeCode) ? causeCode : null;
     const failure = error(`${label}: ${detail}`, blocked ? 'UNSUPPORTED_BROWSER' : diagnosticCode || (operation.kind === 'load' ? 'LOAD_FAILED' : 'REPLY_FAILED'));
     failure.retryable = !blocked; failure.capabilities = capabilities.map(item => ({ ...item }));
     if (blocked) unsupported = { message: failure.message, capabilities };
-    const diagnostic = cause?.diagnostics;
-    const events = Array.isArray(diagnostic?.events) ? diagnostic.events.filter(event => stages.has(event?.stage)).slice(-8).map(event => ({
-      stage: event.stage, detail: typeof event.detail === 'string' ? event.detail.slice(0, 240) : null,
+    const diagnostic = read(cause, 'diagnostics'), diagnosticEvents = read(diagnostic, 'events');
+    const diagnosticStage = read(diagnostic, 'stage'), detailText = diagnosticText(read(diagnostic, 'detail'));
+    const events = Array.isArray(diagnosticEvents) ? diagnosticEvents.filter(event => stages.has(read(event, 'stage'))).slice(-8).map(event => ({
+      stage: read(event, 'stage'), detail: diagnosticText(read(event, 'detail')),
       atMs: Number.isFinite(event.atMs) && event.atMs >= 0 ? Math.floor(event.atMs) : null,
     })) : [];
     publish({ phase: blocked ? 'unsupported' : 'error', modelId: null, ...clearProgress,
       ...(initStarted !== null ? initTiming() : {}),
-      ...(stages.has(diagnostic?.stage) ? { initStage: diagnostic.stage } : {}),
-      ...(typeof diagnostic?.detail === 'string' ? { initDetail: diagnostic.detail.slice(0, 240) } : {}),
+      ...(stages.has(diagnosticStage) ? { initStage: diagnosticStage } : {}),
+      ...(detailText !== null ? { initDetail: detailText } : {}),
       ...(events.length ? { initEvents: events } : {}),
       error: failure.message, errorCode: failure.code, retryable: !blocked, capabilities });
     throw failure;

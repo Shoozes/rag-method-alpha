@@ -1,3 +1,5 @@
+import { normalizeRuntimeError, formatRuntimeError } from './runtime-errors.mjs';
+
 // All model work lives in an owned Worker. Cancel terminates that lifetime,
 // including an initialization with no native progress/abort API; retry starts fresh.
 export function createRuntimeAdapter({ WorkerClass = Worker, initWaitMs = 180_000,
@@ -37,16 +39,17 @@ export function createRuntimeAdapter({ WorkerClass = Worker, initWaitMs = 180_00
         else {
           pending.delete(data.id); item.cleanup();
           if (data.type === 'error') {
-            const failure = new Error(typeof data.value === 'string' ? data.value : 'Browser model operation failed.');
+            const identity = normalizeRuntimeError(data.value);
+            const failure = Object.assign(new Error(identity.message), { name: identity.name || 'Error' });
             if (typeof data.code === 'string' && /^(?:INIT_WAIT_LIMIT|WORKER_ERROR|WORKER_MESSAGE_ERROR|ENGINE_[A-Z_]+|UNHANDLED_REJECTION)$/.test(data.code)) failure.code = data.code;
             if (typeof data.stage === 'string') failure.stage = data.stage.slice(0, 64);
             if (data.diagnostics && typeof data.diagnostics === 'object') {
               failure.diagnostics = {
                 stage: typeof data.diagnostics.stage === 'string' ? data.diagnostics.stage.slice(0, 64) : null,
-                detail: typeof data.diagnostics.detail === 'string' ? data.diagnostics.detail.slice(0, 240) : null,
+                detail: typeof data.diagnostics.detail === 'string' ? normalizeRuntimeError(data.diagnostics.detail).message.slice(0, 240) : null,
                 events: Array.isArray(data.diagnostics.events) ? data.diagnostics.events.slice(-8).map(event => ({
                   stage: typeof event?.stage === 'string' ? event.stage.slice(0, 64) : null,
-                  detail: typeof event?.detail === 'string' ? event.detail.slice(0, 240) : null,
+                  detail: typeof event?.detail === 'string' ? normalizeRuntimeError(event.detail).message.slice(0, 240) : null,
                   atMs: Number.isFinite(event?.atMs) && event.atMs >= 0 ? Math.floor(event.atMs) : null,
                 })) : [],
               };
@@ -67,8 +70,8 @@ export function createRuntimeAdapter({ WorkerClass = Worker, initWaitMs = 180_00
       };
       owner.onerror = event => {
         if (worker !== owner) return;
-        event?.preventDefault?.();
-        const detail = typeof event?.message === 'string' ? event.message.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/https?:\/\/\S+|[A-Za-z]:[\\/]\S+|\/(?:Users|home)\/\S+/g, '[location omitted]').slice(0, 240) : 'No browser error message was available.';
+        try { event?.preventDefault?.(); } catch { /* Browser event access must not hide the original failure. */ }
+        const detail = formatRuntimeError(event).slice(0, 240);
         terminate(Object.assign(new Error(`Browser model worker failed: ${detail} Check runtime setup, browser memory and WASM support before retrying. Cached bytes were not removed.`), { code: 'WORKER_ERROR' }));
       };
       owner.onmessageerror = () => {

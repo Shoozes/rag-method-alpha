@@ -12,13 +12,14 @@ const managedBy = 'examples/browser-model-chat/stage-static.mjs';
 const manifestName = 'site-manifest.json';
 const browserFiles = Object.freeze([
   'index.html', 'style.css', 'app.mjs', 'loader-controller.mjs', 'model-contract.mjs',
-  'runtime-adapter.mjs', 'engine-worker.mjs', 'capabilities.mjs', 'bootstrap.mjs',
+  'runtime-adapter.mjs', 'engine-worker.mjs', 'runtime-errors.mjs', 'capabilities.mjs', 'bootstrap.mjs',
 ]);
 const runtimeIdentities = Object.freeze({ ...RUNTIME.files, ...COMPAT.files });
 const runtimeFiles = Object.freeze(Object.keys(runtimeIdentities));
 const payloadPaths = Object.freeze([...browserFiles, 'theme/aurel-gold.css',
   ...runtimeFiles.map(name => 'runtime/' + name), 'LICENSES/rag-method.txt', 'NOTICE.txt', 'README.txt'].sort());
-const priorPayloadPaths = payloadPaths.filter(name => !name.startsWith('runtime/compat/'));
+const priorPayloadPaths = payloadPaths.filter(name => name !== 'runtime-errors.mjs');
+const legacyPayloadPaths = priorPayloadPaths.filter(name => !name.startsWith('runtime/compat/'));
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const portable = value => value.split(sep).join('/');
 const table = payload => [...payload].map(([path, bytes]) => ({ path, bytes: bytes.length, sha256: hash(bytes) })).sort((a, b) => a.path.localeCompare(b.path));
@@ -79,7 +80,7 @@ async function managedOutput(destination) {
   const previousPaths = previous.files?.map(file => file.path).sort();
   if (previous.schema !== schema || previous.managedBy !== managedBy || identitySha256 !== identity(body)
       || previous.publicReleaseQualified !== false || !Array.isArray(previous.files)
-      || ![payloadPaths, priorPayloadPaths].some(paths => JSON.stringify(previousPaths) === JSON.stringify(paths))) {
+      || ![payloadPaths, priorPayloadPaths, legacyPayloadPaths].some(paths => JSON.stringify(previousPaths) === JSON.stringify(paths))) {
     throw new Error('Refusing output with a foreign or changed managed manifest.');
   }
   const permitted = new Set([...previousPaths, manifestName]);

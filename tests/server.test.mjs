@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import os from 'node:os';
@@ -10,6 +11,7 @@ import { parseCliPort, startServer } from '../examples/browser-model-chat/serve.
 const temporaryPrefix = 'rag-preview-server-test-';
 const repositoryRoot = fileURLToPath(new URL('../', import.meta.url));
 const themePath = path.join(repositoryRoot, 'modules', 'browser-rag-ts', 'demo', 'aurel-gold.css');
+const errorHelperPath = path.join(repositoryRoot, 'examples', 'browser-model-chat', 'runtime-errors.mjs');
 
 function normalizedPath(value) {
   const absolute = path.resolve(value);
@@ -100,12 +102,14 @@ test('browser model preview serves only its bounded HTTP file surface', async (t
   const moduleSource = 'export const fixtureModule = "real-mjs";\n';
   const scriptSource = 'globalThis.fixtureScript = "real-js";\n';
   const runtimeSource = 'export const runtimeFixture = true;\n';
+  const errorHelper = await readFile(errorHelperPath);
   const wasm = Buffer.from([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
   const license = 'Runtime fixture license text\n';
   await Promise.all([
     writeFile(path.join(root, 'index.html'), html),
     writeFile(path.join(root, 'tiny.mjs'), moduleSource),
     writeFile(path.join(root, 'tiny.js'), scriptSource),
+    writeFile(path.join(root, 'runtime-errors.mjs'), errorHelper),
     writeFile(path.join(root, 'style.css'), 'body { color: teal; }\n'),
     writeFile(path.join(root, 'payload.unlisted'), 'non-executable fixture\n'),
     writeFile(path.join(root, '.env'), 'DOTFILE-SECRET'),
@@ -141,6 +145,22 @@ test('browser model preview serves only its bounded HTTP file surface', async (t
       assertType(response, 'application/javascript;charset=utf-8');
       assert.equal(response.body.toString(), body, route);
     }
+  });
+
+  await t.test('serves the real runtime error helper with exact bytes and JavaScript GET/HEAD MIME', async () => {
+    for (const method of ['GET', 'HEAD']) {
+      const response = await request(server.url, '/runtime-errors.mjs', method);
+      assert.equal(response.status, 200, method);
+      assertType(response, 'application/javascript;charset=utf-8');
+      assert.equal(Number(response.headers['content-length']), errorHelper.length);
+      if (method === 'GET') {
+        assert.equal(createHash('sha256').update(response.body).digest('hex'), createHash('sha256').update(errorHelper).digest('hex'));
+        assert.deepEqual(response.body, errorHelper);
+      } else assert.equal(response.body.length, 0);
+    }
+    const missing = await request(server.url, '/runtime-errors.mjs/missing');
+    assert.equal(missing.status, 404);
+    assert.ok(!missing.body.includes(Buffer.from('PREVIEW-INDEX')));
   });
 
   await t.test('serves CSS and unknown file extensions with distinct safe MIME types', async () => {

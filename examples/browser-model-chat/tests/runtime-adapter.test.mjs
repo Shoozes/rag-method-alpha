@@ -172,3 +172,49 @@ test('structured engine failures retain only bounded diagnostic stage events and
     assert.equal(error.diagnostics.events[0].ignored, undefined); return true;
   });
 });
+
+test('unknown runtime error payloads retain bounded safe identity without throwing or exposing unrelated values', async t => {
+  const cases = [
+    { value: 'Fixture native failure', name: 'Error', message: /Fixture native failure/ },
+    { value: new TypeError('Fixture typed failure'), name: 'TypeError', message: /Fixture typed failure/ },
+    { value: { name: 'RuntimeError', message: 'Fixture allocation failure at https://runtime.invalid/private and C:\\private\\model.wasm', prompt: 'UNRELATED PRIVATE VALUE' }, name: 'RuntimeError', message: /Fixture allocation failure/ },
+    { value: null, name: 'Error', message: /\S/ },
+    { value: ['UNRELATED PRIVATE VALUE', { prompt: 'UNRELATED PRIVATE VALUE' }], name: 'Error', message: /array/i },
+    { value: { type: 'error', error: { name: 'RangeError', message: 'Fixture structured event failure' } }, name: 'RangeError', message: /Fixture structured event failure/ },
+  ];
+  const { adapter, workers, active } = fixture(t);
+  for (const scenario of cases) {
+    const loading = adapter.prepare({ source: 'remote' }), worker = workers.at(-1);
+    worker.emit(worker.requests[0].id, 'error', scenario.value, { code: 'ENGINE_NATIVE_ABORT' });
+    await assert.rejects(loading, failure => {
+      assert.equal(failure.name, scenario.name); assert.match(failure.message, scenario.message);
+      assert.equal(failure.code, 'ENGINE_NATIVE_ABORT'); assert.ok(failure.message.length <= 480);
+      assert.doesNotMatch(failure.message, /UNRELATED PRIVATE VALUE|runtime\.invalid|C:\\private/);
+      return true;
+    });
+    assert.equal(worker.terminations, 1); assert.equal(active.size, 0);
+  }
+});
+
+test('Worker error events normalize nested errors, null and hostile getters while stopping the owned lifetime', async t => {
+  const events = [
+    { error: new TypeError('Fixture nested browser failure'), preventDefault() {} },
+    { message: { name: 'RuntimeError', message: 'Fixture browser structured message' }, preventDefault() {} },
+    null,
+    Object.defineProperties({}, {
+      message: { get() { throw new Error('UNRELATED PRIVATE VALUE'); } },
+      error: { get() { throw new Error('UNRELATED PRIVATE VALUE'); } },
+      preventDefault: { get() { throw new Error('UNRELATED PRIVATE VALUE'); } },
+    }),
+  ];
+  const { adapter, workers, active } = fixture(t);
+  for (const event of events) {
+    const loading = adapter.prepare({ source: 'remote' }), worker = workers.at(-1);
+    const rejected = assert.rejects(loading, failure => {
+      assert.equal(failure.code, 'WORKER_ERROR'); assert.match(failure.message, /cached bytes were not removed/i);
+      assert.doesNotMatch(failure.message, /UNRELATED PRIVATE VALUE|message\.replace/); return true;
+    });
+    assert.doesNotThrow(() => worker.onerror(event)); await rejected;
+    assert.equal(worker.terminations, 1); assert.equal(active.size, 0);
+  }
+});

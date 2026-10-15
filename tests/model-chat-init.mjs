@@ -23,17 +23,33 @@ const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const pause = ms => new Promise(done => setTimeout(done, ms));
 const runtimeRoot = join(root, '.artifacts/model-chat/runtime');
 const output = join(root, '.artifacts/proof/model-chat/init-result.json');
-const sourcePaths = ['examples/browser-model-chat/engine-worker.mjs', 'examples/browser-model-chat/capabilities.mjs', 'examples/browser-model-chat/model-contract.mjs', 'tests/model-chat-init.mjs'];
+const sourcePaths = ['examples/browser-model-chat/engine-worker.mjs', 'examples/browser-model-chat/runtime-errors.mjs', 'examples/browser-model-chat/capabilities.mjs', 'examples/browser-model-chat/model-contract.mjs', 'tests/model-chat-init.mjs'];
 const sourceIdentity = await Promise.all(sourcePaths.map(async path => ({ path, sha256: sha(await readFile(join(root, path))) })));
 const checks = [], diagnostics = [], requests = [], errors = [];
+const injectedBrowserErrors = new Set([
+  'Explicit nested Worker startup fault',
+  'Aborted(LinkError: Explicit child WASM instantiation fault). Build with -sASSERTIONS for more info.',
+]);
 const baselineCommit = 'c2ad281';
 const baselineWorker = execFileSync('git', ['show', baselineCommit + ':examples/browser-model-chat/engine-worker.mjs'], { cwd: root, encoding: 'utf8' });
+const abortBaselineCommit = '9cef296';
+const abortBaselineWorker = execFileSync('git', ['show', abortBaselineCommit + ':examples/browser-model-chat/engine-worker.mjs'], { cwd: root, encoding: 'utf8' });
+// Values sent across the real child Worker boundary. The extra private fields
+// and raw stack are sentinels: a report must not dump the whole event or stack.
+const abortFixtures = {
+  string: `['abort', 'Explicit string runtime abort', 'PRIVATE_STACK_SENTINEL https://private.example/stack', null]`,
+  error: `['abort', new Error('Explicit Error runtime abort https://private.example/error C:\\\\private\\\\model.gguf'), 'PRIVATE_STACK_SENTINEL', null]`,
+  object: `['abort', { message: 'Explicit structured runtime abort', name: 'CompileError', private: 'PRIVATE_EVENT_SENTINEL' }, { private: 'PRIVATE_STACK_SENTINEL' }, null]`,
+  null: `['abort', null, null, null]`,
+  array: `['abort', ['PRIVATE_EVENT_SENTINEL', { private: 'PRIVATE_EVENT_SENTINEL' }], ['PRIVATE_STACK_SENTINEL'], null]`,
+  exception: `['exception', { name: 'RuntimeError', message: 'Explicit structured runtime exception', private: 'PRIVATE_EVENT_SENTINEL' }, 7, null]`,
+};
 const cleanup = { browserClosed: false, profileRemoved: false, serverClosed: false, previewClosed: false };
 let profile, preview, server, processHandle, browser, context, origin, failure, version;
 let modelTransfers = 0, modelTransferBytes = 0;
 const started = Date.now();
 
-function workerInjection(fault = false) {
+function workerInjection(fault = false, abortFixture, instantiateFault = false) {
   return `
 const __nativeFetch = globalThis.fetch.bind(globalThis);
 globalThis.fetch = (input, options) => {
@@ -51,6 +67,10 @@ Object.defineProperty(WebAssembly, 'Suspending', { value: undefined, configurabl
 Object.defineProperty(WebAssembly, 'promising', { value: undefined, configurable: true });
 ${fault ? `const __nativeObjectURL = URL.createObjectURL.bind(URL);
 URL.createObjectURL = blob => __nativeObjectURL(blob.size > 100000 ? new Blob(['throw new Error("Explicit nested Worker startup fault");\\n', blob], { type: 'text/javascript' }) : blob);` : ''}
+${abortFixture ? `const __abortObjectURL = URL.createObjectURL.bind(URL);
+URL.createObjectURL = blob => __abortObjectURL(blob.size > 100000 ? new Blob([${JSON.stringify(`postMessage({ verb: 'signal.abort', args: ${abortFixture} });`)}], { type: 'text/javascript' }) : blob);` : ''}
+${instantiateFault ? `const __instantiateObjectURL = URL.createObjectURL.bind(URL);
+URL.createObjectURL = blob => __instantiateObjectURL(blob.size > 100000 ? new Blob(['WebAssembly.instantiateStreaming = WebAssembly.instantiate = async () => { throw new WebAssembly.LinkError("Explicit child WASM instantiation fault"); };\\n', blob], { type: 'text/javascript' }) : blob);` : ''}
 const __NativeWorker = globalThis.Worker;
 globalThis.Worker = class extends __NativeWorker {
   constructor(...args) {
@@ -87,9 +107,12 @@ try {
       try { await pipeline(stream, response); } catch { response.destroy(); }
       return;
     }
-    if (['/engine-worker.mjs', '/engine-worker-fault.mjs', '/baseline-worker-fault.mjs'].includes(request.url)) {
+    const abortMatch = /^\/(engine|baseline)-worker-abort-(string|error|object|null|array|exception)\.mjs$/.exec(request.url);
+    const instantiateMatch = /^\/(engine|baseline)-worker-linkerror\.mjs$/.exec(request.url);
+    if (abortMatch || instantiateMatch || ['/engine-worker.mjs', '/engine-worker-fault.mjs', '/baseline-worker-fault.mjs'].includes(request.url)) {
       response.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
-      return response.end(workerInjection(request.url.includes('-fault')) + '\n' + (request.url.startsWith('/baseline') ? baselineWorker : workerSource));
+      const source = (abortMatch?.[1] || instantiateMatch?.[1]) === 'baseline' ? abortBaselineWorker : request.url.startsWith('/baseline') ? baselineWorker : workerSource;
+      return response.end(workerInjection(request.url.includes('-fault'), abortMatch && abortFixtures[abortMatch[2]], !!instantiateMatch) + '\n' + source);
     }
     const proxy = httpRequest({ hostname: '127.0.0.1', port: upstream.port, path: request.url, method: request.method }, incoming => {
       response.writeHead(incoming.statusCode, incoming.headers); incoming.pipe(response);
@@ -187,7 +210,44 @@ try {
     console.log(JSON.stringify({ check: checks.at(-1).name, code: fixed.code, ms: fixed.ms }));
     const recovered = await run('production-fresh-worker-recovers-from-startup-fault-with-cache');
     assert.equal(recovered.prepared.cached, true); assert.equal(modelTransfers, 1);
+    const masked = await startupFault('./baseline-worker-abort-object.mjs', 5000);
+    assert.equal(masked.outcome, 'error');
+    assert.match(masked.error, /message\.replace is not a function/);
+    checks.push({ name: 'historical-baseline-structured-abort-reproduces-message-replace-masking', passed: true, baselineCommit: abortBaselineCommit, baselineWorkerSHA256: sha(abortBaselineWorker), outcome: masked.outcome, error: masked.error, code: masked.code, ms: masked.ms });
+    console.log(JSON.stringify({ check: checks.at(-1).name, code: masked.code, ms: masked.ms }));
+    const maskedInstantiate = await startupFault('./baseline-worker-linkerror.mjs', 5000);
+    assert.equal(maskedInstantiate.outcome, 'error');
+    assert.match(maskedInstantiate.error, /message\.replace is not a function/);
+    assert.ok(maskedInstantiate.diagnostics.some(item => item.event === 'signal.abort'));
+    checks.push({ name: 'historical-baseline-real-compat-instantiation-abort-masks-LinkError', passed: true, baselineCommit: abortBaselineCommit, baselineWorkerSHA256: sha(abortBaselineWorker), outcome: maskedInstantiate.outcome, error: maskedInstantiate.error, code: maskedInstantiate.code, ms: maskedInstantiate.ms });
+    console.log(JSON.stringify({ check: checks.at(-1).name, code: maskedInstantiate.code, ms: maskedInstantiate.ms }));
+    const fixedInstantiate = await startupFault('./engine-worker-linkerror.mjs', 5000);
+    assert.equal(fixedInstantiate.outcome, 'error');
+    assert.equal(fixedInstantiate.code, 'ENGINE_NATIVE_ABORT');
+    assert.doesNotMatch(fixedInstantiate.error, /message\.replace|rawStack\.replace/);
+    assert.match(fixedInstantiate.error, /Explicit child WASM instantiation fault/);
+    assert.ok(fixedInstantiate.diagnostics.some(item => item.event === 'signal.abort'));
+    assert.ok(fixedInstantiate.ms < 5000); assert.equal(modelTransfers, 1);
+    checks.push({ name: 'production-real-compat-instantiation-abort-preserves-runtime-failure', passed: true, outcome: fixedInstantiate.outcome, error: fixedInstantiate.error, code: fixedInstantiate.code, phases: fixedInstantiate.phases, ms: fixedInstantiate.ms });
+    console.log(JSON.stringify({ check: checks.at(-1).name, code: fixedInstantiate.code, ms: fixedInstantiate.ms }));
+    for (const kind of Object.keys(abortFixtures)) {
+      const result = await startupFault(`./engine-worker-abort-${kind}.mjs`, 5000);
+      assert.equal(result.outcome, 'error', kind + ' must reject the pending initialization');
+      assert.ok(result.ms < 5000, kind + ' abort must not wait for the initialization limit');
+      assert.equal(typeof result.error, 'string'); assert.ok(result.error.length <= 240);
+      assert.doesNotMatch(result.error, /message\.replace|rawStack\.replace|PRIVATE_|private\.example|C:\\private|\[object Object\]/i);
+      assert.equal(result.code, 'ENGINE_NATIVE_ABORT', kind + ' must retain a bounded engine failure identity');
+      assert.ok(result.phases.some(item => item.phase === 'initializing'));
+      assert.equal(result.phases.some(item => item.phase === 'downloading'), false);
+      assert.equal(modelTransfers, 1, kind + ' abort must not redownload a valid cached model');
+      // Do not retain injected raw diagnostics: only the sanitized product result.
+      checks.push({ name: 'production-structured-runtime-abort-' + kind, passed: true, outcome: result.outcome, error: result.error, code: result.code, phases: result.phases, ms: result.ms });
+      console.log(JSON.stringify({ check: checks.at(-1).name, code: result.code, ms: result.ms }));
+    }
+    const abortRecovered = await run('production-fresh-worker-recovers-from-structured-aborts-with-cache');
+    assert.equal(abortRecovered.prepared.cached, true); assert.equal(modelTransfers, 1);
   }
+  assert.deepEqual(errors.filter(message => !injectedBrowserErrors.has(message)), [], 'Only explicitly injected browser errors are expected');
 } catch (error) { failure = error; if (error.diagnosis) diagnostics.push(error.diagnosis); console.error(error.stack || error.message); }
 finally {
   if (browser) { try { const session = await context.newCDPSession(context.pages()[0]); await session.send('Browser.close'); } catch {} await browser.close().catch(() => {}); }
@@ -204,6 +264,6 @@ finally {
     lastFileRead: events.filter(event => event.readCount).map(({ readCount, readBytes }) => ({ readCount, readBytes })).at(-1) || null,
   } });
   await mkdir(dirname(output), { recursive: true });
-  await writeFile(output, JSON.stringify({ schema: 'rag-method.model-chat.init-probe.v1', passed: !failure, browser: version, ms: Date.now()-started, sourceIdentity, model: { file: MODEL.file, bytes: MODEL.bytes, sha256: MODEL.sha256 }, checks: checks.map(compact), diagnostics: diagnostics.map(compact), requests, modelTransfers, modelTransferBytes, externalModelBytes: 0, errors, cleanup, limitations: ['Desktop Chrome with Memory64 and JSPI disabled in owning Worker; not physical iOS.', 'Only model fetch transport redirected to existing native GGUF on owned loopback; canonical URL and OPFS/cache/open/verify/runtime paths stay production.', 'Nested Worker diagnostic listeners record stages without changing pinned vendor bytes.', 'Historical Chrome startup fault bubbles to owner; this was not a reproduced device initialization hang.'], ...(failure ? { error: failure.message } : {}) }, null, 2)+'\n');
+  await writeFile(output, JSON.stringify({ schema: 'rag-method.model-chat.init-probe.v2', passed: !failure, browser: version, ms: Date.now()-started, sourceIdentity, model: { file: MODEL.file, bytes: MODEL.bytes, sha256: MODEL.sha256 }, checks: checks.map(compact), diagnostics: diagnostics.map(compact), requests, modelTransfers, modelTransferBytes, externalModelBytes: 0, errors: errors.filter(message => !injectedBrowserErrors.has(message)), expectedInjectedBrowserErrors: errors.filter(message => injectedBrowserErrors.has(message)), cleanup, limitations: ['Desktop Chrome with Memory64 and JSPI disabled in owning Worker; not physical iOS.', 'Only model fetch transport redirected to existing native GGUF on owned loopback; canonical URL and OPFS/cache/open/verify/runtime paths stay production.', 'Nested Worker diagnostic listeners record stages without changing pinned vendor bytes.', 'Historical Chrome startup fault bubbles to owner; this was not a reproduced device initialization hang.', 'The child-only LinkError is an explicit test fault proving the vendor abort producer and formatter masking, not the iPhone failure cause.'], ...(failure ? { error: failure.message } : {}) }, null, 2)+'\n');
 }
 if (failure) process.exitCode = 1;
