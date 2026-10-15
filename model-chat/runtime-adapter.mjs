@@ -22,11 +22,22 @@ export function createRuntimeAdapter({ WorkerClass = Worker } = {}) {
         else if (data.type === 'token') item.onToken?.(data.value);
         else {
           pending.delete(data.id); item.cleanup();
-          if (data.type === 'error') item.reject(new Error(data.value));
+          if (data.type === 'error') {
+            const failure = new Error(typeof data.value === 'string' ? data.value : 'Browser model operation failed.');
+            // Only an explicit capability refusal locks loading. Network, cache,
+            // initialization and unknown Worker failures retain ordinary recovery.
+            if (data.code === 'UNSUPPORTED_BROWSER' && data.retryable === false) {
+              failure.code = data.code; failure.retryable = false;
+              failure.capabilities = Array.isArray(data.capabilities) ? data.capabilities
+                .filter(item => item && typeof item.id === 'string' && typeof item.label === 'string')
+                .map(({ id, label, detail }) => ({ id, label, ...(typeof detail === 'string' ? { detail } : {}) })) : [];
+            }
+            item.reject(failure);
+          }
           else item.resolve(data.value);
         }
       };
-      owner.onerror = () => { if (worker === owner) terminate(new Error('Browser model worker failed. Check runtime setup, browser memory and WASM support; retry or choose a local file.')); };
+      owner.onerror = () => { if (worker === owner) terminate(new Error('Browser model worker failed. Check runtime setup, browser memory and WASM support before retrying.')); };
     }
     return new Promise((resolve, reject) => {
       const id = ++serial;

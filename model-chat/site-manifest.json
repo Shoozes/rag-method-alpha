@@ -3,16 +3,16 @@
   "managedBy": "examples/browser-model-chat/stage-static.mjs",
   "publicReleaseQualified": false,
   "source": {
-    "head": "f01dcc2c164a6dd4f8cb76b094d0bfda473f26bc",
+    "head": "c2ad28127267dbd6841d8b35bc743d835dcb9fc3",
     "dirty": false,
     "reviewStatus": "unreviewed",
     "fingerprintScope": "allowlisted browser sources, theme, first-party license and packager",
-    "fingerprintSha256": "dda02b8f1315c07627ac637580daaea73e87c21854e029e825d1beb2fbbc2872",
+    "fingerprintSha256": "27bde0119c860719e2a61febf36ff1f0894f397fd3847ac77ab7d04b53cf7f5e",
     "files": [
       {
         "path": "examples/browser-model-chat/app.mjs",
-        "bytes": 9170,
-        "sha256": "545a88fcd4103f45967c6e6f363dcb0cf55825ce0cb8245307e18103cd8ebe0e"
+        "bytes": 10314,
+        "sha256": "90afc86497209f46a833e578c1620221813a5a08313a9bbd0775759e7322b93d"
       },
       {
         "path": "examples/browser-model-chat/bootstrap.mjs",
@@ -26,33 +26,33 @@
       },
       {
         "path": "examples/browser-model-chat/engine-worker.mjs",
-        "bytes": 7193,
-        "sha256": "4866254a97dd8ab88fddc5891ad6ce03d9b851c33802ba0a7cdf515aefe57141"
+        "bytes": 9622,
+        "sha256": "637f2e9bbed04590a84a972356d31427ae4a39b6046afca83cffa3328f065edd"
       },
       {
         "path": "examples/browser-model-chat/index.html",
-        "bytes": 5983,
-        "sha256": "31664b5cdb6c734399fac3d628ef19fd0b5be70fb325752b58a653f66fac173b"
+        "bytes": 6548,
+        "sha256": "d59851bd71004b0697360e0b47fd9c85450f870381148b445da6a5febc03e24f"
       },
       {
         "path": "examples/browser-model-chat/loader-controller.mjs",
-        "bytes": 8912,
-        "sha256": "a01ebc1d861a044d147abca686fa3b0f097079dd1357156731cb69a08a41e12f"
+        "bytes": 11044,
+        "sha256": "1677a0700a963a5ac385498d4c1e391ae62a366194262eb0fbcbdc9e96017406"
       },
       {
         "path": "examples/browser-model-chat/model-contract.mjs",
-        "bytes": 1173,
-        "sha256": "ef56c65d32b0a9739f97aecde20be9433e58edd9bad610a00cce510de8d5e6f4"
+        "bytes": 1862,
+        "sha256": "856e40c76f850e84915cbc96c035ab6d24566548c0458aeae7761826fd1cde34"
       },
       {
         "path": "examples/browser-model-chat/runtime-adapter.mjs",
-        "bytes": 2177,
-        "sha256": "32c09b0efae3977e39fe68d2c2df80c939298e7035018d5248a43732db707af8"
+        "bytes": 2940,
+        "sha256": "3166a2feed6678071e4918a304149637a62bdbf83cc813c1f199a84428ecfa26"
       },
       {
         "path": "examples/browser-model-chat/stage-static.mjs",
-        "bytes": 12638,
-        "sha256": "ef312d72a425d6afe7c1995467370e3c6d60645da17a1c883140d3d45acd5350"
+        "bytes": 13638,
+        "sha256": "d32df3af0b37e76113b9a89ca24ae5511a03f52512ad579eca2b586bfdbed7e0"
       },
       {
         "path": "examples/browser-model-chat/style.css",
@@ -88,11 +88,19 @@
     "license": "MIT",
     "licensePath": "runtime/LICENSE"
   },
+  "compatibilityRuntime": {
+    "package": "@wllama/wllama-compat",
+    "version": "3.5.1",
+    "gitHead": "912c18b75d4358c1405a64646b8dbe43a205943b",
+    "profile": "Memory32/Asyncify",
+    "license": "MIT",
+    "licensePath": "runtime/LICENSE"
+  },
   "files": [
     {
       "path": "app.mjs",
-      "bytes": 9170,
-      "sha256": "545a88fcd4103f45967c6e6f363dcb0cf55825ce0cb8245307e18103cd8ebe0e"
+      "bytes": 10314,
+      "sha256": "90afc86497209f46a833e578c1620221813a5a08313a9bbd0775759e7322b93d"
     },
     {
       "path": "bootstrap.mjs",
@@ -106,13 +114,13 @@
     },
     {
       "path": "engine-worker.mjs",
-      "bytes": 7193,
-      "sha256": "4866254a97dd8ab88fddc5891ad6ce03d9b851c33802ba0a7cdf515aefe57141"
+      "bytes": 9622,
+      "sha256": "637f2e9bbed04590a84a972356d31427ae4a39b6046afca83cffa3328f065edd"
     },
     {
       "path": "index.html",
-      "bytes": 5983,
-      "sha256": "31664b5cdb6c734399fac3d628ef19fd0b5be70fb325752b58a653f66fac173b"
+      "bytes": 6548,
+      "sha256": "d59851bd71004b0697360e0b47fd9c85450f870381148b445da6a5febc03e24f"
     },
     {
       "path": "LICENSES/rag-method.txt",
@@ -121,28 +129,38 @@
     },
     {
       "path": "loader-controller.mjs",
-      "bytes": 8912,
-      "sha256": "a01ebc1d861a044d147abca686fa3b0f097079dd1357156731cb69a08a41e12f"
+      "bytes": 11044,
+      "sha256": "1677a0700a963a5ac385498d4c1e391ae62a366194262eb0fbcbdc9e96017406"
     },
     {
       "path": "model-contract.mjs",
-      "bytes": 1173,
-      "sha256": "ef56c65d32b0a9739f97aecde20be9433e58edd9bad610a00cce510de8d5e6f4"
+      "bytes": 1862,
+      "sha256": "856e40c76f850e84915cbc96c035ab6d24566548c0458aeae7761826fd1cde34"
     },
     {
       "path": "NOTICE.txt",
-      "bytes": 766,
-      "sha256": "a5d5151ff73c895238e7a1dab82209532046e51f33b974e32a840c09062f62e7"
+      "bytes": 1063,
+      "sha256": "0cf9b77717fa9996b9b4ec6bb3648e240cf9ed6aa9316f8d79abd95ab244231b"
     },
     {
       "path": "README.txt",
-      "bytes": 1081,
-      "sha256": "f0647f1a8a6e78b07a62268aac2d78c29aece467304cf34fd81861a3f88aba61"
+      "bytes": 1292,
+      "sha256": "427629213e6fe9d88ef80f29c2937c850fc6f30eaec242d66ea00a982cc287f9"
     },
     {
       "path": "runtime-adapter.mjs",
-      "bytes": 2177,
-      "sha256": "32c09b0efae3977e39fe68d2c2df80c939298e7035018d5248a43732db707af8"
+      "bytes": 2940,
+      "sha256": "3166a2feed6678071e4918a304149637a62bdbf83cc813c1f199a84428ecfa26"
+    },
+    {
+      "path": "runtime/compat/wllama.js",
+      "bytes": 166823,
+      "sha256": "011e11f2c2a4a94d1764a4f45993e01ae5c48f72d78d59464972b26606afd6ac"
+    },
+    {
+      "path": "runtime/compat/wllama.wasm",
+      "bytes": 14186308,
+      "sha256": "9ea153d9396db12c385d53e9a8330b1638ca3e8805159a762ce8859d92d2ac8b"
     },
     {
       "path": "runtime/index.js",
@@ -170,5 +188,5 @@
       "sha256": "9d00bbe275e9025d40a0d14b6e4e6fa1e98af072bb215d83a5c335d65b657ad5"
     }
   ],
-  "identitySha256": "8ecc35e1f0fae862f6dc9c10dadd9fe6a0529d263f2f9c16d84809442304d761"
+  "identitySha256": "98dffaf649e927f9a553a40f1947d3094a5d067ec140e4e500fc554fe3ed10b0"
 }

@@ -2,6 +2,9 @@ RAG Method browser model chat notices
 
 First-party application and Aurel Gold theme: MIT. Complete text: LICENSES/rag-method.txt.
 @wllama/wllama 3.5.1: MIT. Complete retained text: runtime/LICENSE.
+@wllama/wllama-compat 3.5.1: MIT. Complete retained text: runtime/LICENSE.
+Compatibility package upstream source: https://github.com/ngxson/wllama/tree/912c18b75d4358c1405a64646b8dbe43a205943b
+The compatibility npm package omits a license file; runtime/LICENSE matches its exact upstream LICENCE.
 Pinned runtime files retain their verified upstream bytes.
 
 Model: LiquidAI/LFM2.5-230M-GGUF / LFM2.5-230M-Q4_K_M.gguf

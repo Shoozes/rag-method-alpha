@@ -19,14 +19,16 @@
         <div id="scene" class="scene" aria-hidden="true"><div class="halo"></div><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="core"><span>LFM</span><small>230M</small></div><svg viewBox="0 0 300 300"><circle class="track" cx="150" cy="150" r="136"/><circle id="arc" class="arc" cx="150" cy="150" r="136"/></svg><span class="coordinate top">LIQUID FOUNDATION MODEL</span><span class="coordinate bottom">Q4_K_M · CPU / WASM</span></div>
         <div class="load-panel">
           <div class="model-label"><div><p class="eyebrow">LiquidAI / LFM2.5</p><h2>230M <span>Q4_K_M</span></h2></div><span class="size">153.4 MB</span></div>
+          <p id="runtime-profile" class="license" role="status" aria-live="polite">Automatic WASM runtime selection</p>
           <p id="load-status" role="status" aria-live="polite">Ready when you are.</p>
-          <p id="error" class="error" role="alert" hidden></p>
+          <p id="error" class="error" role="alert" tabindex="-1" hidden></p>
+          <p id="unsupported-hint" class="license" hidden>A required browser feature is unavailable. Retrying or choosing a local file cannot add it. Your draft is preserved below. To continue now, open this page in desktop Chrome, where this demo has been tested. Physical iPhone support is not yet verified.</p>
           <progress id="load-progress" max="1" value="0" aria-label="Model loading progress"></progress>
           <div class="progress-notes"><span id="byte-status">One pinned model · SHA-256 checked</span><span id="percent"></span></div>
           <ol class="stages" aria-label="Loading stages"><li data-step="downloading"><span>01</span>Fetch</li><li data-step="verifying"><span>02</span>Verify</li><li data-step="initializing"><span>03</span>Initialize</li></ol>
           <div class="load-actions"><button id="download" class="primary">Download &amp; open chat</button><button id="cancel" class="secondary" hidden>Cancel</button></div>
           <label class="file-choice" for="local-file">Already have the model? <span>Choose a local GGUF</span><input id="local-file" type="file" accept=".gguf"></label>
-          <p class="license">This build requires WebAssembly Memory64 and browser storage (OPFS) for both loading methods. A local File avoids a download and new model-cache writes. Requirements are checked before fetching weights; extra memory is needed for verification and initialization. Physical iPhone support is not yet verified.</p>
+          <p class="license">Self-hosted wllama 3.5.1 selects Memory32 compatibility when Memory64 or JSPI is unavailable. Both loading methods require the browser storage (OPFS) API; a new download also requires writable storage. A local File avoids a download and new model-cache writes. Requirements are checked before fetching weights; extra memory is needed for verification and initialization. Physical iPhone support is pending a new device test.</p>
           <p class="license">Downloading is subject to the <a id="model-license" href="https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF/blob/fa224d4cb60cffe61eb58726712ef255bb64d0b7/LICENSE" target="_blank" rel="noopener noreferrer">LFM Open License v1.0</a>. The browser retains a reusable cache when available.</p>
         </div>
       </div>

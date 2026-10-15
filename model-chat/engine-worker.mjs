@@ -1,5 +1,5 @@
 import { Wllama } from './runtime/index.js';
-import { MODEL, RUNTIME } from './model-contract.mjs';
+import { MODEL, RUNTIME, COMPAT } from './model-contract.mjs';
 import { inspectCapabilities } from './capabilities.mjs';
 
 // Pinned wllama 3.5.1 resolves asset URLs through document.baseURI, even
@@ -15,22 +15,42 @@ const post = (id, type, value) => self.postMessage({ id, type, value });
 function requireCapabilities(report) {
   if (report.supported) return;
   const missing = report.requirements.filter(item => !item.supported);
-  throw new Error(`This browser cannot run this pinned runtime: ${missing.map(item => item.label).join(', ')}. No model was downloaded. ${missing.map(item => item.detail).join(' ')}`);
+  const failure = new Error(`This browser cannot run this pinned runtime: ${missing.map(item => item.label).join(', ')}. No model was downloaded. ${missing.map(item => item.detail).join(' ')}`);
+  // A blocked cache write can recover or use a File. A missing runtime feature
+  // cannot be repaired by retrying the same input in this browser session.
+  if (missing.some(item => item.id !== 'opfs-writable')) {
+    failure.code = 'UNSUPPORTED_BROWSER'; failure.retryable = false;
+    failure.capabilities = missing.map(({ id, label, detail }) => ({ id, label, detail }));
+  }
+  throw failure;
 }
 
-async function validateRuntime() {
-  const response = await fetch(new URL('./runtime/wllama.wasm', import.meta.url));
+async function pinnedRuntimeFile(name, identity, javascript = false) {
+  const response = await fetch(new URL('./runtime/' + name, import.meta.url));
   if (!response.ok) throw new Error(`Runtime WASM is unavailable (${response.status}). No model was downloaded. Check the static runtime setup.`);
-  if (response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'application/wasm') {
-    throw new Error('Runtime WASM must be served as application/wasm. No model was downloaded.');
+  const type = response.headers.get('content-type')?.split(';')[0].trim().toLowerCase();
+  if (javascript ? !['application/javascript', 'text/javascript'].includes(type) : type !== 'application/wasm') {
+    throw new Error(`Runtime ${javascript ? 'JavaScript' : 'WASM'} has the wrong executable MIME type. No model was downloaded.`);
   }
   if (Number(response.headers.get('content-length')) > 16 * 1024 * 1024) throw new Error('Runtime WASM exceeds its size bound. No model was downloaded.');
   const bytes = await response.arrayBuffer();
+  if (bytes.byteLength > 16 * 1024 * 1024) throw new Error('Runtime file exceeds its size bound. No model was downloaded.');
   const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))]
     .map(value => value.toString(16).padStart(2, '0')).join('');
-  if (hash !== RUNTIME.files['wllama.wasm'].sha256) throw new Error('Runtime WASM differs from the pinned build. No model was downloaded. Refresh the site assets.');
+  if (hash !== identity.sha256) throw new Error('Runtime file differs from the pinned build. No model was downloaded. Refresh the site assets.');
+  return bytes;
+}
+
+async function validateRuntime(compat) {
+  const name = compat ? 'compat/wllama.wasm' : 'wllama.wasm';
+  const bytes = await pinnedRuntimeFile(name, (compat ? COMPAT : RUNTIME).files[name]);
   try { await WebAssembly.compile(bytes); }
-  catch { throw new Error('This browser cannot compile the pinned Memory64 WASM runtime. No model was downloaded.'); }
+  catch {
+    throw Object.assign(new Error('This browser cannot compile the pinned WASM runtime. No model was downloaded.'), {
+      code: 'UNSUPPORTED_BROWSER', retryable: false,
+      capabilities: [{ id: 'pinned-wasm', label: 'Pinned WebAssembly runtime', detail: 'Compilation is unavailable for this runtime build or site policy.' }],
+    });
+  }
   // The runtime creates a blob-backed child Worker. Test the actual policy before
   // weights, rather than treating the exposed Worker constructor as permission.
   const url = URL.createObjectURL(new Blob(['postMessage("ready")'], { type: 'application/javascript' }));
@@ -42,8 +62,16 @@ async function validateRuntime() {
       child.onerror = event => { event.preventDefault(); reject(new Error('Worker blocked')); };
       timer = setTimeout(() => reject(new Error('Worker timeout')), 10000);
     });
-  } catch { throw new Error('Site policy prevents the nested model Worker from starting. No model was downloaded.'); }
+  } catch {
+    throw Object.assign(new Error('Site policy prevents the nested model Worker from starting. No model was downloaded.'), {
+      code: 'UNSUPPORTED_BROWSER', retryable: false,
+      capabilities: [{ id: 'module-worker-policy', label: 'Nested module Worker policy', detail: 'This site policy prevents the runtime Worker from starting.' }],
+    });
+  }
   finally { clearTimeout(timer); child?.terminate(); URL.revokeObjectURL(url); }
+  // The compat worker glue is executable too. Verify it before weights and give
+  // the vendor that exact code, rather than fetching a second unchecked copy.
+  return compat ? new TextDecoder().decode(await pinnedRuntimeFile('compat/wllama.js', COMPAT.files['compat/wllama.js'], true)) : null;
 }
 
 async function verify(blob, progress) {
@@ -61,12 +89,17 @@ async function prepare({ source, file }, progress) {
   progress({ phase: 'checking' });
   // Both inputs need the default cache manager's OPFS API, but a File or valid
   // existing cache does not require a new OPFS write. Probe writes only on a miss.
-  requireCapabilities(await inspectCapabilities(globalThis, { requireWritableOPFS: false }));
-  await validateRuntime();
+  const report = await inspectCapabilities(globalThis, { requireMemory64: false, requireWritableOPFS: false });
+  requireCapabilities(report);
+  const optional = id => report.optional.find(item => item.id === id)?.supported === true;
+  const compat = !optional('memory64') || !optional('jspi');
+  const runtimeProfile = compat ? 'memory32-asyncify' : 'memory64';
+  progress({ phase: 'checking', runtimeProfile });
+  const workerCode = await validateRuntime(compat);
   engine = new Wllama({ default: new URL('./runtime/wllama.wasm', import.meta.url).href }, { logger: quiet, suppressNativeLog: true, allowOffline: true });
-  // One CPU thread avoids pthread transfers. The unified binary still requires
-  // Memory64 and shared-memory features; only desktop Chrome is qualified here.
-  engine.setCompat(null);
+  // Keep the exact model and API. Missing Memory64/JSPI selects the maintained,
+  // self-hosted Memory32/Asyncify build; never use the vendor's default CDN.
+  engine.setCompat(compat ? { wasm: new URL('./runtime/compat/wllama.wasm', import.meta.url).href, worker: { code: workerCode } } : null, 'firefox_safari');
   progress({ phase: 'checking' });
   let blobs, model, cached = false;
   if (source === 'file') {
@@ -77,7 +110,7 @@ async function prepare({ source, file }, progress) {
     model = models.find(item => item.url === MODEL.url);
     cached = model?.validate() === 'valid' && model.size === MODEL.bytes;
     if (!cached) {
-      requireCapabilities(await inspectCapabilities(globalThis, { requireWritableOPFS: true }));
+      requireCapabilities(await inspectCapabilities(globalThis, { requireMemory64: false, requireWritableOPFS: true }));
       if (model) await model.remove();
       progress({ phase: 'downloading', loaded: 0, total: MODEL.bytes, cached: false });
       model = await engine.modelManager.downloadModel(MODEL.url, {
@@ -97,7 +130,8 @@ async function prepare({ source, file }, progress) {
   progress({ phase: 'initializing', cached });
   await engine.loadModel(blobs, { n_ctx: 2048, n_batch: 128, n_threads: 1, n_gpu_layers: 0, seed: 42 });
   if (!engine.isModelLoaded()) throw new Error('Runtime returned without a loaded model.');
-  return { cached, modelId: MODEL.file, libllama: Wllama.getLibllamaVersion(), backend: 'single-thread CPU/WASM' };
+  return { cached, modelId: MODEL.file, libllama: Wllama.getLibllamaVersion(), runtimeProfile,
+    backend: compat ? 'Memory32 / Asyncify; single-thread CPU/WASM' : 'Memory64; single-thread CPU/WASM' };
 }
 
 self.onmessage = async ({ data }) => {
@@ -118,6 +152,10 @@ self.onmessage = async ({ data }) => {
       if (!text.trim()) throw new Error('The model returned an empty answer. Try a shorter message.');
       post(id, 'result', text);
     } else throw new Error('Unknown runtime operation.');
-  } catch (error) { post(id, 'error', error?.message || String(error)); }
+  } catch (error) {
+    self.postMessage({ id, type: 'error', value: error?.message || String(error),
+      ...(error?.code === 'UNSUPPORTED_BROWSER' ? { code: error.code, retryable: false, capabilities: error.capabilities || [] } : {}),
+    });
+  }
   finally { active = false; }
 };
