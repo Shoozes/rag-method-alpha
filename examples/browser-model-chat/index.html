@@ -6,7 +6,7 @@
   <meta name="description" content="Load a small LiquidAI model and chat locally in your browser. An optional RAG Method composition.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E">
   <title>RAG Method · Local conversation</title>
-  <link rel="stylesheet" href="/theme/aurel-gold.css">
+  <link rel="stylesheet" href="./theme/aurel-gold.css">
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
@@ -20,11 +20,13 @@
         <div class="load-panel">
           <div class="model-label"><div><p class="eyebrow">LiquidAI / LFM2.5</p><h2>230M <span>Q4_K_M</span></h2></div><span class="size">153.4 MB</span></div>
           <p id="load-status" role="status" aria-live="polite">Ready when you are.</p>
+          <p id="error" class="error" role="alert" hidden></p>
           <progress id="load-progress" max="1" value="0" aria-label="Model loading progress"></progress>
           <div class="progress-notes"><span id="byte-status">One pinned model · SHA-256 checked</span><span id="percent"></span></div>
           <ol class="stages" aria-label="Loading stages"><li data-step="downloading"><span>01</span>Fetch</li><li data-step="verifying"><span>02</span>Verify</li><li data-step="initializing"><span>03</span>Initialize</li></ol>
           <div class="load-actions"><button id="download" class="primary">Download &amp; open chat</button><button id="cancel" class="secondary" hidden>Cancel</button></div>
           <label class="file-choice" for="local-file">Already have the model? <span>Choose a local GGUF</span><input id="local-file" type="file" accept=".gguf"></label>
+          <p class="license">This build requires WebAssembly Memory64 and browser storage (OPFS) for both loading methods. A local File avoids a download and new model-cache writes. Requirements are checked before fetching weights; extra memory is needed for verification and initialization.</p>
           <p class="license">Downloading is subject to the <a id="model-license" href="https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF/blob/fa224d4cb60cffe61eb58726712ef255bb64d0b7/LICENSE" target="_blank" rel="noopener noreferrer">LFM Open License v1.0</a>. The browser retains a reusable cache when available.</p>
         </div>
       </div>
@@ -37,9 +39,8 @@
     <form id="composer"><label for="prompt">Message</label><textarea id="prompt" maxlength="4000" rows="2" placeholder="Ask something…"></textarea><div class="composer-actions"><span>Session only · no saved history</span><button id="stop" class="secondary" type="button" hidden>Stop &amp; unload</button><button id="send" class="primary" type="submit">Send message <span aria-hidden="true">↗</span></button></div></form>
     <button id="clear" class="text-button">Clear conversation</button>
   </section>
-  <p id="error" class="error" role="alert" hidden></p>
   <footer><span>Optional browser model preview · Atlas remains model-free</span><a href="https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF" target="_blank" rel="noopener noreferrer">Model &amp; license ↗</a></footer>
 </main>
-<script type="module">import { mountApp } from './app.mjs'; mountApp();</script>
+<script type="module" src="./bootstrap.mjs"></script>
 </body>
 </html>
