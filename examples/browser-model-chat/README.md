@@ -3,6 +3,10 @@
 An optional, separate browser entry point for one pinned local model and a bounded chat. The existing Atlas entry point remains model-free. This example is served separately and is not included in the standard Vite/Atlas build artifact.
 
 Live static preview: **https://shoozes.github.io/rag-method-alpha/model-chat/**.
+The limited [memory preview](https://shoozes.github.io/rag-method-alpha/model-chat/?memory=1)
+adds automatic selected-passage compaction, optional exact-word saved memory and
+a small read-only graph. It is an experiment: context selection is lossy and the
+230M model can omit or invent details. See [memory setup and limits](./memory/README.md).
 The runtime automatically selects a pinned Memory32 compatibility build when
 Memory64 or JSPI is unavailable. OPFS remains required. The user reported a
 successful iPhone conversation after the resource-binding fix; exact device/iOS

@@ -13,8 +13,9 @@ export function createRuntimeAdapter({ WorkerClass = Worker, initWaitMs = 180_00
     for (const request of pending.values()) { request.cleanup(); request.reject(reason); }
     pending.clear();
   }
-  function request(operation, payload, { signal, onProgress, onToken } = {}) {
+  function request(operation, payload, { signal, onProgress, onToken, beforeDispatch, onDispatch } = {}) {
     if (signal?.aborted) return Promise.reject(new DOMException('Cancelled', 'AbortError'));
+    try { beforeDispatch?.(); } catch (error) { return Promise.reject(error); }
     if (!worker) {
       worker = new WorkerClass(new URL('./engine-worker.mjs', import.meta.url), { type: 'module', name: 'rag-local-model' });
       const owner = worker;
@@ -85,13 +86,18 @@ export function createRuntimeAdapter({ WorkerClass = Worker, initWaitMs = 180_00
       const item = { operation, resolve, reject, onProgress, onToken, initTimer: null, lastStage: null,
         cleanup: () => { signal?.removeEventListener('abort', abort); if (item.initTimer !== null) clearTimeoutFn(item.initTimer); item.initTimer = null; } };
       pending.set(id, item);
-      try { worker.postMessage({ id, operation, payload }); }
+      try {
+        worker.postMessage({ id, operation, payload });
+        try { onDispatch?.(); } catch { /* Observation cannot cancel a dispatched request. */ }
+      }
       catch { terminate(Object.assign(new Error('The browser could not send model data to its Worker. Cached bytes were not removed. Retry the cached load.'), { code: 'WORKER_MESSAGE_ERROR' })); }
     });
   }
   return {
     prepare: ({ source, file, ...options }) => request('prepare', { source, file }, options),
     reply: (messages, options) => request('reply', { messages }, options),
+    measure: (messages, options) => request('measure', { messages }, options),
+    summarize: (messages, options) => request('summarize', { messages }, options),
     dispose: async () => terminate(),
   };
 }

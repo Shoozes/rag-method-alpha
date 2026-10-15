@@ -54,7 +54,7 @@ async function resolveFile(root, suffix) {
 
 /** Local preview only. Callers choose roots; request URLs cannot choose filesystem roots. */
 export async function startServer({ port = 0, root = exampleDirectory,
-  runtimeRoot = join(repositoryDirectory, '.artifacts/model-chat/runtime') } = {}) {
+  runtimeRoot = join(repositoryDirectory, '.artifacts/model-chat/runtime'), memoryCoreRoot } = {}) {
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Port must be an integer from 0 to 65535.');
   const exampleRoot = await realpath(resolve(root));
   if (!(await stat(exampleRoot)).isDirectory()) throw new Error('Example root must be a directory.');
@@ -72,7 +72,11 @@ export async function startServer({ port = 0, root = exampleDirectory,
       let mount = exampleRoot;
       let suffix = pathname.slice(1);
       let contentType;
-      if (pathname.startsWith('/runtime/')) {
+      if (pathname === '/memory/rag-core.mjs') {
+        if (!memoryCoreRoot) { response.writeHead(404).end(); return; }
+        mount = resolve(memoryCoreRoot);
+        suffix = 'rag-core.mjs';
+      } else if (pathname.startsWith('/runtime/')) {
         suffix = pathname.slice('/runtime/'.length);
         if (!runtimeFiles.has(suffix)) { response.writeHead(404).end(); return; }
         mount = runtimeDirectory;

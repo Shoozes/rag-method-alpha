@@ -15,6 +15,16 @@ const browserFiles = Object.freeze([
   'runtime-adapter.mjs', 'engine-worker.mjs', 'runtime-errors.mjs', 'wasm-memory.mjs', 'runtime-profile.mjs',
   'capabilities.mjs', 'bootstrap.mjs',
 ]);
+const memoryFiles = Object.freeze([
+  'memory/workspace.mjs', 'memory/store.mjs', 'memory/events.mjs', 'memory/context.mjs',
+  'memory/structured-context.mjs', 'memory/automatic-context.mjs', 'memory/rag-adapter.mjs',
+  'memory/restore-events.mjs', 'memory/citations.mjs', 'memory/panel.mjs', 'memory/panel.css',
+  'memory/rag-core.mjs',
+]);
+const memoryCoreSha256 = 'c282ebb3965c4a25b48fb66082ce18c72184449f2123633a901ffceb9939ace6';
+const modelLicenseSource = 'examples/browser-model-chat/licenses/LFM-Open-License-1.0.txt';
+const modelLicensePath = 'LICENSES/lfm-open-license-1.0.txt';
+const modelLicenseSha256 = '30adf9d6478191fb87f2424f63ba0728598335aaf99cd2848ef17e8e545fe94b';
 const runtimeIdentities = Object.freeze({ ...RUNTIME.files, ...COMPAT.files });
 const runtimeFiles = Object.freeze(Object.keys(runtimeIdentities));
 const payloadPaths = Object.freeze([...browserFiles, 'theme/aurel-gold.css',
@@ -22,6 +32,7 @@ const payloadPaths = Object.freeze([...browserFiles, 'theme/aurel-gold.css',
 const preMemoryPayloadPaths = payloadPaths.filter(name => !['wasm-memory.mjs', 'runtime-profile.mjs'].includes(name));
 const priorPayloadPaths = preMemoryPayloadPaths.filter(name => name !== 'runtime-errors.mjs');
 const legacyPayloadPaths = priorPayloadPaths.filter(name => !name.startsWith('runtime/compat/'));
+const memoryPayloadPaths = Object.freeze([...payloadPaths, ...memoryFiles, modelLicensePath].sort());
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const portable = value => value.split(sep).join('/');
 const table = payload => [...payload].map(([path, bytes]) => ({ path, bytes: bytes.length, sha256: hash(bytes) })).sort((a, b) => a.path.localeCompare(b.path));
@@ -67,7 +78,7 @@ async function outputPath(value) {
   return destination;
 }
 
-async function managedOutput(destination) {
+async function managedOutput(destination, memoryPreview) {
   try { await lstat(destination); } catch (error) {
     if (error.code === 'ENOENT') return null;
     throw error;
@@ -82,11 +93,12 @@ async function managedOutput(destination) {
   const previousPaths = previous.files?.map(file => file.path).sort();
   if (previous.schema !== schema || previous.managedBy !== managedBy || identitySha256 !== identity(body)
       || previous.publicReleaseQualified !== false || !Array.isArray(previous.files)
-      || ![payloadPaths, preMemoryPayloadPaths, priorPayloadPaths, legacyPayloadPaths].some(paths => JSON.stringify(previousPaths) === JSON.stringify(paths))) {
+      || ![...(memoryPreview ? [memoryPayloadPaths] : []), payloadPaths, preMemoryPayloadPaths, priorPayloadPaths, legacyPayloadPaths]
+        .some(paths => JSON.stringify(previousPaths) === JSON.stringify(paths))) {
     throw new Error('Refusing output with a foreign or changed managed manifest.');
   }
   const permitted = new Set([...previousPaths, manifestName]);
-  const permittedDirectories = new Set(['theme', 'runtime', 'runtime/compat', 'LICENSES']);
+  const permittedDirectories = new Set(['theme', 'runtime', 'runtime/compat', 'LICENSES', ...(memoryPreview ? ['memory'] : [])]);
   const actual = [];
   async function visit(directory, prefix = '') {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -116,9 +128,15 @@ function gitIdentity() {
 
 /** Package existing verified assets only; never download, build, or deploy. */
 export async function stageStatic({ output = join(workspace, '.artifacts/model-chat/site'),
-  runtimeRoot = join(workspace, '.artifacts/model-chat/runtime') } = {}) {
+  runtimeRoot = join(workspace, '.artifacts/model-chat/runtime'), memoryPreview = false } = {}) {
+  if (typeof memoryPreview !== 'boolean') throw new Error('memoryPreview must be an explicit boolean.');
+  const privateMarker = await lstat(join(example, 'memory/PRIVATE_LOCAL_ONLY')).catch(error => {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  });
+  if (privateMarker && !memoryPreview) throw new Error('Private memory preview is local only');
   const destination = await outputPath(output);
-  const previous = await managedOutput(destination);
+  const previous = await managedOutput(destination, memoryPreview);
   const payload = new Map(), source = new Map();
   for (const name of runtimeFiles) {
     const bytes = await ordinaryBytes(join(resolve(runtimeRoot), name), 'runtime/' + name, 16 * 1024 * 1024);
@@ -128,6 +146,18 @@ export async function stageStatic({ output = join(workspace, '.artifacts/model-c
   for (const name of browserFiles) {
     const bytes = await ordinaryBytes(join(example, name), 'examples/browser-model-chat/' + name);
     payload.set(name, bytes); source.set('examples/browser-model-chat/' + name, bytes);
+  }
+  if (memoryPreview) {
+    for (const name of memoryFiles) {
+      const sourcePath = name === 'memory/rag-core.mjs' ? '.artifacts/memory/rag-core.mjs' : 'examples/browser-model-chat/' + name;
+      const bytes = await ordinaryBytes(join(workspace, sourcePath), sourcePath);
+      if (name === 'memory/rag-core.mjs' && hash(bytes) !== memoryCoreSha256) throw new Error('Pinned memory core SHA-256 mismatch.');
+      payload.set(name, bytes); source.set(sourcePath, bytes);
+    }
+    const modelLicense = await ordinaryBytes(join(workspace, modelLicenseSource), modelLicenseSource, 64 * 1024);
+    if (hash(modelLicense) !== modelLicenseSha256) throw new Error('Pinned model license SHA-256 mismatch.');
+    payload.set(modelLicensePath, modelLicense); source.set(modelLicenseSource, modelLicense);
+    source.set('examples/browser-model-chat/memory/build-core.mjs', await ordinaryBytes(join(example, 'memory/build-core.mjs'), 'memory core build source'));
   }
   const theme = await ordinaryBytes(join(workspace, 'modules/browser-rag-ts/demo/aurel-gold.css'), 'Aurel Gold stylesheet');
   payload.set('theme/aurel-gold.css', theme); source.set('modules/browser-rag-ts/demo/aurel-gold.css', theme);
@@ -146,8 +176,13 @@ export async function stageStatic({ output = join(workspace, '.artifacts/model-c
     'Model revision: ' + MODEL.revision,
     'Model license: LFM Open License v1.0 (distinct from the application/runtime MIT licenses).',
     MODEL.license,
+    ...(memoryPreview ? ['Complete pinned model license: ' + modelLicensePath + '.'] : []),
     'Model weights are not included in this static payload. Download is an explicit browser action.',
     'The model license applies to model use and redistribution; inspect its pinned terms before deployment.', '',
+    ...(memoryPreview ? [
+      'Experimental model limitation: after a correction, the model used Thursday instead of Tuesday but omitted the codename and city in a multi-field answer.',
+      'Automatic passage/provenance checks do not establish generated-answer completeness or truth.', '',
+    ] : []),
   ].join('\n')));
   payload.set('README.txt', Buffer.from([
     'RAG Method browser model chat static payload', '',
@@ -163,17 +198,29 @@ export async function stageStatic({ output = join(workspace, '.artifacts/model-c
     'Writable OPFS is required only for a new remote cache miss; an OPFS write failure does not itself block File or valid cached-byte loading.',
     'JSPI absence alone is not a loading gate.',
     'The model download, cache, and inference run only after an explicit browser action.',
+    ...(memoryPreview ? [
+      'Open ?memory=1 for this one-chat memory preview; add &graph=0 to omit the optional read-only SVG event graph.',
+      'Older context is selected automatically as source-linked exact passages; no special markup is required.',
+      'Automatic passage selection is lossy extractive context, not general semantic summarization or verified fact admission.',
+      'Explicit Save stores selected exact user words separately for keyword retrieval; Forget does not erase the transcript.',
+      'Historical answer links describe Sources sent at the time, not answer truth, current record eligibility or authenticated execution.',
+      'Known 230M model limits include failed unrelated-question abstention and answer-format adherence.',
+      'After correction, a native test used Thursday instead of Tuesday but omitted the codename and city in a multi-field answer; answer completeness is not guaranteed.',
+      'The complete model license is included at ' + modelLicensePath + '; inspect its commercial eligibility and redistribution terms.',
+    ] : []),
     'Read NOTICE.txt, LICENSES/rag-method.txt, runtime/LICENSE, and the pinned model license.',
     'This package is a static preview, not full product-release or iOS qualification.', '',
   ].join('\n')));
   const sourceFiles = table(source);
   const body = {
-    schema, managedBy, publicReleaseQualified: false,
+    schema, managedBy, publicReleaseQualified: false, ...(memoryPreview ? { memoryPreview: true } : {}),
     source: { ...gitIdentity(), reviewStatus: 'unreviewed',
-      fingerprintScope: 'allowlisted browser sources, theme, first-party license and packager',
+      fingerprintScope: memoryPreview ? 'allowlisted browser sources, generated memory core, build source, theme, licenses and packager'
+        : 'allowlisted browser sources, theme, first-party license and packager',
       fingerprintSha256: identity(sourceFiles), files: sourceFiles },
     model: { id: MODEL.id, file: MODEL.file, revision: MODEL.revision, bytes: MODEL.bytes,
-      sha256: MODEL.sha256, url: MODEL.url, license: 'LFM Open License v1.0', licenseUrl: MODEL.license, weightsIncluded: false },
+      sha256: MODEL.sha256, url: MODEL.url, license: 'LFM Open License v1.0', licenseUrl: MODEL.license,
+      ...(memoryPreview ? { licensePath: modelLicensePath, licenseSha256: modelLicenseSha256 } : {}), weightsIncluded: false },
     runtime: { package: '@wllama/wllama', version: RUNTIME.version, license: 'MIT', licensePath: 'runtime/LICENSE' },
     compatibilityRuntime: { package: COMPAT.package, version: COMPAT.version, gitHead: COMPAT.gitHead,
       profile: 'Memory32/Asyncify', license: 'MIT', licensePath: 'runtime/LICENSE' },
@@ -181,7 +228,7 @@ export async function stageStatic({ output = join(workspace, '.artifacts/model-c
   };
   const manifest = { ...body, identitySha256: identity(body) };
   // Validate the complete incoming payload before creating any output directory.
-  if (JSON.stringify([...payload.keys()].sort()) !== JSON.stringify(payloadPaths)) throw new Error('Static payload allowlist mismatch.');
+  if (JSON.stringify([...payload.keys()].sort()) !== JSON.stringify(memoryPreview ? memoryPayloadPaths : payloadPaths)) throw new Error('Static payload allowlist mismatch.');
   await mkdir(destination, { recursive: true });
   for (const file of manifest.files) {
     const target = join(destination, file.path);
@@ -206,13 +253,18 @@ export async function stageStatic({ output = join(workspace, '.artifacts/model-c
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const args = process.argv.slice(2), options = {};
-    for (let index = 0; index < args.length; index += 2) {
+    for (let index = 0; index < args.length;) {
+      if (args[index] === '--memory-preview') {
+        if (options.memoryPreview) throw new Error('Duplicate staging option.');
+        options.memoryPreview = true; index++; continue;
+      }
       if (!['--output', '--runtime-root'].includes(args[index]) || !args[index + 1] || args[index + 1].startsWith('--')) {
-        throw new Error('Usage: node examples/browser-model-chat/stage-static.mjs [--output <workspace directory>] [--runtime-root <prepared directory>]');
+        throw new Error('Usage: node examples/browser-model-chat/stage-static.mjs [--output <workspace directory>] [--runtime-root <prepared directory>] [--memory-preview]');
       }
       const key = args[index] === '--output' ? 'output' : 'runtimeRoot';
       if (options[key]) throw new Error('Duplicate staging option.');
       options[key] = args[index + 1];
+      index += 2;
     }
     const result = await stageStatic(options);
     console.log(JSON.stringify({ output: portable(relative(workspace, result.output)), files: result.manifest.files.length,

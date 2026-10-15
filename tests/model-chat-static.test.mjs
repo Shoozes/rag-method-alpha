@@ -1,17 +1,19 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { link, lstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { copyFile, link, lstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
-import { stageStatic } from '../examples/browser-model-chat/stage-static.mjs';
+import { stageStatic as stageSource } from '../examples/browser-model-chat/stage-static.mjs';
 import { COMPAT, MODEL, RUNTIME } from '../examples/browser-model-chat/model-contract.mjs';
 import { listenStatic } from '../modules/browser-rag-ts/scripts/static-server.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const artifacts = join(root, '.artifacts/model-chat');
-const site = join(artifacts, 'site');
+const site = resolve(process.env.BROWSER_MEMORY_PREVIEW_SITE || join(artifacts, 'memory-preview-site'));
+const preparedRuntime = resolve(process.env.BROWSER_MODEL_RUNTIME_ROOT || join(artifacts, 'runtime'));
+const stageStatic = options => stageSource({ output: site, memoryPreview: true, runtimeRoot: preparedRuntime, ...options });
 const prefix = '/prefix/model-chat/';
 const hash = value => createHash('sha256').update(value).digest('hex');
 const exists = async path => { try { await lstat(path); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; } };
@@ -19,6 +21,12 @@ const browserFiles = ['index.html', 'style.css', 'app.mjs', 'loader-controller.m
   'runtime-adapter.mjs', 'engine-worker.mjs', 'runtime-errors.mjs', 'wasm-memory.mjs', 'runtime-profile.mjs',
   'capabilities.mjs', 'bootstrap.mjs'];
 const helperFiles = ['runtime-errors.mjs', 'wasm-memory.mjs', 'runtime-profile.mjs'];
+const memoryFiles = ['memory/workspace.mjs', 'memory/store.mjs', 'memory/events.mjs', 'memory/context.mjs',
+  'memory/structured-context.mjs', 'memory/automatic-context.mjs', 'memory/rag-adapter.mjs', 'memory/restore-events.mjs',
+  'memory/citations.mjs', 'memory/panel.mjs', 'memory/panel.css', 'memory/rag-core.mjs'];
+const modelLicensePath = 'LICENSES/lfm-open-license-1.0.txt';
+const previewAdded = [...memoryFiles, modelLicensePath];
+const modelLicenseSha256 = '30adf9d6478191fb87f2424f63ba0728598335aaf99cd2848ef17e8e545fe94b';
 
 async function privateFixture(t) {
   await mkdir(artifacts, { recursive: true });
@@ -30,6 +38,24 @@ async function privateFixture(t) {
   });
   return directory;
 }
+
+test('an isolated private marker refuses default staging before runtime reads or output; opt-in must be boolean', async t => {
+  const fixtureRoot = join(await privateFixture(t), 'guard-source');
+  const fixtureExample = join(fixtureRoot, 'examples/browser-model-chat');
+  await mkdir(join(fixtureExample, 'memory'), { recursive: true });
+  // Copy only the two tiny stager inputs. Never add/remove a real source marker
+  // or copy the application/runtime/model tree to exercise this guard.
+  for (const name of ['stage-static.mjs', 'model-contract.mjs']) {
+    await copyFile(join(root, 'examples/browser-model-chat', name), join(fixtureExample, name));
+  }
+  await writeFile(join(fixtureExample, 'memory/PRIVATE_LOCAL_ONLY'), 'Isolated test fixture only.\n');
+  const { stageStatic: stagePrivate } = await import(pathToFileURL(join(fixtureExample, 'stage-static.mjs')).href);
+  const output = join(fixtureRoot, 'default-must-not-exist');
+  await assert.rejects(stagePrivate({ output, runtimeRoot: 'missing-runtime' }), /Private memory preview is local only/);
+  await assert.rejects(stagePrivate({ output, memoryPreview: false }), /Private memory preview is local only/);
+  for (const memoryPreview of ['true', 1, {}]) await assert.rejects(stagePrivate({ output, memoryPreview }), /explicit boolean/);
+  assert.equal(await exists(output), false);
+});
 
 test('static staging refuses unsafe, linked, existing foreign and forged output without overwriting', async t => {
   const fixture = await privateFixture(t);
@@ -66,7 +92,7 @@ test('missing or wrong pinned runtime bytes fail before creating output', async 
   assert.equal(await exists(output), false);
 });
 
-test('one retained-runtime site has an exact hashed allowlist, notices, unreviewed identity and safe refresh', async t => {
+test('explicit preview export has exactly 34 hashed payload files plus manifest, complete licenses and safe refresh', async t => {
   // The intended delivery site is the sole delivery output. No second runtime tree
   // or model is created; failure cases above use only a few fixture bytes.
   const staged = await stageStatic();
@@ -75,6 +101,7 @@ test('one retained-runtime site has an exact hashed allowlist, notices, unreview
   const { identitySha256, ...body } = manifest;
   assert.equal(identitySha256, hash(JSON.stringify(body)));
   assert.equal(manifest.publicReleaseQualified, false);
+  assert.equal(manifest.memoryPreview, true, 'opt-in is an export mode, not release approval');
   assert.equal(manifest.source.reviewStatus, 'unreviewed');
   assert.ok(manifest.source.head === null || /^[0-9a-f]{40}$/.test(manifest.source.head));
   assert.ok(manifest.source.dirty === null || typeof manifest.source.dirty === 'boolean');
@@ -82,9 +109,23 @@ test('one retained-runtime site has an exact hashed allowlist, notices, unreview
   assert.equal(manifest.model.weightsIncluded, false);
   assert.equal(manifest.model.sha256, MODEL.sha256);
   assert.equal(manifest.model.licenseUrl, MODEL.license);
+  assert.equal(manifest.model.licensePath, modelLicensePath);
+  assert.equal(manifest.model.licenseSha256, modelLicenseSha256);
   const expected = [...browserFiles, 'theme/aurel-gold.css', 'runtime/index.js', 'runtime/wllama.wasm',
-    'runtime/LICENSE', 'runtime/compat/wllama.js', 'runtime/compat/wllama.wasm', 'LICENSES/rag-method.txt', 'NOTICE.txt', 'README.txt'].sort();
+    'runtime/LICENSE', 'runtime/compat/wllama.js', 'runtime/compat/wllama.wasm', 'LICENSES/rag-method.txt', 'NOTICE.txt', 'README.txt',
+    ...previewAdded].sort();
   assert.deepEqual(manifest.files.map(file => file.path).sort(), expected);
+  assert.equal(manifest.files.length, 34);
+  const actual = [];
+  async function visit(directory, prefix = '') {
+    for (const item of await readdir(directory, { withFileTypes: true })) {
+      if (item.isDirectory()) await visit(join(directory, item.name), prefix + item.name + '/');
+      else { assert.equal(item.isFile(), true); actual.push(prefix + item.name); }
+    }
+  }
+  await visit(site);
+  assert.deepEqual(actual.sort(), [...expected, 'site-manifest.json'].sort());
+  assert.equal(actual.length, 35, 'no additional files, source, models or private products');
   for (const file of manifest.files) {
     const bytes = await readFile(join(site, file.path));
     assert.equal(bytes.length, file.bytes, file.path);
@@ -94,8 +135,9 @@ test('one retained-runtime site has an exact hashed allowlist, notices, unreview
   for (const [name, contract] of Object.entries({ ...RUNTIME.files, ...COMPAT.files })) {
     assert.equal(hash(await readFile(join(site, 'runtime', name))), contract.sha256, 'retained runtime: ' + name);
   }
-  for (const helperPath of helperFiles) {
-    const helperSource = await readFile(join(root, 'examples/browser-model-chat', helperPath));
+  for (const helperPath of [...helperFiles, ...memoryFiles]) {
+    const helperSource = await readFile(helperPath === 'memory/rag-core.mjs'
+      ? join(root, '.artifacts/memory/rag-core.mjs') : join(root, 'examples/browser-model-chat', helperPath));
     const helperManifest = manifest.files.find(file => file.path === helperPath);
     assert.equal(helperManifest.bytes, helperSource.length, helperPath);
     assert.equal(helperManifest.sha256, hash(helperSource), helperPath);
@@ -103,19 +145,32 @@ test('one retained-runtime site has an exact hashed allowlist, notices, unreview
   }
   assert.equal(hash(await readFile(join(site, 'theme/aurel-gold.css'))), hash(await readFile(join(root, 'modules/browser-rag-ts/demo/aurel-gold.css'))));
   assert.equal(hash(await readFile(join(site, 'LICENSES/rag-method.txt'))), hash(await readFile(join(root, 'LICENSE'))));
+  const modelLicense = await readFile(join(site, modelLicensePath));
+  assert.equal(hash(modelLicense), modelLicenseSha256);
+  assert.deepEqual(modelLicense, await readFile(join(root, 'examples/browser-model-chat/licenses/LFM-Open-License-1.0.txt')));
+  assert.match(modelLicense.toString(), /LFM Open License v1\.0/);
+  assert.match(modelLicense.toString(), /END OF TERMS/);
   const notices = await readFile(join(site, 'NOTICE.txt'), 'utf8');
   assert.match(notices, /@wllama\/wllama 3\.5\.1: MIT/);
   assert.match(notices, /@wllama\/wllama-compat 3\.5\.1: MIT/);
   assert.ok(notices.includes(COMPAT.gitHead));
   assert.match(notices, /LFM Open License v1\.0 \(distinct/);
   assert.ok(notices.includes(MODEL.license));
+  assert.ok(notices.includes(modelLicensePath));
   assert.match(notices, /weights are not included/);
+  assert.match(notices, /used Thursday instead of Tuesday but omitted the codename and city/);
   const launch = await readFile(join(site, 'README.txt'), 'utf8');
   assert.match(launch, /main wllama 3\.5\.1 runtime requires WebAssembly Memory64/);
   assert.match(launch, /compatibility runtime uses Memory32 and Asyncify/);
   assert.match(launch, /Both runtime profiles require the OPFS API/);
   assert.match(launch, /Writable OPFS is required only for a new remote cache miss/);
   assert.match(launch, /JSPI absence alone is not a loading gate/);
+  assert.match(launch, /selected automatically as source-linked exact passages; no special markup is required/);
+  assert.match(launch, /lossy extractive context, not general semantic summarization/);
+  assert.match(launch, /Sources sent at the time, not answer truth/);
+  assert.match(launch, /failed unrelated-question abstention and answer-format adherence/);
+  assert.match(launch, /omitted the codename and city in a multi-field answer; answer completeness is not guaranteed/);
+  assert.doesNotMatch(launch, /must write|Fact\[key\]/);
   assert.doesNotMatch(JSON.stringify(manifest), /[A-Za-z]:\\|\/Users\/|\/home\/|file:\/\//);
   assert.deepEqual((await stageStatic()).manifest, manifest, 'an intact managed site refreshes deterministically without another output tree');
   const foreign = join(await privateFixture(t), 'extra-content');
@@ -126,18 +181,19 @@ test('one retained-runtime site has an exact hashed allowlist, notices, unreview
   assert.equal(await readFile(join(foreign, '.env'), 'utf8'), 'PRIVATE-FIXTURE-KEEP');
 });
 
-test('the sole managed site refreshes exact pre-memory, pre-error-helper and legacy pre-compat payloads', async () => {
+test('the sole managed site migrates exact old 21-file and prior payloads; partial or extra memory sets are refused', async () => {
   const manifestBytes = await readFile(join(site, 'site-manifest.json'));
   const manifest = JSON.parse(manifestBytes);
   const retained = new Map();
-  for (const name of [...helperFiles, 'runtime/compat/wllama.js', 'runtime/compat/wllama.wasm']) {
+  for (const name of [...previewAdded, ...helperFiles, 'runtime/compat/wllama.js', 'runtime/compat/wllama.wasm']) {
     retained.set(name, await readFile(join(site, name)));
   }
   try {
     for (const absent of [
-      ['wasm-memory.mjs', 'runtime-profile.mjs'],
-      helperFiles,
-      [...helperFiles, 'runtime/compat/wllama.js', 'runtime/compat/wllama.wasm'],
+      previewAdded,
+      [...previewAdded, 'wasm-memory.mjs', 'runtime-profile.mjs'],
+      [...previewAdded, ...helperFiles],
+      [...previewAdded, ...helperFiles, 'runtime/compat/wllama.js', 'runtime/compat/wllama.wasm'],
     ]) {
       const { identitySha256, ...previous } = structuredClone(manifest);
       previous.files = previous.files.filter(file => !absent.includes(file.path));
@@ -151,10 +207,10 @@ test('the sole managed site refreshes exact pre-memory, pre-error-helper and leg
       for (const name of absent) assert.deepEqual(await readFile(join(site, name)), retained.get(name), name);
     }
     const { identitySha256, ...partial } = structuredClone(manifest);
-    partial.files = partial.files.filter(file => file.path !== 'wasm-memory.mjs');
-    await rm(join(site, 'wasm-memory.mjs'));
+    partial.files = partial.files.filter(file => file.path !== 'memory/automatic-context.mjs');
+    await rm(join(site, 'memory/automatic-context.mjs'));
     await writeFile(join(site, 'site-manifest.json'), JSON.stringify({ ...partial, identitySha256: hash(JSON.stringify(partial)) }));
-    await assert.rejects(stageStatic(), /foreign or changed/, 'a partial helper subset is not an accepted historical payload');
+    await assert.rejects(stageStatic(), /foreign or changed/, 'a partial memory subset is not an accepted historical payload');
   } finally {
     // Keep the single intended output recoverable even if this regression fails.
     for (const [name, bytes] of retained) await writeFile(join(site, name), bytes);
@@ -201,25 +257,27 @@ test('hard-linked managed files and manifest are refused while linked read-only 
   await mkdir(runtimeRoot);
   for (const name of Object.keys({ ...RUNTIME.files, ...COMPAT.files })) {
     await mkdir(dirname(join(runtimeRoot, name)), { recursive: true });
-    await link(join(artifacts, 'runtime', name), join(runtimeRoot, name));
+    await link(join(preparedRuntime, name), join(runtimeRoot, name));
   }
   assert.ok((await lstat(join(runtimeRoot, 'index.js'))).nlink > 1);
   assert.deepEqual((await stageStatic({ runtimeRoot })).manifest, originalManifest, 'read-only verified runtime inputs may be hard-linked');
 });
 
-test('staged modules, Worker, theme and WASM serve with correct GET/HEAD MIME under a nested prefix', async () => {
+test('curated output alone serves every module and dynamic import with exact GET/HEAD MIME under a nested prefix', async () => {
   // Node's default test concurrency is sequential: the single staging test above
   // leaves this intended artifact for HTTP checks and operator inspection.
   const server = await listenStatic(site, prefix);
   try {
     const helperHashes = new Map();
-    for (const name of helperFiles) helperHashes.set(name, hash(await readFile(join(site, name))));
+    for (const name of [...browserFiles, ...memoryFiles, modelLicensePath]) helperHashes.set(name, hash(await readFile(join(site, name))));
     const expected = [
       ['', 'text/html; charset=utf-8'], ...browserFiles.filter(name => name.endsWith('.mjs')).map(name => [name, 'application/javascript; charset=utf-8']),
       ['style.css', 'text/css; charset=utf-8'], ['theme/aurel-gold.css', 'text/css; charset=utf-8'],
       ['runtime/index.js', 'application/javascript; charset=utf-8'], ['runtime/wllama.wasm', 'application/wasm'],
       ['runtime/compat/wllama.js', 'application/javascript; charset=utf-8'], ['runtime/compat/wllama.wasm', 'application/wasm'],
       ['site-manifest.json', 'application/json; charset=utf-8'],
+      ...memoryFiles.map(name => [name, name.endsWith('.css') ? 'text/css; charset=utf-8' : 'application/javascript; charset=utf-8']),
+      [modelLicensePath, 'application/octet-stream'],
     ];
     for (const [asset, mime] of expected) {
       for (const method of ['GET', 'HEAD']) {
@@ -239,18 +297,24 @@ test('staged modules, Worker, theme and WASM serve with correct GET/HEAD MIME un
       if (/^(?:https?:|data:|#)/.test(match[1])) continue;
       assert.ok(new URL(match[1], server.baseUrl).pathname.startsWith(prefix), 'HTML asset retains nested prefix: ' + match[1]);
     }
-    for (const module of browserFiles.filter(name => name.endsWith('.mjs'))) {
+    const dynamicImports = [];
+    for (const module of [...browserFiles, ...memoryFiles].filter(name => name.endsWith('.mjs'))) {
       const text = await readFile(join(site, module), 'utf8');
-      for (const match of text.matchAll(/(?:from\s*|import\s*)['"]([^'"]+)['"]|new URL\(\s*['"]([^'"]+)['"]\s*,/g)) {
+      for (const match of text.matchAll(/(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)['"]([^'"]+)['"]|new URL\(\s*['"]([^'"]+)['"]\s*,/g)) {
         const target = match[1] || match[2];
         if (/^(?:https?:|data:|node:)/.test(target)) continue;
         const resolved = new URL(target, new URL(module, server.baseUrl));
         assert.ok(resolved.pathname.startsWith(prefix), 'module asset retains nested prefix: ' + module + ' -> ' + target);
         assert.equal((await fetch(resolved, { method: 'HEAD' })).status, 200, 'module asset exists: ' + target);
+        if (/^import\s*\(/.test(match[0])) dynamicImports.push(resolved.pathname.slice(prefix.length));
       }
     }
+    assert.deepEqual(dynamicImports.sort(), ['memory/panel.mjs', 'memory/rag-core.mjs', 'memory/workspace.mjs']);
     for (const missing of ['missing.mjs', 'missing.js', 'missing.wasm', 'serve.mjs', 'prepare-runtime.mjs', 'stage-static.mjs',
-      'tests/loader-controller.test.mjs', '.git/config', '.env', 'runtime/private.txt', 'runtime/compat/private.js', MODEL.file, 'cache/model.gguf']) {
+      'tests/loader-controller.test.mjs', '.git/config', '.env', 'runtime/private.txt', 'runtime/compat/private.js', MODEL.file, 'cache/model.gguf',
+      'memory/PRIVATE_LOCAL_ONLY', 'memory/README.md', 'memory/PREVIEW_READINESS.md', 'memory/build-core.mjs', 'memory/serve-local.mjs',
+      'memory-proof/runtime-probe.mjs', 'examples/browser-model-chat/licenses/LFM-Open-License-1.0.txt', '.artifacts/proof/local-memory/receipt.json',
+      'agent-workspace/source/workspace.html', 'modules/browser-rag-ts/src/core/index.ts']) {
       const response = await fetch(new URL(missing, server.baseUrl));
       assert.equal(response.status, 404, missing);
       assert.ok(!(response.headers.get('content-type') || '').startsWith('text/html'), missing + ' has no HTML fallback');
