@@ -64,4 +64,6 @@ Browser journeys are explicit tasks and use an installed local Chromium browser 
 
 The default demonstrations are model-free. They show real retrieval and context assembly rather than generated answers. Semantic model setup, authenticated remote browser access, persistence in the browser explorer, and large-corpus performance are outside this release's demonstrated scope.
 
+The separate [browser model chat preview](examples/browser-model-chat/README.md) offers an optional loading-to-chat composition for a pinned LFM2.5-230M Q4_K_M model. It has its own explicit runtime setup and loopback entry point; it is not part of the Atlas release artifact and does not change retrieval or graph behavior.
+
 MIT licensed. The pinned graph archive, Three.js runtime, and redistributed Three.js documentation retain their own MIT notices. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
