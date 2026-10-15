@@ -52,6 +52,16 @@ That masking bug is reproduced and guarded without changing vendor bytes;
 device WASM failure is not established by that repair. Reload the same origin
 without clearing storage and retain a new Copy report, device/iOS and container.
 
+The next report exposed `Memory64 is not enabled` at WASM byte 4294. That location
+matches the primary Memory64 binary; the official compatibility binary is
+Memory32. Genuine WebKit reproduced a vendor constructor-probe false positive
+and primary reselection despite the app label. The app now binds the verified
+compatibility WASM and glue together, and a genuine Memory64-rejecting WebKit
+engine initializes the exact model with that pair. That desktop File-only test
+uses a storage-manager fixture because Windows WebKit lacks OPFS; production
+cache and physical iPhone acceptance remain separate. Retest the same URL and
+cache after reloading, without clearing storage or changing models.
+
 ## Evidence boundary
 
 Run `node tests/model-chat-mobile.mjs` with the existing Playwright/Chrome setup
@@ -76,6 +86,11 @@ and verify safe errors, plus a labeled child startup fault and cache-preserving
 recovery. No external model bytes
 are downloaded, no existing browser cache is inspected, and vendor files remain
 unchanged. This desktop probe does not identify the physical Safari failure.
+
+Chrome JavaScript feature-probe fixtures do not disable the VM's Memory64 parser.
+The separate `model-chat-memory32-engine.mjs` test proves genuine WebKit parser
+refusal with a known Memory64 control and the complete primary binary, then
+executes the bound official Memory32 build without WebAssembly API overrides.
 
 Desktop Chrome checks use real browser interaction, resized viewports, long text,
 scroll/focus checks and reduced motion. A resized desktop viewport can approximate

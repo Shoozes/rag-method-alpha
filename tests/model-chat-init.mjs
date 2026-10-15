@@ -23,7 +23,7 @@ const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const pause = ms => new Promise(done => setTimeout(done, ms));
 const runtimeRoot = join(root, '.artifacts/model-chat/runtime');
 const output = join(root, '.artifacts/proof/model-chat/init-result.json');
-const sourcePaths = ['examples/browser-model-chat/engine-worker.mjs', 'examples/browser-model-chat/runtime-errors.mjs', 'examples/browser-model-chat/capabilities.mjs', 'examples/browser-model-chat/model-contract.mjs', 'tests/model-chat-init.mjs'];
+const sourcePaths = ['examples/browser-model-chat/engine-worker.mjs', 'examples/browser-model-chat/runtime-errors.mjs', 'examples/browser-model-chat/runtime-profile.mjs', 'examples/browser-model-chat/wasm-memory.mjs', 'examples/browser-model-chat/capabilities.mjs', 'examples/browser-model-chat/model-contract.mjs', 'tests/model-chat-init.mjs'];
 const sourceIdentity = await Promise.all(sourcePaths.map(async path => ({ path, sha256: sha(await readFile(join(root, path))) })));
 const checks = [], diagnostics = [], requests = [], errors = [];
 const injectedBrowserErrors = new Set([
@@ -60,7 +60,7 @@ globalThis.fetch = (input, options) => {
 };
 const __NativeMemory = WebAssembly.Memory;
 WebAssembly.Memory = new Proxy(__NativeMemory, { construct(target, args) {
-  if (args[0]?.address === 'i64') throw new TypeError('Memory64 absent: explicit desktop capability injection');
+  if (args[0]?.address === 'i64') throw new TypeError('Memory64 constructor probe fixture; engine feature set unchanged');
   return Reflect.construct(target, args);
 }});
 Object.defineProperty(WebAssembly, 'Suspending', { value: undefined, configurable: true });
@@ -264,6 +264,6 @@ finally {
     lastFileRead: events.filter(event => event.readCount).map(({ readCount, readBytes }) => ({ readCount, readBytes })).at(-1) || null,
   } });
   await mkdir(dirname(output), { recursive: true });
-  await writeFile(output, JSON.stringify({ schema: 'rag-method.model-chat.init-probe.v2', passed: !failure, browser: version, ms: Date.now()-started, sourceIdentity, model: { file: MODEL.file, bytes: MODEL.bytes, sha256: MODEL.sha256 }, checks: checks.map(compact), diagnostics: diagnostics.map(compact), requests, modelTransfers, modelTransferBytes, externalModelBytes: 0, errors: errors.filter(message => !injectedBrowserErrors.has(message)), expectedInjectedBrowserErrors: errors.filter(message => injectedBrowserErrors.has(message)), cleanup, limitations: ['Desktop Chrome with Memory64 and JSPI disabled in owning Worker; not physical iOS.', 'Only model fetch transport redirected to existing native GGUF on owned loopback; canonical URL and OPFS/cache/open/verify/runtime paths stay production.', 'Nested Worker diagnostic listeners record stages without changing pinned vendor bytes.', 'Historical Chrome startup fault bubbles to owner; this was not a reproduced device initialization hang.', 'The child-only LinkError is an explicit test fault proving the vendor abort producer and formatter masking, not the iPhone failure cause.'], ...(failure ? { error: failure.message } : {}) }, null, 2)+'\n');
+  await writeFile(output, JSON.stringify({ schema: 'rag-method.model-chat.init-probe.v2', passed: !failure, browser: version, ms: Date.now()-started, sourceIdentity, model: { file: MODEL.file, bytes: MODEL.bytes, sha256: MODEL.sha256 }, checks: checks.map(compact), diagnostics: diagnostics.map(compact), requests, modelTransfers, modelTransferBytes, externalModelBytes: 0, errors: errors.filter(message => !injectedBrowserErrors.has(message)), expectedInjectedBrowserErrors: errors.filter(message => injectedBrowserErrors.has(message)), cleanup, limitations: ['Desktop Chrome JS constructor/JSPI API fixtures; the engine can still parse Memory64. Genuine engine refusal is checked separately; no physical iOS proof.', 'Only model fetch transport redirected to existing native GGUF on owned loopback; canonical URL and OPFS/cache/open/verify/runtime paths stay production.', 'Nested Worker diagnostic listeners record stages without changing pinned vendor bytes.', 'Historical Chrome startup fault bubbles to owner; this was not a reproduced device initialization hang.', 'The child-only LinkError is an explicit test fault proving the vendor abort producer and formatter masking, not the iPhone failure cause.'], ...(failure ? { error: failure.message } : {}) }, null, 2)+'\n');
 }
 if (failure) process.exitCode = 1;

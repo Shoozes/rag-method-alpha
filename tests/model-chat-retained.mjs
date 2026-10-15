@@ -252,14 +252,14 @@ Object.defineProperty(navigator.storage, 'getDirectory', { value: undefined, con
     await page.locator('#unload').click(); await settled(page, 'cancelled');
     await until(() => workerClosed === workerCreated, 'All observed model Workers closed');
   });
-  await check('production-Memory32-fallback-with-Memory64-and-JSPI-absent', async () => {
+  await check('production-Memory32-selection-with-JavaScript-probe-fixtures', async () => {
     const requestsBefore = runtimeRequests.length;
     await page.route(url + 'engine-worker.mjs', async route => {
       const response = await route.fetch();
       const injection = `
 const __nativeMemory = WebAssembly.Memory;
 WebAssembly.Memory = new Proxy(__nativeMemory, { construct(target, args) {
-  if (args[0]?.address === 'i64') throw new TypeError('Memory64 absent: explicit test injection');
+  if (args[0]?.address === 'i64') throw new TypeError('Memory64 constructor probe fixture; engine feature set unchanged');
   return Reflect.construct(target, args);
 }});
 Object.defineProperty(WebAssembly, 'Suspending', { value: undefined, configurable: true });
@@ -330,7 +330,7 @@ finally {
     browser: browserVersion, node: process.version, subpath: prefix, staticExport: !!process.env.BROWSER_MODEL_STATIC_ROOT,
     sourceIdentity, checks, phases, runtimeRequests, externalRequests, localHttpFailures, bridge, screenshots, workers: { created: workerCreated, closed: workerClosed }, cleanup,
     ms: Date.now() - started,
-    limitations: ['Desktop Chrome only; no iOS or physical/native file picker qualification.', 'File API input is constructed from existing exact bytes over loopback.', 'Browser-managed Blob/cache storage is not measured; the harness makes no explicit model file copy.', 'No canonical remote URL cache or offline cache recovery claim.', 'Native peak memory/release is not measured.'],
+    limitations: ['Desktop Chrome only; JavaScript probe fixtures do not disable engine Memory64. No iOS or physical/native file picker qualification.', 'File API input is constructed from existing exact bytes over loopback.', 'Browser-managed Blob/cache storage is not measured; the harness makes no explicit model file copy.', 'No canonical remote URL cache or offline cache recovery claim.', 'Native peak memory/release is not measured.'],
     ...(failure ? { error: failure.message } : {}),
   }, null, 2) + '\n');
 }

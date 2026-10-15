@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { MODEL, RUNTIME, COMPAT } from '../examples/browser-model-chat/model-contract.mjs';
+import { inspectWasmMemories } from '../examples/browser-model-chat/wasm-memory.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const output = join(root, '.artifacts/proof/model-chat');
@@ -100,7 +101,12 @@ try {
       else if (/\.html$/.test(item.path)) assert.match(mime, /text\/html/i, item.path);
       const bytes = Buffer.from(await res.arrayBuffer()); assert.equal(bytes.length, item.bytes, item.path);
       assert.equal(digest(bytes), item.sha256, item.path);
-      files.push({ path: item.path, bytes: bytes.length, sha256: item.sha256, mime });
+      const memory = /\.wasm$/.test(item.path) ? inspectWasmMemories(bytes) : null;
+      if (memory) {
+        assert.equal(memory.memories.length, 1, item.path);
+        assert.equal(memory.requiresMemory64, item.path === 'runtime/wllama.wasm', item.path);
+      }
+      files.push({ path: item.path, bytes: bytes.length, sha256: item.sha256, mime, ...(memory ? { memory } : {}) });
     }
     for (const [name, identity] of Object.entries({ ...RUNTIME.files, ...COMPAT.files })) {
       assert.equal(files.find(item => item.path === 'runtime/' + name)?.sha256, identity.sha256);
@@ -231,14 +237,14 @@ Object.defineProperty(navigator.storage, 'getDirectory', { value: undefined, con
     await page.locator('#unload').click(); await settled(page, 'cancelled');
     await until(() => workerClosed === workerCreated, 'All observed runtime Workers closed');
   });
-  await check('live-maintained-Memory32-fallback-and-real-chat-without-Memory64-or-JSPI', async () => {
+  await check('live-maintained-Memory32-selection-and-chat-with-JavaScript-probe-fixtures', async () => {
     const requestsBefore = runtimeRequests.length;
     await page.route(new URL('engine-worker.mjs', live).href, async route => {
       const res = await route.fetch();
       const injection = `
 const __nativeMemory = WebAssembly.Memory;
 WebAssembly.Memory = new Proxy(__nativeMemory, { construct(target, args) {
-  if (args[0]?.address === 'i64') throw new TypeError('Memory64 absent: explicit test injection');
+  if (args[0]?.address === 'i64') throw new TypeError('Memory64 constructor probe fixture; engine feature set unchanged');
   return Reflect.construct(target, args);
 }});
 Object.defineProperty(WebAssembly, 'Suspending', { value: undefined, configurable: true });
@@ -305,7 +311,7 @@ finally {
     capabilityRefusals: 'injected missing SIMD and OPFS permanently refuse; injected Memory64 and JSPI absence selects and runs the actual published maintained Memory32 runtime',
     checks, files, exclusions, phases, runtimeRequests, externalRequests, pageErrors, screenshots,
     workers: { created: workerCreated, closed: workerClosed }, cleanup, ms: Date.now() - started,
-    limitations: ['Desktop Chrome with mobile viewport; physical iOS is untested.',
+    limitations: ['Desktop Chrome with mobile viewport and JS probe fixtures; VM Memory64 remains supported. Physical iOS is untested.',
       'Native File path selection uses browser automation; physical picker and iPhone Files are unqualified.',
       'Remote weight download/cache/recovery and native peak memory are not measured by this run.',
       'Browser-managed Blob storage is not measured; this harness creates no explicit disk copy of the model.'],

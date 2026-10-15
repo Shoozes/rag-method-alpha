@@ -39,6 +39,13 @@ In the page, explicitly download the model or choose the exact GGUF File. Both p
 
 Before requesting weights, the Worker tests browser capabilities, verifies and compiles the exact selected WASM, verifies compatibility worker glue when selected, and starts a tiny module child Worker to check policy. Full JSPI absence selects Asyncify; a partially broken JSPI interface is rejected. Permanent capability failures focus an explanation and remove futile Retry/File controls. Transient download/cache failures retain recovery. Memory32 compatibility may be slower, and neither profile guarantees enough device memory.
 
+The selected binary's imported and defined memory declarations are checked too:
+compat must be Memory32, and the primary build requires Memory64. The app binds
+the selected WASM URL, verified worker code and compatibility flag to the owned
+runtime instance. `setCompat()` alone only provides a candidate; wllama 3.5.1
+can otherwise reselect with a weaker constructor probe and load the primary
+Memory64 binary despite the app's compatibility label.
+
 ## Stage a static candidate
 
 After runtime preparation, create the bounded, subpath-safe delivery directory:
@@ -96,18 +103,32 @@ The [Bonsai Space](https://huggingface.co/spaces/webml-community/ternary-bonsai-
 
 A separate comparison loaded the exact pinned 230M bytes with that retained Memory32 single-thread runtime and generated a reply in ordinary desktop Chrome. A second File API run passed with the OPFS directory API hidden before runtime construction. This is a labeled capability injection, not a native Files picker or iOS test. It establishes that the older donor can execute this model on the tested desktop; it does not change the product runtime or qualify the older build for distribution.
 
-The maintained [wllama-compat 3.5.1 package](https://registry.npmjs.org/@wllama%2fwllama-compat/3.5.1) and [its configuration](https://github.com/ngxson/wllama/blob/766d28e03eeac044fe055327d06b83d3f9b84544/compat/README.md) provide Memory32/Asyncify. The exact pinned package was tested with the unchanged model in desktop Chrome while the Memory64 constructor was deliberately unavailable, and again with JSPI absent. Both runs initialized the real WASM and generated replies; File loading also worked when OPFS calls were blocked but the required API remained exposed. Production-path and published-page checks are separate from that focused comparison.
+The maintained [wllama-compat 3.5.1 package](https://registry.npmjs.org/@wllama%2fwllama-compat/3.5.1) and [its configuration](https://github.com/ngxson/wllama/blob/766d28e03eeac044fe055327d06b83d3f9b84544/compat/README.md) provide Memory32/Asyncify. Earlier desktop Chrome tests forced JavaScript constructor/JSPI probes to fail and generated replies with the selected compatibility build. Those tests exercise selection and transport; they do not disable V8's Memory64 parser or establish genuine feature absence. The genuine-engine test below is separate.
 
 The first real iPhone test of the earlier Memory64-only preview refused loading before weights: "Memory64 WebAssembly is unavailable." A subsequent Safari screenshot showed the maintained Memory32/Asyncify profile selected and initialization still waiting after the user reported several minutes. It showed no runtime error or internal substage. Device/iOS version and the cause remain unknown; this is not successful iPhone support. The added diagnostics and waiting limit make the next attempt bounded and inspectable. Desktop tests exercise fresh download into OPFS, cache reopening, SHA verification and real Memory32 initialization/chat; they do not reproduce that device stall. Earlier user-reported HTTPS success and HTTP failures around 50 MB remain historical observations, not universal limits. A fresh device retest must record device/browser, exact model/license, memory, loading/cache, cancellation and recovery without changing browser security settings.
 
 A later screenshot of a cached retry showed an immediate `message.replace is not a function` failure at the first WASM stage, with zero displayed elapsed seconds. Its browser chrome appears to be an in-app sheet; it must not be assumed to be the earlier full Safari tab. The exact masking mechanism was reproduced: the pinned compatibility loader can call `abort(reason)` with an Error object before coercion, while the parent vendor receiver calls `message.replace` and `rawStack.replace` as though both fields were strings. The first-party [runtime-errors.mjs](./runtime-errors.mjs) guards the exact pinned instance's configurable `proxy` assignment before the child receiver is bound. It bypasses that abort formatter and stack decoder, preserves only safe name/message/type, and rejects the vendor queues through their existing safe-string `abort` method. Ordinary messages keep their receiver and behavior. A changed pinned interface fails with `ENGINE_BOUNDARY_ERROR`; vendor bytes are unchanged. An injected real WASM-instantiation LinkError proves the masking bug and its repair, not the underlying iPhone cause. Device/iOS, browser container and a fresh report of the original failure remain required.
+
+The next device report exposed `WebAssembly.Module doesn't parse at byte 4294:
+Memory64 is not enabled`. The primary pinned binary imports shared Memory64 at
+byte 4293 (flags 7), matching that parse location. The official compatibility
+binary imports shared Memory32 at byte 3357 (flags 3). In genuine desktop
+WebKit/JSC, the constructor probe and JSPI both succeed while the actual parser
+rejects Memory64: an unbound vendor instance therefore selects the primary
+binary. Explicit resource binding fixes that reproduced selection defect. The
+same engine rejects the exact primary binary at 4294, accepts the exact compat
+binary, then initializes the unchanged model and generates a reply with the
+bound pair, without any WebAssembly overrides. Windows WebKit lacks OPFS, so
+that File-only engine test injects public read-only storage managers; their
+methods are never called. It qualifies the runtime path, not iPhone storage or
+physical-device support. The production OPFS/cache path is tested separately.
 
 ## Local verification
 
 Run the focused built-in Node tests from the repository root:
 
 ```sh
-node --test examples/browser-model-chat/tests/runtime-errors.test.mjs examples/browser-model-chat/tests/loader-controller.test.mjs examples/browser-model-chat/tests/runtime-adapter.test.mjs examples/browser-model-chat/tests/capabilities.test.mjs tests/server.test.mjs tests/model-chat-static.test.mjs tests/model-chat-prepare.test.mjs
+node --test examples/browser-model-chat/tests/wasm-memory.test.mjs examples/browser-model-chat/tests/runtime-profile.test.mjs examples/browser-model-chat/tests/runtime-errors.test.mjs examples/browser-model-chat/tests/loader-controller.test.mjs examples/browser-model-chat/tests/runtime-adapter.test.mjs examples/browser-model-chat/tests/capabilities.test.mjs tests/server.test.mjs tests/model-chat-static.test.mjs tests/model-chat-prepare.test.mjs
 ```
 
 The server/static tests use real HTTP requests for nested-prefix GET/HEAD routes, executable module/WASM MIME types, missing routes, excluded files, traversal/dotfile rejection, link escape/refresher rejection, loopback binding and CLI port parsing. Capability tests cover missing features and tiny writable-cache cleanup. Controller/adapter tests use injected fixtures; they do not establish real-model inference or device support.
@@ -124,7 +145,7 @@ node tests/model-chat-browser.mjs
 node tests/model-chat-retained.mjs
 ```
 
-This journey streams that file once over owned loopback into a browser-held File, blocks external origins, checks injected SIMD/OPFS refusal before weights and actual Memory32 fallback when Memory64/JSPI are absent, cancellation/retry, two real initializations/replies and narrow reduced-motion layout. It does not copy or download a model. The separate donor comparison requires existing exact vendor inputs in `BROWSER_MODEL_MEMORY32_JS_FILE`, `BROWSER_MODEL_MEMORY32_WASM_FILE` and `BROWSER_MODEL_MEMORY32_LICENSE_FILE`:
+This journey streams that file once over owned loopback into a browser-held File, blocks external origins, checks injected SIMD/OPFS refusal before weights and Memory32 selection through JavaScript probe fixtures, cancellation/retry, two real initializations/replies and narrow reduced-motion layout. The V8 engine remains Memory64-capable. It does not copy or download a model. The separate donor comparison requires existing exact vendor inputs in `BROWSER_MODEL_MEMORY32_JS_FILE`, `BROWSER_MODEL_MEMORY32_WASM_FILE` and `BROWSER_MODEL_MEMORY32_LICENSE_FILE`:
 
 ```sh
 node tests/model-chat-memory32.mjs --existing-cache
@@ -147,6 +168,17 @@ the masking TypeError separately from the safe structured failure:
 node tests/model-chat-init.mjs
 ```
 
+With an already installed Playwright WebKit executable, set
+`BROWSER_MODEL_WEBKIT_PATH` along with the same retained model and Playwright
+module. The genuine-engine journey requires a real Memory64 rejection control,
+checks both complete pinned binaries, reproduces the unbound selector mismatch,
+and runs the bound Memory32 model. It installs nothing and makes no WebAssembly
+API overrides:
+
+```sh
+node tests/model-chat-memory32-engine.mjs
+```
+
 The original cold-remote journey is retained for a separately authorized new download:
 
 ```sh
@@ -155,7 +187,7 @@ node tests/model-chat-live.mjs --remote
 
 The journeys use an installed browser, do not install dependencies, and clean up their owned server/browser/profile. Actual model journeys launch ordinary headless Chrome and attach through CDP, without security-bypass flags. `BROWSER_RAG_CHROMIUM_PATH` selects its installed Chrome executable.
 
-The source-bound receipt records exact acceptance counts and identities. The focused suite covers capability selection, permanent refusal versus transient recovery, transport/lifecycle cancellation, bounded preparation, and static hashes/MIME/404s. UI fixtures cover mobile layout and unsupported states. The production retained-file journey separately executes both Memory64 and maintained Memory32/Asyncify, with the latter selected while Memory64 and JSPI are deliberately absent. The Pages journey repeats that behavior against the deployed HTTPS bytes. Feature injection remains a desktop simulation, not physical iPhone proof.
+The source-bound receipt records exact acceptance counts and identities. The focused suite covers capability selection, permanent refusal versus transient recovery, transport/lifecycle cancellation, bounded preparation, and static hashes/MIME/404s. UI fixtures cover mobile layout and unsupported states. The Chrome retained-file and Pages journeys execute both profiles using JavaScript selection fixtures, while genuine WebKit separately rejects Memory64 and executes the bound Memory32 pair. The published WASM memory declarations and hashes are checked. None of these desktop journeys qualifies physical iPhone support.
 
 Historical cold-remote/cache acceptance at commit `12478fb34c9c749fdc218f870d1d366f186af547` passed 7 real-model checks, including official remote transfer, integrity verification, generated replies and cache-only reuse with external requests blocked. That evidence is retained under its original commit identity; it is not represented as a rerun of the current source. A physical iOS device remains unqualified.
 

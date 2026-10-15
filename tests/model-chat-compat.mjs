@@ -81,8 +81,8 @@ try {
           const stages = []; const at = performance.now(); const mark = phase => stages.push({ phase, ms: Math.round(performance.now() - at) });
           try {
             const { Wllama } = await import('${origin}/runtime/index.js');
-            let memory64Available = true; try { new WebAssembly.Memory({ address: 'i64', initial: 1n }); } catch { memory64Available = false; }
-            if (memory64Available) throw Error('Memory64 probe injection failed');
+            let memory64ConstructorProbeSucceeded = true; try { new WebAssembly.Memory({ address: 'i64', initial: 1n }); } catch { memory64ConstructorProbeSucceeded = false; }
+            if (memory64ConstructorProbeSucceeded) throw Error('Memory64 probe injection failed');
             const jsPIPresentBeforeInit = typeof WebAssembly.Suspending === 'function';
             const storageDescriptor = Object.getOwnPropertyDescriptor(navigator.storage, 'getDirectory');
             Object.defineProperty(navigator.storage, 'getDirectory', { value: undefined, configurable: true });
@@ -103,7 +103,7 @@ try {
             mark('generating'); const completion = await engine.createChatCompletion({ messages: [{ role: 'user', content: 'What is 2 + 2? Answer briefly.' }], max_tokens: 48, temperature: 0 });
             const reply = completion.choices?.[0]?.message?.content || '';
             mark('completed'); await engine.exit(); engine = undefined;
-            postMessage({ loaded: true, modelBytes: data.file.size, reply: String(reply).trim().slice(0, 300), libllama: Wllama.getLibllamaVersion(), memory64Available, jsPIPresentBeforeInit, missingOPFSError, runtime: 'official-3.5.1-memory32-asyncify', crossOriginIsolated, stages });
+            postMessage({ loaded: true, modelBytes: data.file.size, reply: String(reply).trim().slice(0, 300), libllama: Wllama.getLibllamaVersion(), memory64ConstructorProbeSucceeded, jsPIPresentBeforeInit, missingOPFSError, runtime: 'official-3.5.1-memory32-asyncify', crossOriginIsolated, stages });
           } catch (error) { try { await engine?.exit(); } catch {} postMessage({ error: error.stack || String(error) }); }
         };
       `;
@@ -115,10 +115,10 @@ try {
         return await new Promise((resolve, reject) => { const timer = setTimeout(() => reject(Error('Compatibility probe timeout')), 180000); worker.onmessage = ({ data }) => { clearTimeout(timer); data.error ? reject(Error(data.error)) : resolve(data); }; worker.onerror = error => { clearTimeout(timer); reject(Error(error.message)); }; worker.postMessage({ file }); });
       } finally { worker.terminate(); URL.revokeObjectURL(workerURL); }
     }, { model: MODEL, hideJSPI });
-    assert.ok(result.loaded); assert.ok(result.reply.trim()); assert.equal(result.memory64Available, false);
+    assert.ok(result.loaded); assert.ok(result.reply.trim()); assert.equal(result.memory64ConstructorProbeSucceeded, false);
     assert.equal(result.libllama, 'b9640-dd4623a');
     if (hideJSPI) assert.equal(result.jsPIPresentBeforeInit, false);
-    checks.push({ name: hideJSPI ? 'official-memory32-no-jspi-file-with-opfs-access-forbidden' : 'official-memory32-file-init-and-chat', passed: true, capabilityInjection: hideJSPI ? 'Memory64 constructor and JSPI absent; OPFS API exposed but calls throw' : 'Only Memory64 constructor i64 probe fails', ...result });
+    checks.push({ name: hideJSPI ? 'official-memory32-no-jspi-file-with-opfs-access-forbidden' : 'official-memory32-file-init-and-chat', passed: true, capabilityInjection: hideJSPI ? 'JavaScript constructor/JSPI probe fixtures; VM Memory64 unchanged; OPFS API exposed but calls throw' : 'Only the JavaScript Memory64 constructor probe is forced to fail; VM Memory64 unchanged', ...result });
     console.log(JSON.stringify(checks.at(-1)));
   }
   assert.equal(requests.some(item => item.path === 'EXTERNAL_BLOCKED'), false);
@@ -135,6 +135,6 @@ finally {
   if (await sha256(fileURLToPath(import.meta.url)) !== sourceIdentity.sha256) failure ||= Error('Probe changed during qualification');
   if (!cleanup.browserClosed || !cleanup.serverClosed || !cleanup.profileRemoved) failure ||= Error('Owned cleanup not confirmed');
   await mkdir(dirname(output), { recursive: true });
-  await writeFile(output, JSON.stringify({ schema: 'rag-method.official-memory32.compatibility-probe.v1', passed: !failure, sourceIdentity, model: { input: 'BROWSER_MODEL_GGUF_FILE', file: MODEL.file, bytes: MODEL.bytes, sha256: MODEL.sha256 }, runtime: { main: '@wllama/wllama@3.5.1', compat: '@wllama/wllama-compat@3.5.1', libllama: 'b9640-dd4623a', compatGitHead: '912c18b75d4358c1405a64646b8dbe43a205943b', archiveBytes: 3544062, archiveSHA256: '465c6429ebeef90bc111ab260f808d907a6b6b4b4c533ee13557f357e9279b1a', archiveIntegrity: 'sha512-eWFeyLmAgshNsT4eti7El4F0Iip1/Gt/vn5thAhezFoRS8vkC2YjXRMAGmwHRttTWz+7u21f1Me/A70La1TgyA==', files: await Promise.all(runtime.map(async ({ route, path, sha256 }) => ({ route, bytes: (await stat(path)).size, sha256 }))) }, browser: browserVersion, ms: Date.now() - started, checks, requests, modelTransfer: 'native File through CDP path only', externalModelBytes: 0, pageErrors, cleanup, limitations: ['Ordinary desktop Chrome qualification only; no physical iPhone or native Files picker proof.', 'Feature absence is injected in the owning module Worker; the actual Memory32 WASM compiles and runs.', 'The default CacheManager still requires OPFS API presence even for File inputs.', 'No change to production runtime configuration in this probe.'], ...(failure ? { error: failure.message } : {}) }, null, 2) + '\n');
+  await writeFile(output, JSON.stringify({ schema: 'rag-method.official-memory32.compatibility-probe.v1', passed: !failure, sourceIdentity, model: { input: 'BROWSER_MODEL_GGUF_FILE', file: MODEL.file, bytes: MODEL.bytes, sha256: MODEL.sha256 }, runtime: { main: '@wllama/wllama@3.5.1', compat: '@wllama/wllama-compat@3.5.1', libllama: 'b9640-dd4623a', compatGitHead: '912c18b75d4358c1405a64646b8dbe43a205943b', archiveBytes: 3544062, archiveSHA256: '465c6429ebeef90bc111ab260f808d907a6b6b4b4c533ee13557f357e9279b1a', archiveIntegrity: 'sha512-eWFeyLmAgshNsT4eti7El4F0Iip1/Gt/vn5thAhezFoRS8vkC2YjXRMAGmwHRttTWz+7u21f1Me/A70La1TgyA==', files: await Promise.all(runtime.map(async ({ route, path, sha256 }) => ({ route, bytes: (await stat(path)).size, sha256 }))) }, browser: browserVersion, ms: Date.now() - started, checks, requests, modelTransfer: 'native File through CDP path only', externalModelBytes: 0, pageErrors, cleanup, limitations: ['Ordinary desktop Chrome qualification only; no physical iPhone or native Files picker proof.', 'JavaScript API fixtures select Memory32 in a Memory64-capable VM; this does not prove actual Memory64 refusal.', 'The default CacheManager still requires OPFS API presence even for File inputs.', 'No change to production runtime configuration in this probe.'], ...(failure ? { error: failure.message } : {}) }, null, 2) + '\n');
 }
 if (failure) process.exitCode = 1;
