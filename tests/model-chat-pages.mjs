@@ -164,9 +164,11 @@ try {
     assert.equal(await page.evaluate(() => isSecureContext && location.protocol === 'https:'), true);
     assert.equal(await page.locator('#app').getAttribute('data-phase'), 'idle');
     assert.equal(await page.locator('#chat-stage').isVisible(), false); assert.deepEqual(externalRequests, []);
-    const requirements = (await page.locator('.license').allTextContents()).join(' ');
-    assert.match(requirements, /Memory64/); assert.match(requirements, /Memory32/);
-    assert.match(requirements, /OPFS/);
+    assert.equal(await page.locator('#load-details').getAttribute('open'), null);
+    assert.equal(await page.locator('#runtime-profile').isVisible(), false);
+    const requirements = await page.locator('#load-details').textContent();
+    assert.match(requirements, /wllama 3\.5\.1/); assert.match(requirements, /OPFS/);
+    assert.equal(await page.locator('#model-license').getAttribute('href'), MODEL.license);
   });
   async function refusal(name, injection, label) {
     await check(name, async () => {
@@ -235,6 +237,7 @@ Object.defineProperty(navigator.storage, 'getDirectory', { value: undefined, con
     await page.locator('#draft').fill('Reply with one short greeting.');
     await chooseRetainedFile(page); await settled(page);
     assert.match(await page.locator('#runtime-label').textContent(), /local file/);
+    assert.match(await page.locator('#runtime-label').textContent(), /Memory64/);
     assert.equal(await page.locator('#prompt').inputValue(), 'Reply with one short greeting.');
     await reply(page, 'Reply with one short greeting.');
     await reply(page, 'What is two plus two? Answer briefly.');
