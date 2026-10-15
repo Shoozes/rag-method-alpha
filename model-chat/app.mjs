@@ -1,6 +1,7 @@
 import { createLoaderController } from './loader-controller.mjs';
 import { createRuntimeAdapter } from './runtime-adapter.mjs';
 import { MODEL, RUNTIME } from './model-contract.mjs';
+import { formatRuntimeError } from './runtime-errors.mjs';
 
 export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions } = {}) {
   const $ = id => document.getElementById(id);
@@ -46,7 +47,7 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions }
   window.visualViewport?.addEventListener('scroll', fitViewport, { passive: true });
   fitViewport();
   const controller = createLoaderController(adapter, render, controllerOptions);
-  const reportText = value => typeof value === 'string' ? value.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/https?:\/\/\S+|[A-Za-z]:[\\/]\S+|\/(?:Users|home)\/\S+/g, '[location omitted]').slice(0, 240) : null;
+  const reportText = value => value === null || value === undefined ? null : formatRuntimeError(value).slice(0, 240);
   function render(state) {
     const busy = busyPhases.has(state.phase);
     const unsupported = state.phase === 'unsupported';

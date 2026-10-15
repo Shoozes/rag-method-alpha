@@ -1,6 +1,7 @@
 import { Wllama } from './runtime/index.js';
 import { MODEL, RUNTIME, COMPAT } from './model-contract.mjs';
 import { inspectCapabilities } from './capabilities.mjs';
+import { formatRuntimeError, formatRuntimeAbort, installRuntimeAbortGuard } from './runtime-errors.mjs';
 
 // Pinned wllama 3.5.1 resolves asset URLs through document.baseURI, even
 // for absolute URLs. It otherwise runs in this dedicated Worker. Supply only
@@ -10,16 +11,16 @@ globalThis.document = Object.freeze({ baseURI: self.location.href });
 let engine;
 let active = false;
 let rejectOperation;
+let nativeAbortFailure;
 const post = (id, type, value) => self.postMessage({ id, type, value });
+const errorField = (value, key) => { try { return value?.[key]; } catch { return undefined; } };
 
 // The pinned vendor sends a child Worker's ErrorEvent to logger.error without
 // rejecting its pending task. Race that real failure with the owned operation;
 // the main-thread adapter then terminates the whole Worker lifetime. No vendor
 // bytes are patched, and ordinary native log lines do not become errors.
 function safeError(value) {
-  return String(value?.message || value || 'No browser error detail was supplied.')
-    .split('\n')[0].replace(/(?:https?|blob|file):\S+/gi, '[URL]')
-    .replace(/[A-Z]:[\\/][^\s]*/gi, '[path]').slice(0, 240);
+  return formatRuntimeError(value);
 }
 
 function failOperation(code, value) {
@@ -44,9 +45,11 @@ function engineLogger(milestone) {
     }
   };
   return { debug: log, log, warn() {}, error(...args) {
-    const workerError = args.find(value => typeof ErrorEvent !== 'undefined' && value instanceof ErrorEvent);
+    const workerError = args.find(value => { try { return typeof ErrorEvent !== 'undefined' && value instanceof ErrorEvent; } catch { return false; } });
     if (workerError) { workerError.preventDefault(); failOperation('ENGINE_WORKER_ERROR', workerError); return; }
-    const error = args.find(value => value instanceof Error);
+    // An abort can carry any structured-clone value. Its explicit signal is
+    // handled by the guard below; unknown console objects are never dumped.
+    const error = args.find(value => { try { return value instanceof Error; } catch { return false; } });
     if (error) failOperation('ENGINE_INIT_ERROR', error);
   } };
 }
@@ -147,6 +150,10 @@ async function prepare({ source, file }, progress) {
   // Native output is consumed only by this allowlist; no raw logs, model
   // metadata or prompt text are posted to the page or diagnostic report.
   engine = new Wllama({ default: new URL('./runtime/wllama.wasm', import.meta.url).href }, { logger: engineLogger(milestone), suppressNativeLog: false, allowOffline: true });
+  installRuntimeAbortGuard(engine, identity => {
+    nativeAbortFailure = Object.assign(new Error(formatRuntimeAbort(identity)), { code: 'ENGINE_NATIVE_ABORT', retryable: true });
+    rejectOperation?.(nativeAbortFailure);
+  });
   // Keep the exact model and API. Missing Memory64/JSPI selects the maintained,
   // self-hosted Memory32/Asyncify build; never use the vendor's default CDN.
   engine.setCompat(compat ? { wasm: new URL('./runtime/compat/wllama.wasm', import.meta.url).href, worker: { code: workerCode } } : null, 'firefox_safari');
@@ -186,7 +193,8 @@ async function prepare({ source, file }, progress) {
     if (!engine.isModelLoaded()) throw new Error('Runtime returned without a loaded model.');
     milestone('ready', 'Runtime confirmed the model is ready.');
   } catch (error) {
-    const failure = error instanceof Error ? error : new Error(safeError(error));
+    const failure = nativeAbortFailure || Object.assign(new Error(safeError(error)),
+      typeof errorField(error, 'code') === 'string' ? { code: errorField(error, 'code'), retryable: errorField(error, 'retryable') } : {});
     failure.diagnostics = { stage: events.at(-1)?.stage, detail: events.at(-1)?.detail, events };
     throw failure;
   } finally { rejectOperation = undefined; initializing = false; }
@@ -198,6 +206,7 @@ self.onmessage = async ({ data }) => {
   const { id, operation, payload } = data;
   if (active) return post(id, 'error', 'The model is already working.');
   active = true;
+  nativeAbortFailure = undefined;
   try {
     if (operation === 'prepare') post(id, 'result', await prepare(payload, event => post(id, 'progress', event)));
     else if (operation === 'reply') {
@@ -213,10 +222,11 @@ self.onmessage = async ({ data }) => {
       post(id, 'result', text);
     } else throw new Error('Unknown runtime operation.');
   } catch (error) {
-    self.postMessage({ id, type: 'error', value: safeError(error),
-      ...(error?.code ? { code: error.code, retryable: error.retryable !== false } : {}),
-      ...(error?.capabilities ? { capabilities: error.capabilities } : {}),
-      ...(error?.diagnostics ? { diagnostics: error.diagnostics } : {}),
+    const failure = nativeAbortFailure || error;
+    self.postMessage({ id, type: 'error', value: safeError(failure),
+      ...(typeof errorField(failure, 'code') === 'string' ? { code: errorField(failure, 'code'), retryable: errorField(failure, 'retryable') !== false } : {}),
+      ...(errorField(failure, 'capabilities') ? { capabilities: errorField(failure, 'capabilities') } : {}),
+      ...(errorField(failure, 'diagnostics') ? { diagnostics: errorField(failure, 'diagnostics') } : {}),
     });
   }
   finally { active = false; }
