@@ -83,6 +83,16 @@ The executable contract is [model-contract.mjs](./model-contract.mjs).
 
 The model has the [LFM Open License v1.0 at the pinned revision](https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF/blob/fa224d4cb60cffe61eb58726712ef255bb64d0b7/LICENSE); it is not covered by the runtime's MIT license. Both wllama packages are MIT licensed; `/runtime/LICENSE` contains the full shared upstream text. The compatibility package declares MIT but omits a license file, so its upstream text was verified at commit `912c18b75d4358c1405a64646b8dbe43a205943b`. Review both licenses before redistribution or deployment. Model weights remain outside Git and Pages. Prepared runtimes are ignored on the source branch; only verified allowlisted runtime bytes enter the Pages branch.
 
+## Desktop entry
+
+The collapsed landing uses the left column for the introduction and draft,
+with model controls alongside it. Decorative height follows the available
+viewport. Common desktop heights fit without an empty page scroll; expanded
+information, errors, smaller windows and zoomed layouts retain natural scrolling.
+The primary Load model button has a static under-glow only while idle and
+ambient light is enabled. The cue stops when loading starts and does not flash
+or pulse; forced-colors mode removes it. Keyboard focus remains explicit.
+
 ## Mobile conversation surface
 
 Chat uses one compact header, a contained transcript and an inline composer.
@@ -209,7 +219,7 @@ The source-bound receipt records exact acceptance counts and identities. The foc
 
 Historical cold-remote/cache acceptance at commit `12478fb34c9c749fdc218f870d1d366f186af547` passed 7 real-model checks, including official remote transfer, integrity verification, generated replies and cache-only reuse with external requests blocked. That evidence is retained under its original commit identity; it is not represented as a rerun of the current source. A physical iOS device remains unqualified.
 
-The compact source-bound receipt is `.artifacts/proof/model-chat/receipt.json`. It names the essential labeled fixture image and `live-mobile-chat.png` (actual HTTPS model response). Runtime and delivery assets are ignored; temporary browser profiles were removed. The earlier vendor URL-base failure and its narrow fix remain in the historical record. Browser verification runs locally against the published HTTPS site. GitHub runs its native Pages deployment only; no hosted verification suite, paid inference, API credentials or browser security bypass is used.
+The compact source-bound receipt is `.artifacts/proof/model-chat/receipt.json`. It names only the essential current captures, including the desktop landing and `live-mobile-chat.png` (actual HTTPS model response). Runtime and delivery assets are ignored; temporary browser profiles were removed. The earlier vendor URL-base failure and its narrow fix remain in the historical record. Browser verification runs locally against the published HTTPS site. GitHub runs its native Pages deployment only; no hosted verification suite, paid inference, API credentials or browser security bypass is used.
 
 ## Next bounded steps
 

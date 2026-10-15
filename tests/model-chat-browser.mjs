@@ -29,7 +29,7 @@ const sourcePaths = [
   'examples/browser-model-chat/serve.mjs', 'tests/model-chat-browser.mjs',
 ];
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
-const checks = [], screenshots = [], unexpectedRequests = [], pageErrors = [];
+const checks = [], screenshots = [], unexpectedRequests = [], pageErrors = [], desktopObservations = [];
 let preview, context, profile, browserVersion, cleanupComplete = false, failure;
 let adapterReplacements = 0, requestCount = 0;
 const started = Date.now();
@@ -142,6 +142,36 @@ async function revealControl(page, id) {
   const disclosure = page.locator('#' + id).locator('xpath=ancestor::details[1]');
   if (await disclosure.count() && !await disclosure.evaluate(node => node.open)) await disclosure.locator(':scope > summary').click();
 }
+async function landingGeometry(page) {
+  return page.evaluate(() => {
+    const bounds = id => {
+      const rect = document.getElementById(id).getBoundingClientRect();
+      return { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right, width: rect.width, height: rect.height };
+    };
+    return { viewport: { width: innerWidth, height: innerHeight }, rootScrollHeight: document.documentElement.scrollHeight,
+      bodyScrollHeight: document.body.scrollHeight, scrollY, rootOverflow: getComputedStyle(document.documentElement).overflowY,
+      bodyOverflow: getComputedStyle(document.body).overflowY, bodyPosition: getComputedStyle(document.body).position,
+      controls: Object.fromEntries(['download', 'draft', 'load-details'].map(id => [id, bounds(id)])) };
+  });
+}
+async function downloadCue(page) {
+  return page.locator('#download').evaluate(node => {
+    const style = getComputedStyle(node);
+    return { animation: style.animationName, shadow: style.boxShadow,
+      externalShadows: style.boxShadow.split(/,(?![^()]*\))/).filter(value => value.trim() !== 'none' && !value.includes('inset')) };
+  });
+}
+function cueVisible(cue) { return cue.externalShadows.length > 0; }
+async function inViewport(locator) {
+  return locator.evaluate(node => { const rect = node.getBoundingClientRect(); return rect.top >= 0 && rect.bottom <= innerHeight + 1 && rect.left >= 0 && rect.right <= innerWidth + 1; });
+}
+async function naturallyScrollable(page) {
+  const geometry = await landingGeometry(page);
+  assert.ok(!['hidden', 'clip'].includes(geometry.rootOverflow), 'landing root can expose genuine overflow: ' + JSON.stringify(geometry));
+  assert.ok(!['hidden', 'clip'].includes(geometry.bodyOverflow), 'landing body can expose genuine overflow: ' + JSON.stringify(geometry));
+  assert.notEqual(geometry.bodyPosition, 'fixed', 'landing does not retain the ready-chat body lock');
+  return geometry;
+}
 async function ready(page, cached = false) {
   await fixture(page, 'progress', { phase: 'verifying', cached });
   await phase(page, 'verifying');
@@ -221,6 +251,91 @@ try {
   });
   context.setDefaultTimeout(5_000);
   browserVersion = context.browser()?.version() || 'installed Chromium';
+
+  await check('collapsed desktop landing fits common viewports without clipping real content', async () => {
+    const page = await newPage();
+    try {
+      for (const viewport of [{ width: 1366, height: 768 }, { width: 1280, height: 720 }, { width: 1440, height: 900 }, { width: 1024, height: 600 }]) {
+        await page.setViewportSize(viewport); await settle(page);
+        assert.equal(await page.locator('#load-details').evaluate(node => node.open), false);
+        const geometry = await naturallyScrollable(page);
+        assert.ok(geometry.rootScrollHeight <= viewport.height + 1, 'collapsed landing fits: ' + JSON.stringify(geometry));
+        for (const [id, bounds] of Object.entries(geometry.controls)) {
+          assert.ok(bounds.top >= 0 && bounds.bottom <= viewport.height + 1, id + ' is visible without a scroll: ' + JSON.stringify(bounds));
+        }
+        await noOverflow(page);
+        desktopObservations.push({ state: 'collapsed', ...geometry });
+        if (viewport.width === 1366) await screenshot(page, 'after-desktop.png');
+      }
+    } finally { await page.close(); }
+  });
+
+  await check('expanded desktop details, failure reports and zoom-equivalent small windows retain reachable overflow', async () => {
+    const page = await newPage();
+    try {
+      for (const viewport of [{ width: 1366, height: 768 }, { width: 1280, height: 720 }, { width: 1440, height: 900 }, { width: 1024, height: 600 }]) {
+        await page.setViewportSize(viewport); await settle(page);
+        await revealControl(page, 'effects');
+        const geometry = await naturallyScrollable(page);
+        desktopObservations.push({ state: 'expanded-details', ...geometry });
+        await page.locator('#effects').scrollIntoViewIfNeeded();
+        assert.equal(await inViewport(page.locator('#effects')), true, 'expanded information remains reachable');
+        await noOverflow(page);
+        await page.locator('#load-details > summary').click();
+      }
+      // A smaller CSS viewport represents the space available at browser zoom;
+      // this is a real small window, not a claim of physical zoom validation.
+      await page.setViewportSize({ width: 640, height: 360 }); await settle(page);
+      const small = await naturallyScrollable(page);
+      assert.ok(small.rootScrollHeight > small.viewport.height, 'small-window content is allowed to overflow naturally');
+      await page.locator('#draft').scrollIntoViewIfNeeded(); await page.locator('#draft').fill('Draft remains reachable in a small CSS viewport.');
+      assert.equal(await inViewport(page.locator('#draft')), true, 'small-window draft is wholly reachable');
+      desktopObservations.push({ state: 'zoom-equivalent-small-window', actualZoomValidation: false, ...small });
+      await page.setViewportSize({ width: 1024, height: 600 });
+      await page.locator('#download').click(); await fixture(page, 'fail', 'Fixture loading failure. '.repeat(20)); await phase(page, 'error');
+      await revealControl(page, 'effects'); await page.locator('#diagnostics > summary').click();
+      const error = await naturallyScrollable(page);
+      assert.ok(error.rootScrollHeight > error.viewport.height, 'expanded error/report content retains real overflow');
+      await page.locator('#diagnostic-report').scrollIntoViewIfNeeded();
+      await page.locator('#diagnostic-report').evaluate(node => node.scrollIntoView({ block: 'center' })); await settle(page);
+      assert.equal(await inViewport(page.locator('#diagnostic-report')), true, 'diagnostic report is wholly reachable: ' + JSON.stringify(await page.locator('#diagnostic-report').boundingBox()));
+      await page.locator('#copy-report').scrollIntoViewIfNeeded();
+      assert.equal(await inViewport(page.locator('#copy-report')), true, 'copy action is wholly reachable: ' + JSON.stringify(await page.locator('#copy-report').boundingBox()));
+      assert.equal(await page.locator('#draft').inputValue(), 'Draft remains reachable in a small CSS viewport.');
+      desktopObservations.push({ state: 'expanded-error-report', ...error });
+      await noOverflow(page);
+    } finally { await page.close(); }
+  });
+
+  await check('Load model is a clear static idle action with reduced-motion and forced-colors-safe cue', async () => {
+    const page = await newPage({ reducedMotion: true });
+    try {
+      const button = page.getByRole('button', { name: /^Load model$/ });
+      assert.equal(await button.isVisible(), true);
+      const bounds = await button.boundingBox();
+      assert.ok(bounds && bounds.height >= 46 && bounds.width >= 46, 'primary model loading touch target');
+      const idleCue = await downloadCue(page);
+      assert.equal(cueVisible(idleCue), true, 'the available idle action has a visible under-glow');
+      assert.equal(idleCue.animation, 'none', 'reduced-motion cue is static');
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      assert.equal((await downloadCue(page)).animation, 'none', 'idle cue remains static without reduced motion');
+      await page.emulateMedia({ forcedColors: 'active' });
+      assert.equal(cueVisible(await downloadCue(page)), false, 'decorative glow yields to forced colors');
+      const colors = await button.evaluate(node => { const style = getComputedStyle(node); return { border: Number.parseFloat(style.borderTopWidth), borderColor: style.borderTopColor, background: style.backgroundColor, color: style.color }; });
+      assert.ok(colors.border >= 1 && colors.color !== colors.background, 'system button retains a visible border and label');
+      await page.emulateMedia({ forcedColors: 'none' });
+      await revealControl(page, 'effects'); await page.locator('#effects').uncheck();
+      assert.equal(cueVisible(await downloadCue(page)), false, 'ambient light preference disables the decorative idle cue');
+      await page.locator('#effects').check();
+      assert.equal(cueVisible(await downloadCue(page)), true);
+      await button.click(); await phase(page, 'downloading');
+      assert.equal(cueVisible(await downloadCue(page)), false, 'busy action has no idle loading cue');
+      await page.locator('#cancel').click(); await phase(page, 'cancelled');
+      assert.equal(cueVisible(await downloadCue(page)), false, 'cancelled recovery is not advertised as a fresh idle action');
+      await page.locator('#download').click(); await fixture(page, 'fail', 'Fixture retry failure.'); await phase(page, 'error');
+      assert.equal(cueVisible(await downloadCue(page)), false, 'error recovery has no idle loading cue');
+    } finally { await page.close(); }
+  });
 
   await check('native loading and chat disclosures expose labeled secondary actions by keyboard', async () => {
     const page = await newPage({ mobile: true, reducedMotion: true });
@@ -571,7 +686,7 @@ try {
   });
 
   await check('fixture boundary: no engine, runtime, model, external requests or page errors', async () => {
-    assert.equal(adapterReplacements, 11);
+    assert.equal(adapterReplacements, 14);
     assert.deepEqual(unexpectedRequests, []);
     assert.deepEqual(pageErrors, []);
     for (const identity of sourceIdentity) {
@@ -597,7 +712,7 @@ try {
     schemaVersion: 1, kind: 'browser-model-chat-fixture', label: fixtureLabel,
     status: failure ? 'fail' : 'pass', actualModelExecution: false, actualCacheValidation: false,
     actualIosValidation: false, startedAt: new Date(started).toISOString(), durationMs: Date.now() - started,
-    browser: browserVersion, node: process.version, sourceIdentity, checks, screenshots,
+    browser: browserVersion, node: process.version, sourceIdentity, checks, screenshots, desktopObservations,
     boundary: { adapterReplacements, requestCount, unexpectedRequests, pageErrors },
     cleanup: { browserContextClosed: !!context && cleanupComplete, loopbackServerClosed: !!preview && cleanupComplete, ownedTemporaryProfileRemoved: !!profile && cleanupComplete },
     ...(failure ? { error: failure.message } : {}),

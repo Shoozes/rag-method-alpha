@@ -118,7 +118,7 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions }
     $('stop').hidden = state.phase !== 'generating';
     $('unload').disabled = state.phase === 'generating';
     $('clear').disabled = state.phase === 'generating';
-    $('download').textContent = ['error', 'cancelled'].includes(state.phase) ? 'Retry cached load' : 'Open chat';
+    $('download').textContent = ['error', 'cancelled'].includes(state.phase) ? 'Retry cached load' : 'Load model';
     $('error').hidden = !state.error;
     $('error').textContent = state.error || '';
     if (state.phase !== previousPhase) {

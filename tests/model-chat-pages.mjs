@@ -30,7 +30,7 @@ const cleanup = { browserClosed: false, profileRemoved: false };
 const profilePrefix = 'rag-model-chat-pages-';
 const started = Date.now();
 const harnessSha256 = digest(await readFile(fileURLToPath(import.meta.url)));
-let manifest, manifestSha256, modelPath, profile, chromeProcess, browser, context, browserVersion, failure;
+let manifest, manifestSha256, modelPath, profile, chromeProcess, browser, context, browserVersion, desktopLanding, failure;
 let workerCreated = 0, workerClosed = 0, nativeSelections = 0;
 
 async function check(name, action) {
@@ -169,6 +169,27 @@ try {
     const requirements = await page.locator('#load-details').textContent();
     assert.match(requirements, /wllama 3\.5\.1/); assert.match(requirements, /OPFS/);
     assert.equal(await page.locator('#model-license').getAttribute('href'), MODEL.license);
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
+    assert.equal(await page.locator('#download').textContent(), 'Load model');
+    desktopLanding = await page.evaluate(() => {
+      const button = document.getElementById('download'), box = button.getBoundingClientRect();
+      return { width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth,
+        scrollHeight: document.documentElement.scrollHeight, bodyOverflowY: getComputedStyle(document.body).overflowY,
+        bodyPosition: getComputedStyle(document.body).position, button: { x: box.x, y: box.y, width: box.width, height: box.height },
+        shadow: getComputedStyle(button).boxShadow, animation: getComputedStyle(button).animationName };
+    });
+    assert.ok(desktopLanding.scrollHeight <= desktopLanding.height + 1);
+    assert.ok(desktopLanding.scrollWidth <= desktopLanding.width + 1);
+    assert.notEqual(desktopLanding.bodyOverflowY, 'hidden'); assert.notEqual(desktopLanding.bodyPosition, 'fixed');
+    const { button } = desktopLanding;
+    assert.ok(button.width >= 44 && button.height >= 44 && button.y >= 0 && button.y + button.height <= desktopLanding.height);
+    assert.ok(desktopLanding.shadow.split(/,(?![^(]*\))/).some(part => !part.includes('inset') && part.trim() !== 'none'), 'visible static under-glow');
+    assert.equal(desktopLanding.animation, 'none');
+    await mkdir(output, { recursive: true });
+    const path = 'live-desktop.png'; await page.screenshot({ path: join(output, path), fullPage: true });
+    const bytes = await readFile(join(output, path)); screenshots.push({ path, bytes: bytes.length, sha256: digest(bytes) });
+    await page.setViewportSize({ width: 1440, height: 1000 });
   });
   async function refusal(name, injection, label) {
     await check(name, async () => {
@@ -323,7 +344,7 @@ finally {
     externalModelDownloads: 0, harnessModelFileCopies: 0, nativeSelections,
     runtime: { version: RUNTIME.version, files: RUNTIME.files, compat: COMPAT }, browser: browserVersion, node: process.version,
     capabilityRefusals: 'injected missing SIMD and OPFS permanently refuse; injected Memory64 and JSPI absence selects and runs the actual published maintained Memory32 runtime',
-    checks, files, exclusions, phases, runtimeRequests, externalRequests, pageErrors, screenshots,
+    checks, files, exclusions, phases, runtimeRequests, externalRequests, pageErrors, screenshots, desktopLanding,
     workers: { created: workerCreated, closed: workerClosed }, cleanup, ms: Date.now() - started,
     limitations: ['Desktop Chrome with mobile viewport and JS probe fixtures; VM Memory64 remains supported. Physical iOS is untested.',
       'Native File path selection uses browser automation; physical picker and iPhone Files are unqualified.',
