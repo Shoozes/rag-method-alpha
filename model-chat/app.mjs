@@ -14,6 +14,33 @@ export function mountApp(adapter = createRuntimeAdapter()) {
     cancelled: 'Stopped. You can try again or choose a local file.', error: 'The model could not finish. You can retry below.',
   };
   let previousPhase = '', messages = [], pendingMessage;
+  const log = $('messages');
+  let followTail = true, viewportFrame;
+  function scrollLatest(force = false) {
+    if (force) followTail = true;
+    if (followTail) log.scrollTop = log.scrollHeight;
+    $('new-messages').hidden = followTail;
+  }
+  log.addEventListener('scroll', () => {
+    followTail = log.scrollHeight - log.scrollTop - log.clientHeight < 64;
+    if (followTail) $('new-messages').hidden = true;
+  }, { passive: true });
+  $('new-messages').addEventListener('click', () => scrollLatest(true));
+  // Use the space actually available above the keyboard. Do not reflow on pinch
+  // zoom: the browser keeps its native zoom/pan behavior. Physical iOS is untested.
+  function fitViewport() {
+    const viewport = window.visualViewport;
+    if (viewport && Math.abs(viewport.scale - 1) > 0.01) return;
+    const wasFollowing = followTail;
+    app.style.setProperty('--app-height', `${Math.round(viewport?.height || window.innerHeight)}px`);
+    app.style.setProperty('--app-top', `${Math.round(viewport?.offsetTop || 0)}px`);
+    cancelAnimationFrame(viewportFrame);
+    viewportFrame = requestAnimationFrame(() => scrollLatest(wasFollowing));
+  }
+  window.addEventListener('resize', fitViewport);
+  window.visualViewport?.addEventListener('resize', fitViewport);
+  window.visualViewport?.addEventListener('scroll', fitViewport, { passive: true });
+  fitViewport();
   const controller = createLoaderController(adapter, render);
   function render(state) {
     const busy = busyPhases.has(state.phase);
@@ -54,7 +81,14 @@ export function mountApp(adapter = createRuntimeAdapter()) {
       $('runtime-label').textContent = `${MODEL.file} · ${state.cached ? 'cached bytes' : state.source === 'file' ? 'local file' : 'download verified'} · 2,048-token context`;
       $('chat-heading').focus();
     }
-    if (state.phase === 'generating' && pendingMessage) pendingMessage.querySelector('.content').textContent = state.text || '';
+    if (state.phase === 'generating' && pendingMessage) {
+      pendingMessage.querySelector('.content').textContent = state.text || '';
+      scrollLatest();
+    }
+    if (inChat && previousPhase !== 'ready' && previousPhase !== 'generating') {
+      fitViewport();
+      requestAnimationFrame(() => scrollLatest(true));
+    }
     previousPhase = state.phase;
   }
   function message(role, text, pending = false) {
@@ -63,7 +97,7 @@ export function mountApp(adapter = createRuntimeAdapter()) {
     node.className = `message ${role}${pending ? ' pending' : ''}`;
     const name = document.createElement('p'); name.className = 'speaker'; name.textContent = role === 'user' ? 'You' : 'LFM2.5 · local model';
     const content = document.createElement('p'); content.className = 'content'; content.textContent = text;
-    node.append(name, content); $('messages').append(node); return node;
+    node.append(name, content); log.append(node); scrollLatest(); return node;
   }
   async function load(source, file) {
     try { await controller.load({ source, file }); }
@@ -83,8 +117,10 @@ export function mountApp(adapter = createRuntimeAdapter()) {
   $('stop').addEventListener('click', () => controller.cancel());
   $('clear').addEventListener('click', () => {
     messages = [];
+    $('chat-error').hidden = true;
     for (const node of $('messages').querySelectorAll('.message')) node.remove();
     $('chat-empty').hidden = false;
+    scrollLatest(true);
   });
   $('composer').addEventListener('submit', async event => {
     event.preventDefault();
@@ -93,17 +129,19 @@ export function mountApp(adapter = createRuntimeAdapter()) {
     if (!text) { $('prompt').focus(); return; }
     // Keep this preview bounded; no attachment/context injection or tool execution.
     if (messages.length >= 12 || messages.reduce((sum, item) => sum + item.content.length, text.length) > 6000) {
-      $('error').hidden = false; $('error').textContent = 'This preview has reached its conversation limit. Clear the conversation to start fresh.'; return;
+      $('chat-error').hidden = false; $('chat-error').textContent = 'This preview has reached its conversation limit. Clear the conversation to start fresh.'; return;
     }
+    $('chat-error').hidden = true;
     messages.push({ role: 'user', content: text }); message('user', text);
     $('prompt').value = ''; $('draft').value = '';
+    $('prompt').focus({ preventScroll: true });
     pendingMessage = message('assistant', '', true);
     try {
       const answer = await controller.send([{ role: 'system', content: 'You are a concise, helpful assistant. Answer in plain text.' }, ...messages]);
       pendingMessage.querySelector('.content').textContent = answer;
       pendingMessage.classList.remove('pending');
+      scrollLatest();
       messages.push({ role: 'assistant', content: answer });
-      $('prompt').focus();
     } catch {
       pendingMessage.classList.remove('pending'); pendingMessage.classList.add('interrupted');
       if (!pendingMessage.querySelector('.content').textContent) pendingMessage.querySelector('.content').textContent = 'No completed answer.';
@@ -111,7 +149,13 @@ export function mountApp(adapter = createRuntimeAdapter()) {
       messages.pop();
     } finally { pendingMessage = null; }
   });
-  window.addEventListener('pagehide', () => { void controller.dispose(); document.removeEventListener('visibilitychange', visibility); }, { once: true });
+  window.addEventListener('pagehide', () => {
+    void controller.dispose(); document.removeEventListener('visibilitychange', visibility);
+    window.removeEventListener('resize', fitViewport);
+    window.visualViewport?.removeEventListener('resize', fitViewport);
+    window.visualViewport?.removeEventListener('scroll', fitViewport);
+    cancelAnimationFrame(viewportFrame);
+  }, { once: true });
   render(controller.getState());
   return { controller, getMessages: () => structuredClone(messages) };
 }

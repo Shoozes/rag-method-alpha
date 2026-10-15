@@ -3,16 +3,16 @@
   "managedBy": "examples/browser-model-chat/stage-static.mjs",
   "publicReleaseQualified": false,
   "source": {
-    "head": "644a87c3e1a8be8bb667cd0814c31a0d9e13c171",
+    "head": "f01dcc2c164a6dd4f8cb76b094d0bfda473f26bc",
     "dirty": false,
     "reviewStatus": "unreviewed",
     "fingerprintScope": "allowlisted browser sources, theme, first-party license and packager",
-    "fingerprintSha256": "fc208e4d0ee72f9c6322167c0a5811ec85ecca3b53d4d4744be3da4be1492bc4",
+    "fingerprintSha256": "dda02b8f1315c07627ac637580daaea73e87c21854e029e825d1beb2fbbc2872",
     "files": [
       {
         "path": "examples/browser-model-chat/app.mjs",
-        "bytes": 7196,
-        "sha256": "152bed0382412b60a5f592c2d42122fc33f87e63babe4f961b327b41c87fcc74"
+        "bytes": 9170,
+        "sha256": "545a88fcd4103f45967c6e6f363dcb0cf55825ce0cb8245307e18103cd8ebe0e"
       },
       {
         "path": "examples/browser-model-chat/bootstrap.mjs",
@@ -31,8 +31,8 @@
       },
       {
         "path": "examples/browser-model-chat/index.html",
-        "bytes": 5675,
-        "sha256": "8c3b5ded8e76b8ecbda6255239c2e4f9c065d36d0dcc80013ebf29e104a8e8db"
+        "bytes": 5983,
+        "sha256": "31664b5cdb6c734399fac3d628ef19fd0b5be70fb325752b58a653f66fac173b"
       },
       {
         "path": "examples/browser-model-chat/loader-controller.mjs",
@@ -56,8 +56,8 @@
       },
       {
         "path": "examples/browser-model-chat/style.css",
-        "bytes": 11034,
-        "sha256": "3dc6c90b03f2918a05de672b0bc2b4b6c9829e84d169eb3ce6269c2b7220979a"
+        "bytes": 14425,
+        "sha256": "af3e3591878f9315bd2ea1b9ec91ee307e19bf8e6a3f35848bf2a079859454e6"
       },
       {
         "path": "LICENSE",
@@ -91,8 +91,8 @@
   "files": [
     {
       "path": "app.mjs",
-      "bytes": 7196,
-      "sha256": "152bed0382412b60a5f592c2d42122fc33f87e63babe4f961b327b41c87fcc74"
+      "bytes": 9170,
+      "sha256": "545a88fcd4103f45967c6e6f363dcb0cf55825ce0cb8245307e18103cd8ebe0e"
     },
     {
       "path": "bootstrap.mjs",
@@ -111,8 +111,8 @@
     },
     {
       "path": "index.html",
-      "bytes": 5675,
-      "sha256": "8c3b5ded8e76b8ecbda6255239c2e4f9c065d36d0dcc80013ebf29e104a8e8db"
+      "bytes": 5983,
+      "sha256": "31664b5cdb6c734399fac3d628ef19fd0b5be70fb325752b58a653f66fac173b"
     },
     {
       "path": "LICENSES/rag-method.txt",
@@ -161,8 +161,8 @@
     },
     {
       "path": "style.css",
-      "bytes": 11034,
-      "sha256": "3dc6c90b03f2918a05de672b0bc2b4b6c9829e84d169eb3ce6269c2b7220979a"
+      "bytes": 14425,
+      "sha256": "af3e3591878f9315bd2ea1b9ec91ee307e19bf8e6a3f35848bf2a079859454e6"
     },
     {
       "path": "theme/aurel-gold.css",
@@ -170,5 +170,5 @@
       "sha256": "9d00bbe275e9025d40a0d14b6e4e6fa1e98af072bb215d83a5c335d65b657ad5"
     }
   ],
-  "identitySha256": "869e651b9e84c602ddcb6f9ac734a62dbee793e2a7878749a103b2eee4b719bc"
+  "identitySha256": "8ecc35e1f0fae862f6dc9c10dadd9fe6a0529d263f2f9c16d84809442304d761"
 }
