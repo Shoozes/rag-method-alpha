@@ -4,8 +4,9 @@ An optional, separate browser entry point for one pinned local model and a bound
 
 Live static preview: **https://shoozes.github.io/rag-method-alpha/model-chat/**.
 The runtime automatically selects a pinned Memory32 compatibility build when
-Memory64 or JSPI is unavailable. OPFS remains required. Physical iPhone support
-awaits a fresh device retest; use the [mobile checklist](./MOBILE.md).
+Memory64 or JSPI is unavailable. OPFS remains required. The user reported a
+successful iPhone conversation after the resource-binding fix; exact device/iOS
+and broader acceptance remain unrecorded. Use the [mobile checklist](./MOBILE.md).
 
 ## Run locally
 
@@ -35,7 +36,7 @@ node examples/browser-model-chat/serve.mjs --port 5188
 
 Keep the same origin, including the port, to reuse that origin's browser model cache. `--port 0` selects an ephemeral port; the exported `startServer()` API also defaults to port 0 for tests. The preview binds only IPv4 loopback. It exposes this example, the existing Aurel Gold stylesheet, and five allowlisted runtime files; it does not expose a model directory or arbitrary host files.
 
-In the page, explicitly download the model or choose the exact GGUF File. Both paths verify byte length and SHA-256 before initialization. The API remains wllama 3.5.1 with the same model. Browsers lacking Memory64 or JSPI automatically use the pinned, self-hosted wllama-compat 3.5.1 Memory32/Asyncify build; other browsers use Memory64. The chosen profile is visible before weight loading and in chat. Both paths require a secure context, SIMD, exception handling, nested module Workers, Web Crypto and the OPFS API. A local File avoids downloading weights and creating a new model-cache entry, but cannot bypass a missing required browser feature. Only a new remote cache miss requires writable OPFS sync access. Valid cached bytes and Files skip that write probe.
+In the page, explicitly download the model or choose the exact GGUF File. Both paths verify byte length and SHA-256 before initialization. The API remains wllama 3.5.1 with the same model. Browsers lacking Memory64 or JSPI automatically use the pinned, self-hosted wllama-compat 3.5.1 Memory32/Asyncify build; other browsers use Memory64. The chosen profile is available under Model details before loading and Chat options in chat. Both paths require a secure context, SIMD, exception handling, nested module Workers, Web Crypto and the OPFS API. A local File avoids downloading weights and creating a new model-cache entry, but cannot bypass a missing required browser feature. Only a new remote cache miss requires writable OPFS sync access. Valid cached bytes and Files skip that write probe.
 
 Before requesting weights, the Worker tests browser capabilities, verifies and compiles the exact selected WASM, verifies compatibility worker glue when selected, and starts a tiny module child Worker to check policy. Full JSPI absence selects Asyncify; a partially broken JSPI interface is rejected. Permanent capability failures focus an explanation and remove futile Retry/File controls. Transient download/cache failures retain recovery. Memory32 compatibility may be slower, and neither profile guarantees enough device memory.
 
@@ -82,6 +83,23 @@ The executable contract is [model-contract.mjs](./model-contract.mjs).
 
 The model has the [LFM Open License v1.0 at the pinned revision](https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF/blob/fa224d4cb60cffe61eb58726712ef255bb64d0b7/LICENSE); it is not covered by the runtime's MIT license. Both wllama packages are MIT licensed; `/runtime/LICENSE` contains the full shared upstream text. The compatibility package declares MIT but omits a license file, so its upstream text was verified at commit `912c18b75d4358c1405a64646b8dbe43a205943b`. Review both licenses before redistribution or deployment. Model weights remain outside Git and Pages. Prepared runtimes are ignored on the source branch; only verified allowlisted runtime bytes enter the Pages branch.
 
+## Mobile conversation surface
+
+Chat uses one compact header, a contained transcript and an inline composer.
+Chat options holds model details, Clear conversation and Unload model; Escape
+closes it and returns focus. The loader keeps its primary controls visible,
+while Model details and Loading report disclose secondary information. UI
+symbols are local SVG, not emoji or an icon font.
+
+The chat document is bounded as well as its transcript, including entry from a
+scrolled loading screen. Focus does not pan the document. Keyboard fitting
+coalesces viewport changes and applies vertical offsets only during a focused
+keyboard-sized edit; ordinary viewport pan is not followed. Native pinch zoom
+remains available. The composer grows within a bound, safe-area padding remains,
+and unloading restores the setup reading position and unsent draft. Responsive
+checks include actual Chrome page zoom plus separately labeled synthetic Safari
+viewport offsets; they do not establish physical Safari keyboard behavior.
+
 ## Behavior and limits
 
 - Download progress uses measured bytes. Integrity checking is a separate phase. Initialization shows elapsed time and the last confirmed runtime stage, without a percentage estimate. Time since a stage update measures silence, not Worker health. After 30 seconds the page explains recovery; after 180 seconds the main thread stops its owned Worker with `INIT_WAIT_LIMIT`. This waiting limit is not a model validation result.
@@ -99,7 +117,7 @@ The full-file integrity buffer and model initialization add memory pressure beyo
 
 The implementation uses the repository's existing Aurel Gold CSS and the pinned [MIT wllama 3.5.1 release](https://github.com/ngxson/wllama/tree/766d28e03eeac044fe055327d06b83d3f9b84544). Its URL resolver expects `document.baseURI`; the owned Worker supplies only that base-URL property, keeping vendor bytes unchanged. Single-thread CPU execution needs no WebGPU presentation or cross-origin isolation headers in the tested Chrome configuration.
 
-The [Bonsai Space](https://huggingface.co/spaces/webml-community/ternary-bonsai-2-webgpu-kernels/tree/94320c9da2b7aeac5b5807c9e61d696a3c09edb5) informed the loading-to-chat interaction pattern only. Its application source license was unspecified, so this example was independently implemented and no Bonsai code or model was copied. [Local_Browser_LLM at 5873eb0](https://github.com/Shoozes/Local_Browser_LLM/tree/5873eb04555819c13d9ea2f406974e88fbddf215) and the read-only `LocalLLMTemplate-Basic-03_13_2026` archive supplied historical URL/File lifecycle references. Their vendor bytes match each other and embed `release-2.3.7`. No private donor application code was imported.
+The [Bonsai Space](https://huggingface.co/spaces/webml-community/ternary-bonsai-2-webgpu-kernels/tree/94320c9da2b7aeac5b5807c9e61d696a3c09edb5) informed the loading-to-chat interaction pattern only. Its application source license was unspecified, so this example was independently implemented and no Bonsai code or model was copied. [Local_Browser_LLM at 5873eb0](https://github.com/Shoozes/Local_Browser_LLM/tree/5873eb04555819c13d9ea2f406974e88fbddf215) and the read-only `LocalLLMTemplate-Basic-03_13_2026` archive supplied historical URL/File lifecycle references. The retained historical inputs embedded `release-2.3.7`; current archive JavaScript has since changed, so those earlier byte identities do not qualify its present contents. No private donor application code was imported.
 
 A separate comparison loaded the exact pinned 230M bytes with that retained Memory32 single-thread runtime and generated a reply in ordinary desktop Chrome. A second File API run passed with the OPFS directory API hidden before runtime construction. This is a labeled capability injection, not a native Files picker or iOS test. It establishes that the older donor can execute this model on the tested desktop; it does not change the product runtime or qualify the older build for distribution.
 

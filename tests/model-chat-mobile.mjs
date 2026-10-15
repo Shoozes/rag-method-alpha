@@ -72,9 +72,19 @@ async function ready(page) {
   await page.locator('#download').click(); await phase(page, 'downloading');
   await fixture(page, 'ready'); await phase(page, 'ready'); await settle(page);
 }
-async function newPage(viewport = { width: 390, height: 844 }) {
+async function revealControl(page, id) {
+  const disclosure = page.locator('#' + id).locator('xpath=ancestor::details[1]');
+  if (await disclosure.count() && !await disclosure.evaluate(node => node.open)) await disclosure.locator(':scope > summary').click();
+}
+async function newPage(viewport = { width: 390, height: 844 }, { viewportFixture = false } = {}) {
   const page = await context.newPage();
   await page.setViewportSize(viewport);
+  if (viewportFixture) await page.addInitScript(() => {
+    // A labeled event/geometry fixture, not physical Safari keyboard evidence.
+    const value = Object.assign(new EventTarget(), { width: innerWidth, height: innerHeight, offsetTop: 0, offsetLeft: 0, scale: 1 });
+    window.__fixtureViewport = change => { Object.assign(value, change); value.dispatchEvent(new Event('resize')); value.dispatchEvent(new Event('scroll')); };
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value });
+  });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.route('**/*', async route => {
@@ -96,17 +106,19 @@ async function geometry(page) {
   return page.evaluate(() => {
     const rect = id => { const r = document.getElementById(id).getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width, height: r.height }; };
     const container = selector => {
-      const node = document.querySelector(selector), r = node.getBoundingClientRect(), style = getComputedStyle(node);
+      const node = document.querySelector(selector);
+      if (!node) return null;
+      const r = node.getBoundingClientRect(), style = getComputedStyle(node);
       return { left: r.left, right: r.right, width: r.width, clientWidth: node.clientWidth, scrollWidth: node.scrollWidth,
         minWidth: style.minWidth, cssWidth: style.width, boxSizing: style.boxSizing,
         paddingLeft: style.paddingLeft, paddingRight: style.paddingRight, display: style.display };
     };
     const log = document.getElementById('messages');
-    return { viewport: { width: innerWidth, height: innerHeight, visualHeight: visualViewport?.height,
+    return { viewport: { width: innerWidth, height: innerHeight, scale: visualViewport?.scale, visualHeight: visualViewport?.height,
         visualWidth: visualViewport?.width, offsetLeft: visualViewport?.offsetLeft, offsetTop: visualViewport?.offsetTop },
       page: { scrollX, scrollY, scrollHeight: document.documentElement.scrollHeight, width: document.documentElement.scrollWidth },
       log: { ...rect('messages'), overflowY: getComputedStyle(log).overflowY, scrollHeight: log.scrollHeight, clientHeight: log.clientHeight, scrollTop: log.scrollTop },
-      composer: rect('composer'), prompt: rect('prompt'), send: rect('send'), unload: rect('unload'), clear: rect('clear'),
+      app: rect('app'), composer: rect('composer'), prompt: rect('prompt'), send: rect('send'),
       containers: Object.fromEntries(['#app', '#chat-stage', '.chat-header', '.chat-header>div', '.conversation', '#composer'].map(selector => [selector, container(selector)])) };
   });
 }
@@ -115,6 +127,8 @@ async function capture(page, name) {
     const badge = document.createElement('div'); badge.id = 'mobile-fixture-badge';
     badge.textContent = 'UI FIXTURE · no model loaded';
     badge.style.cssText = 'position:fixed;top:4px;right:4px;z-index:999999;padding:5px 7px;background:#17140d;color:#ffedc8;border:1px solid #e6c98e;font:10px ui-monospace,monospace;pointer-events:none';
+    // Keep the evidence label clear of the real header actions.
+    badge.style.top = Math.ceil(document.querySelector('.masthead').getBoundingClientRect().bottom + 4) + 'px';
     document.body.append(badge);
   });
   const target = path.join(output, name);
@@ -137,14 +151,15 @@ async function noHorizontalOverflow(page) {
 async function containedChat(page) {
   await settle(page);
   const value = await geometry(page);
+  const visualTop = value.viewport.offsetTop || 0, visualBottom = visualTop + (value.viewport.visualHeight || value.viewport.height);
   assert.ok(['auto', 'scroll'].includes(value.log.overflowY), 'conversation is its own scroll container: ' + JSON.stringify(value));
-  assert.ok(value.log.height >= 40 && value.log.bottom <= value.viewport.height + 1, 'conversation remains usable: ' + JSON.stringify(value));
-  assert.ok(value.composer.top >= -1 && value.composer.bottom <= value.viewport.height + 1, 'composer in viewport: ' + JSON.stringify(value));
-  assert.ok(value.prompt.top >= -1 && value.prompt.bottom <= value.viewport.height + 1, 'prompt in viewport: ' + JSON.stringify(value));
-  assert.ok(value.send.top >= -1 && value.send.bottom <= value.viewport.height + 1, 'send in viewport: ' + JSON.stringify(value));
-  for (const key of ['composer', 'prompt', 'send', 'unload', 'clear']) {
+  assert.ok(value.log.height >= 40 && value.log.bottom <= visualBottom + 1, 'conversation remains usable: ' + JSON.stringify(value));
+  assert.ok(value.composer.top >= visualTop - 1 && value.composer.bottom <= visualBottom + 1, 'composer in visual viewport: ' + JSON.stringify(value));
+  assert.ok(value.prompt.top >= visualTop - 1 && value.prompt.bottom <= visualBottom + 1, 'prompt in visual viewport: ' + JSON.stringify(value));
+  assert.ok(value.send.top >= visualTop - 1 && value.send.bottom <= visualBottom + 1, 'send in visual viewport: ' + JSON.stringify(value));
+  for (const key of ['composer', 'prompt', 'send']) {
     const bounds = value[key];
-    assert.ok(bounds.left >= -1 && bounds.right <= value.viewport.width + 1 && bounds.top >= -1 && bounds.bottom <= value.viewport.height + 1,
+    assert.ok(bounds.left >= -1 && bounds.right <= value.viewport.width + 1 && bounds.top >= visualTop - 1 && bounds.bottom <= visualBottom + 1,
       key + ' fully in viewport without hidden clipping: ' + JSON.stringify(value));
   }
   assert.ok(value.page.scrollHeight <= value.viewport.height + 1 && Math.abs(value.page.scrollY) <= 1, 'ready page does not scroll behind log: ' + JSON.stringify(value));
@@ -192,7 +207,11 @@ try {
       const page = await newPage();
       try {
         await ready(page); observations.push({ name: 'ready390x844', ...(await containedChat(page)) });
-        for (const id of ['send', 'unload', 'clear']) await touchTarget(page.locator('#' + id));
+        await touchTarget(page.locator('#send'));
+        assert.ok((await geometry(page)).log.height >= 844 / 2, 'transcript owns most of the ready screen');
+        assert.equal(await page.locator('#unload').isVisible(), false, 'secondary actions start collapsed');
+        await revealControl(page, 'unload');
+        for (const id of ['unload', 'clear']) await touchTarget(page.locator('#' + id));
       } finally { await page.close(); }
     });
     await check('keyboard-size, landscape and narrow resizing preserve draft and composer visibility', async () => {
@@ -217,11 +236,66 @@ try {
         assert.match(css, /env\(safe-area-inset-top/);
         const viewport = await page.locator('meta[name="viewport"]').getAttribute('content');
         assert.match(viewport, /viewport-fit\s*=\s*cover/);
+        assert.doesNotMatch(viewport, /user-scalable\s*=\s*(?:no|0)|maximum-scale\s*=\s*1(?:\D|$)/i, 'viewport permits native zoom');
         const before = await page.evaluate(() => ({ height: visualViewport.height, width: visualViewport.width }));
         await page.setViewportSize({ width: 390, height: 480 }); await settle(page);
         const after = await page.evaluate(() => ({ height: visualViewport.height, width: visualViewport.width }));
         assert.ok(after.height < before.height && after.width === before.width);
       } finally { await page.close(); }
+    });
+    await check('scrolled loading entry anchors ready chat and prevents unintended page pan', async () => {
+      const page = await newPage({ width: 390, height: 480 });
+      try {
+        await page.locator('#draft').fill('A draft from the scrolled loading page.');
+        await page.locator('#download').click(); await phase(page, 'downloading');
+        await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight)); await settle(page);
+        const loadingScrollY = await page.evaluate(() => scrollY);
+        assert.ok(loadingScrollY > 0, 'precondition: loading page was actually scrolled');
+        await fixture(page, 'ready'); await phase(page, 'ready');
+        const initial = await containedChat(page);
+        assert.ok(Math.abs(initial.app.top) <= 1 && Math.abs(initial.app.left) <= 1, 'ready shell starts at visible origin');
+        assert.equal(await page.locator('#prompt').inputValue(), 'A draft from the scrolled loading page.');
+        await page.evaluate(() => scrollTo(120, 180));
+        await page.mouse.move(4, 4); await page.mouse.wheel(180, 160); await settle(page);
+        const attempted = await containedChat(page);
+        assert.ok(Math.abs(attempted.page.scrollX) <= 1 && Math.abs(attempted.page.scrollY) <= 1, 'root stays anchored after attempted pan');
+        observations.push({ name: 'scrolled-loading-to-ready', ...attempted });
+        await revealControl(page, 'unload'); await page.locator('#unload').click(); await phase(page, 'cancelled'); await settle(page);
+        assert.ok(Math.abs(await page.evaluate(() => scrollY) - loadingScrollY) <= 1, 'leaving ready chat restores the original loading-page scroll position');
+      } finally { await page.close(); }
+    });
+    await check('synthetic Safari-style visual viewport offsets preserve draft and reader position', async () => {
+      const page = await newPage({ width: 390, height: 844 }, { viewportFixture: true });
+      try {
+        await ready(page); await send(page, 'Viewport fixture reader position.');
+        await fixture(page, 'answer', 'Earlier transcript line remains readable.\n'.repeat(100)); await phase(page, 'ready'); await settle(page);
+        await page.locator('#prompt').fill('Unsent viewport fixture draft.');
+        await page.locator('#messages').evaluate(node => { node.scrollTop = 64; }); await settle(page);
+        const readingTop = await page.locator('#messages').evaluate(node => node.scrollTop);
+        for (const change of [{ height: 430, offsetTop: 38 }, { height: 520, offsetTop: 0 }, { height: 844, offsetTop: 0 }]) {
+          await page.evaluate(change => window.__fixtureViewport(change), change); await settle(page);
+          const value = await containedChat(page);
+          assert.ok(Math.abs(value.app.top - change.offsetTop) <= 1, 'shell follows the fixture visual origin');
+          assert.ok(Math.abs(value.app.height - change.height) <= 1, 'shell fits the fixture available height');
+          assert.equal(await page.locator('#prompt').inputValue(), 'Unsent viewport fixture draft.');
+          assert.ok(Math.abs(await page.locator('#messages').evaluate(node => node.scrollTop) - readingTop) <= 2, 'viewport resize preserves a scrolled-up reader');
+          observations.push({ name: 'synthetic-visual-viewport', input: change, ...value });
+        }
+      } finally { await page.close(); }
+    });
+    await check('native browser page zoom remains available without reflowing the app height', async () => {
+      const page = await newPage();
+      const session = await context.newCDPSession(page);
+      try {
+        await ready(page);
+        const before = await page.locator('#app').evaluate(node => ({ height: node.style.getPropertyValue('--app-height'), top: node.style.getPropertyValue('--app-top') }));
+        await session.send('Emulation.setPageScaleFactor', { pageScaleFactor: 2 });
+        await page.waitForFunction(() => visualViewport.scale > 1.5); await settle(page);
+        assert.deepEqual(await page.locator('#app').evaluate(node => ({ height: node.style.getPropertyValue('--app-height'), top: node.style.getPropertyValue('--app-top') })), before, 'zoom does not squeeze the application into the magnified viewport');
+        assert.equal(await page.locator('#prompt').inputValue(), '');
+        await session.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 }); await settle(page);
+        await containedChat(page);
+      } finally { await session.detach(); await page.close(); }
     });
     await check('long plain messages wrap and tokens follow only while reading the latest reply', async () => {
       const page = await newPage({ width: 390, height: 480 });
@@ -268,27 +342,31 @@ try {
         const bounds = await page.locator('#chat-error').boundingBox();
         assert.ok(bounds.y >= 0 && bounds.y + bounds.height <= 481, 'limit feedback within viewport: ' + JSON.stringify(bounds));
         await containedChat(page);
-        await page.locator('#clear').click(); assert.equal(await page.locator('#chat-error').isVisible(), false);
+        await revealControl(page, 'clear'); await page.locator('#clear').click(); assert.equal(await page.locator('#chat-error').isVisible(), false);
       } finally { await page.close(); }
     });
     await check('leaving ready chat restores scrollable loading layout and retains an unsent draft', async () => {
       const page = await newPage({ width: 320, height: 568 });
       try {
         await ready(page); await page.locator('#prompt').fill('Fixture draft kept when unloading.');
-        await page.locator('#unload').click(); await phase(page, 'cancelled'); await settle(page);
+        await revealControl(page, 'unload'); await page.locator('#unload').click(); await phase(page, 'cancelled'); await settle(page);
         assert.equal(await page.locator('#loading-stage').isVisible(), true);
         assert.equal(await page.locator('#draft').inputValue(), 'Fixture draft kept when unloading.');
-        assert.ok(await page.evaluate(() => document.documentElement.scrollHeight > innerHeight), 'long loading page stays scrollable');
+        await page.locator('#draft').scrollIntoViewIfNeeded();
+        assert.equal(await page.locator('#draft').isVisible(), true, 'loading controls remain reachable after ready root lock is released');
         await touchTarget(page.locator('.file-choice'));
       } finally { await page.close(); }
     });
-    await check('essential keyboard-size screenshot is visibly labeled as a UI fixture', async () => {
-      const page = await newPage({ width: 390, height: 480 });
+    await check('essential 390x844 after screenshot is visibly labeled as a UI fixture', async () => {
+      const page = await newPage({ width: 390, height: 844 });
       try {
-        await ready(page); await send(page, 'Can I keep the message box visible?');
-        await fixture(page, 'answer', 'UI fixture response: the conversation scrolls above the message box. No model was loaded for this layout check.');
-        await phase(page, 'ready'); await page.locator('#prompt').fill('A draft survives rotation.');
-        await containedChat(page); await capture(page, 'mobile-layout-fixture.png');
+        await ready(page); await send(page, 'Hello');
+        await fixture(page, 'answer', 'Hello! How can I help you today?'); await phase(page, 'ready');
+        await send(page, 'Can we keep the conversation in view?');
+        await fixture(page, 'answer', 'Yes. Your conversation stays above the message box.');
+        await phase(page, 'ready'); await page.locator('#prompt').fill('Ready for a new thought.');
+        observations.push({ name: 'after390x844', ...(await containedChat(page)) });
+        await capture(page, 'after-mobile.png');
       } finally { await page.close(); }
     });
     await check('fixture boundary and source identity remain intact', async () => {

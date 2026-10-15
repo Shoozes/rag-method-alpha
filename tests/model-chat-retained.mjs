@@ -75,6 +75,17 @@ async function reply(page, prompt) {
   await page.locator('#send').click(); await settled(page);
   assert.ok((await page.locator('.message.assistant .content').last().textContent()).trim().length > 0);
 }
+async function clickChatControl(page, id) {
+  const control = page.locator('#' + id);
+  if (!await control.isVisible()) {
+    const containers = control.locator('xpath=ancestor::details');
+    for (let index = 0; index < await containers.count(); index++) {
+      const details = containers.nth(index);
+      if (!await details.evaluate(node => node.open)) await details.locator(':scope > summary').click();
+    }
+  }
+  await control.click();
+}
 async function closeServer(server) {
   if (!server) return;
   await new Promise((yes, no) => { server.close(error => error ? no(error) : yes()); server.closeIdleConnections(); });
@@ -231,7 +242,7 @@ Object.defineProperty(navigator.storage, 'getDirectory', { value: undefined, con
   });
   await check('fresh-worker-reinitialization-and-inference-reuse-retained-file', async () => {
     const before = workerCreated, closedBefore = workerClosed;
-    await page.locator('#unload').click(); await settled(page, 'cancelled');
+    await clickChatControl(page, 'unload'); await settled(page, 'cancelled');
     await until(() => workerClosed > closedBefore, 'Unloaded model Worker closed');
     await chooseRetainedFile(page); await settled(page);
     assert.ok(workerCreated > before, 'Fresh owned Worker initialized');
@@ -249,7 +260,7 @@ Object.defineProperty(navigator.storage, 'getDirectory', { value: undefined, con
     const name = 'live-mobile-chat.png';
     await page.screenshot({ path: join(output, name), fullPage: true });
     const bytes = await readFile(join(output, name)); screenshots.push({ path: name, bytes: bytes.length, sha256: digest(bytes) });
-    await page.locator('#unload').click(); await settled(page, 'cancelled');
+    await clickChatControl(page, 'unload'); await settled(page, 'cancelled');
     await until(() => workerClosed === workerCreated, 'All observed model Workers closed');
   });
   await check('production-Memory32-selection-with-JavaScript-probe-fixtures', async () => {
@@ -289,7 +300,7 @@ Object.defineProperty(WebAssembly, 'promising', { value: undefined, configurable
     assert.ok(selected.some(path => path.endsWith('/runtime/compat/wllama.js')));
     assert.equal(selected.some(path => path.endsWith('/runtime/wllama.wasm')), false);
     assert.equal(bridge.requests, 1); assert.deepEqual(externalRequests, []); assert.deepEqual(pageErrors, []);
-    await page.locator('#unload').click(); await settled(page, 'cancelled');
+    await clickChatControl(page, 'unload'); await settled(page, 'cancelled');
     await until(() => workerClosed === workerCreated, 'Fallback model Worker and nested Worker closed');
   });
 } catch (error) { failure = error; console.error(error.stack); }

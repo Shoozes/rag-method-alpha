@@ -66,6 +66,17 @@ async function reply(page, prompt) {
   await page.locator('#prompt').fill(prompt); await page.locator('#send').click(); await settled(page);
   assert.ok((await page.locator('.message.assistant .content').last().textContent()).trim().length > 0);
 }
+async function clickChatControl(page, id) {
+  const control = page.locator('#' + id);
+  if (!await control.isVisible()) {
+    const containers = control.locator('xpath=ancestor::details');
+    for (let index = 0; index < await containers.count(); index++) {
+      const details = containers.nth(index);
+      if (!await details.evaluate(node => node.open)) await details.locator(':scope > summary').click();
+    }
+  }
+  await control.click();
+}
 
 try {
   await check('exact-native-model-byte-identity', async () => {
@@ -234,7 +245,7 @@ Object.defineProperty(navigator.storage, 'getDirectory', { value: undefined, con
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     assert.equal(await page.locator('#loading-stage').isVisible(), false);
     assert.ok(await page.evaluate(() => [...document.querySelectorAll('#scene *')].every(item => getComputedStyle(item).animationName === 'none')));
-    await page.locator('#unload').click(); await settled(page, 'cancelled');
+    await clickChatControl(page, 'unload'); await settled(page, 'cancelled');
     await until(() => workerClosed === workerCreated, 'All observed runtime Workers closed');
   });
   await check('live-maintained-Memory32-selection-and-chat-with-JavaScript-probe-fixtures', async () => {
@@ -275,7 +286,7 @@ Object.defineProperty(WebAssembly, 'promising', { value: undefined, configurable
     await mkdir(output, { recursive: true });
     const path = 'live-mobile-chat.png'; await page.screenshot({ path: join(output, path), fullPage: true });
     const bytes = await readFile(join(output, path)); screenshots.push({ path, bytes: bytes.length, sha256: digest(bytes) });
-    await page.locator('#unload').click(); await settled(page, 'cancelled');
+    await clickChatControl(page, 'unload'); await settled(page, 'cancelled');
     await until(() => workerClosed === workerCreated, 'All observed fallback runtime Workers closed');
   });
 } catch (error) { failure = error; console.error(error.stack); }

@@ -11,16 +11,15 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions }
   const stages = { 'runtime-start': 'Starting the WASM runtime', 'model-read': 'Reading verified model bytes',
     'model-load': 'Loading model tensors', 'context-create': 'Creating the conversation context', warmup: 'Warming up the model', ready: 'Initialization completed' };
   const labels = {
-    idle: 'Ready when you are.', checking: 'Checking this browser and its cache…',
-    downloading: 'Bringing the model to your device…', verifying: 'Checking the model’s SHA-256…',
-    initializing: 'Opening the model in WASM. This can take a moment…',
-    ready: 'Your model is ready.', generating: 'Writing a reply on your device…',
-    cancelled: 'Stopped. You can try again or choose a local file.', error: 'The model could not finish. You can retry below.',
+    idle: 'Ready when you are.', checking: 'Checking browser and cache.',
+    downloading: 'Downloading model.', verifying: 'Verifying model bytes.',
+    initializing: 'Opening model.', ready: 'Ready.', generating: 'Writing a reply.',
+    cancelled: 'Stopped. Ready to retry.', error: 'Could not load. Try again below.',
     unsupported: 'This browser cannot run this runtime.',
   };
   let previousPhase = '', messages = [], pendingMessage, latestReport = '';
   const log = $('messages');
-  let followTail = true, viewportFrame;
+  let followTail = true, viewportFrame, documentFrame, loadingScrollY = 0;
   function scrollLatest(force = false) {
     if (force) followTail = true;
     if (followTail) log.scrollTop = log.scrollHeight;
@@ -31,16 +30,41 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions }
     if (followTail) $('new-messages').hidden = true;
   }, { passive: true });
   $('new-messages').addEventListener('click', () => scrollLatest(true));
-  // Use the space actually available above the keyboard. Do not reflow on pinch
-  // zoom: the browser keeps its native zoom/pan behavior. Physical iOS is untested.
+  // The transcript owns scrolling in chat. Restore the setup reading position
+  // when unloading, and never carry its document pan into the fixed chat view.
+  function setChatDocument(inChat) {
+    if (inChat === document.documentElement.classList.contains('chat-open')) return;
+    cancelAnimationFrame(documentFrame);
+    if (inChat) {
+      loadingScrollY = window.scrollY;
+      document.documentElement.classList.add('chat-open');
+      window.scrollTo({ left: 0, top: 0, behavior: 'instant' });
+    } else {
+      document.documentElement.classList.remove('chat-open');
+      documentFrame = requestAnimationFrame(() => {
+        if (!document.documentElement.classList.contains('chat-open')) window.scrollTo({ left: 0, top: loadingScrollY, behavior: 'instant' });
+      });
+    }
+    $('chat-options').open = false;
+  }
+  // Resize for the keyboard, not ordinary page pan or browser rubber-banding.
+  // Native pinch zoom stays untouched; viewport fixtures are not device proof.
   function fitViewport() {
-    const viewport = window.visualViewport;
-    if (viewport && Math.abs(viewport.scale - 1) > 0.01) return;
-    const wasFollowing = followTail;
-    app.style.setProperty('--app-height', `${Math.round(viewport?.height || window.innerHeight)}px`);
-    app.style.setProperty('--app-top', `${Math.round(viewport?.offsetTop || 0)}px`);
     cancelAnimationFrame(viewportFrame);
-    viewportFrame = requestAnimationFrame(() => scrollLatest(wasFollowing));
+    viewportFrame = requestAnimationFrame(() => {
+      const viewport = window.visualViewport;
+      if (viewport && Math.abs(viewport.scale - 1) > 0.01) return;
+      const height = Math.round(viewport?.height || window.innerHeight);
+      const layoutHeight = Math.max(document.documentElement.clientHeight, window.innerHeight);
+      const editing = document.activeElement === $('prompt');
+      const keyboard = editing && height < layoutHeight - 80;
+      const top = keyboard ? Math.max(0, Math.min(Math.round(viewport?.offsetTop || 0), layoutHeight - height)) : 0;
+      if (app.style.getPropertyValue('--app-height') === `${height}px` && app.style.getPropertyValue('--app-top') === `${top}px`) return;
+      const wasFollowing = followTail;
+      app.style.setProperty('--app-height', `${height}px`);
+      app.style.setProperty('--app-top', `${top}px`);
+      scrollLatest(wasFollowing);
+    });
   }
   window.addEventListener('resize', fitViewport);
   window.visualViewport?.addEventListener('resize', fitViewport);
@@ -52,6 +76,7 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions }
     const busy = busyPhases.has(state.phase);
     const unsupported = state.phase === 'unsupported';
     const inChat = state.phase === 'ready' || state.phase === 'generating';
+    setChatDocument(inChat);
     app.dataset.phase = state.phase;
     if (profiles[state.runtimeProfile]) app.dataset.runtimeProfile = state.runtimeProfile;
     else delete app.dataset.runtimeProfile;
@@ -59,6 +84,7 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions }
     app.classList.toggle('is-loading', busy);
     $('loading-stage').hidden = inChat;
     $('chat-stage').hidden = !inChat;
+    $('chat-options').hidden = !inChat;
     $('download').disabled = busy || unsupported;
     $('download').hidden = unsupported;
     $('local-file').disabled = busy || unsupported;
@@ -73,8 +99,8 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions }
     $('cancel').textContent = state.phase === 'initializing' ? 'Stop initialization' : 'Cancel';
     const hasInit = state.initStage !== null || state.phase === 'initializing';
     $('init-status').hidden = !hasInit || inChat;
-    $('init-stage').textContent = `Last confirmed stage: ${stages[state.initStage] || 'Opening the model'}${state.initDetail ? ' — ' + state.initDetail : ''}`;
-    $('init-timing').textContent = `${Math.floor(state.initElapsedMs / 1000)}s elapsed · ${Math.floor(state.lastProgressAgeMs / 1000)}s since the last engine stage update. No percentage estimate.`;
+    $('init-stage').textContent = stages[state.initStage] || 'Opening the model';
+    $('init-timing').textContent = `${Math.floor(state.initElapsedMs / 1000)}s elapsed; last stage ${Math.floor(state.lastProgressAgeMs / 1000)}s ago`;
     $('init-guidance').hidden = state.phase !== 'initializing' || state.initElapsedMs < 30_000;
     const initRecovery = state.phase === 'error' && (hasInit || state.errorCode === 'INIT_WAIT_LIMIT');
     $('recovery-hint').hidden = !initRecovery;
@@ -92,12 +118,12 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions }
     $('stop').hidden = state.phase !== 'generating';
     $('unload').disabled = state.phase === 'generating';
     $('clear').disabled = state.phase === 'generating';
-    $('download').textContent = ['error', 'cancelled'].includes(state.phase) ? 'Retry download / cached load' : 'Download & open chat';
+    $('download').textContent = ['error', 'cancelled'].includes(state.phase) ? 'Retry cached load' : 'Open chat';
     $('error').hidden = !state.error;
     $('error').textContent = state.error || '';
     if (state.phase !== previousPhase) {
       $('load-status').textContent = state.errorCode === 'INIT_WAIT_LIMIT' ? 'Initialization waiting limit reached. Cached bytes can be retried.' : labels[state.phase] || state.phase;
-      $('session-status').textContent = inChat ? (state.phase === 'generating' ? 'Writing locally' : 'Ready · CPU / WASM') : busy ? 'Preparing model' : unsupported ? 'Browser unsupported' : 'Model not loaded';
+      $('session-status').textContent = inChat ? (state.phase === 'generating' ? 'Writing' : 'On device') : busy ? 'Loading' : unsupported ? 'Unavailable' : 'Not loaded';
       if (unsupported || initRecovery) $('error').focus();
     }
     if (state.determinate) {
@@ -116,7 +142,8 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions }
     if (state.phase === 'ready' && previousPhase !== 'ready' && previousPhase !== 'generating') {
       if (!$('prompt').value) $('prompt').value = $('draft').value;
       $('runtime-label').textContent = `${MODEL.file} · ${profiles[state.runtimeProfile] || 'Automatic WASM runtime selection'} · ${state.cached ? 'cached bytes' : state.source === 'file' ? 'local file' : 'download verified'} · 2,048-token context`;
-      $('chat-heading').focus();
+      $('chat-heading').focus({ preventScroll: true });
+      resizePrompt();
     }
     if (state.phase === 'generating' && pendingMessage) {
       pendingMessage.querySelector('.content').textContent = state.text || '';
@@ -132,7 +159,7 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions }
     $('chat-empty').hidden = true;
     const node = document.createElement('article');
     node.className = `message ${role}${pending ? ' pending' : ''}`;
-    const name = document.createElement('p'); name.className = 'speaker'; name.textContent = role === 'user' ? 'You' : 'LFM2.5 · local model';
+    const name = document.createElement('p'); name.className = 'speaker'; name.textContent = role === 'user' ? 'You' : 'LFM2.5';
     const content = document.createElement('p'); content.className = 'content'; content.textContent = text;
     node.append(name, content); log.append(node); scrollLatest(); return node;
   }
@@ -162,16 +189,35 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions }
     }
   });
   $('effects').addEventListener('change', () => app.classList.toggle('quiet', !$('effects').checked));
+  function resizePrompt() {
+    const prompt = $('prompt');
+    prompt.style.height = '48px';
+    prompt.style.height = `${Math.max(48, Math.min(prompt.scrollHeight, parseFloat(getComputedStyle(prompt).maxHeight) || 140))}px`;
+  }
+  $('prompt').addEventListener('input', resizePrompt);
+  $('prompt').addEventListener('focus', fitViewport);
+  $('prompt').addEventListener('blur', fitViewport);
+  const options = $('chat-options');
+  const closeOptions = event => {
+    if (!options.open) return;
+    if (event.type === 'keydown' && event.key === 'Escape') {
+      options.open = false; options.querySelector('summary').focus({ preventScroll: true });
+    } else if (event.type === 'pointerdown' && !options.contains(event.target)) options.open = false;
+  };
+  document.addEventListener('keydown', closeOptions);
+  document.addEventListener('pointerdown', closeOptions);
   const visibility = () => app.classList.toggle('is-hidden', document.hidden);
   document.addEventListener('visibilitychange', visibility); visibility();
   $('unload').addEventListener('click', async () => { $('draft').value = $('prompt').value; await controller.cancel(); });
   $('stop').addEventListener('click', () => controller.cancel());
   $('clear').addEventListener('click', () => {
+    options.open = false;
     messages = [];
     $('chat-error').hidden = true;
     for (const node of $('messages').querySelectorAll('.message')) node.remove();
     $('chat-empty').hidden = false;
     scrollLatest(true);
+    $('prompt').focus({ preventScroll: true });
   });
   $('composer').addEventListener('submit', async event => {
     event.preventDefault();
@@ -185,6 +231,7 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions }
     $('chat-error').hidden = true;
     messages.push({ role: 'user', content: text }); message('user', text);
     $('prompt').value = ''; $('draft').value = '';
+    resizePrompt();
     $('prompt').focus({ preventScroll: true });
     pendingMessage = message('assistant', '', true);
     try {
@@ -202,10 +249,13 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions }
   });
   window.addEventListener('pagehide', () => {
     void controller.dispose(); document.removeEventListener('visibilitychange', visibility);
+    document.removeEventListener('keydown', closeOptions);
+    document.removeEventListener('pointerdown', closeOptions);
     window.removeEventListener('resize', fitViewport);
     window.visualViewport?.removeEventListener('resize', fitViewport);
     window.visualViewport?.removeEventListener('scroll', fitViewport);
     cancelAnimationFrame(viewportFrame);
+    cancelAnimationFrame(documentFrame);
   }, { once: true });
   render(controller.getState());
   return { controller, getMessages: () => structuredClone(messages) };

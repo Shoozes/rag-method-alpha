@@ -138,6 +138,10 @@ async function fixture(page, action, ...args) {
 async function settle(page) {
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
+async function revealControl(page, id) {
+  const disclosure = page.locator('#' + id).locator('xpath=ancestor::details[1]');
+  if (await disclosure.count() && !await disclosure.evaluate(node => node.open)) await disclosure.locator(':scope > summary').click();
+}
 async function ready(page, cached = false) {
   await fixture(page, 'progress', { phase: 'verifying', cached });
   await phase(page, 'verifying');
@@ -217,6 +221,54 @@ try {
   });
   context.setDefaultTimeout(5_000);
   browserVersion = context.browser()?.version() || 'installed Chromium';
+
+  await check('native loading and chat disclosures expose labeled secondary actions by keyboard', async () => {
+    const page = await newPage({ mobile: true, reducedMotion: true });
+    try {
+      assert.equal(await page.locator('#load-details').evaluate(node => node.open), false);
+      assert.equal(await page.locator('#download').isVisible(), true);
+      assert.equal(await page.locator('.file-choice').isVisible(), true);
+      assert.equal(await page.locator('#effects').isVisible(), false);
+      const loadSummary = page.locator('#load-details > summary');
+      await loadSummary.focus(); await page.keyboard.press('Enter');
+      assert.equal(await page.locator('#load-details').evaluate(node => node.open), true);
+      assert.equal(await page.locator('#model-license').isVisible(), true);
+      assert.equal(await page.locator('#effects').isVisible(), true);
+      await page.keyboard.press('Enter');
+      assert.equal(await page.locator('#load-details').evaluate(node => node.open), false);
+      await page.locator('#download').click(); await ready(page);
+      assert.equal(await page.locator('#chat-options').evaluate(node => node.open), false);
+      assert.equal(await page.locator('#clear').isVisible(), false);
+      assert.equal(await page.locator('#unload').isVisible(), false);
+      assert.match(await page.locator('#send').getAttribute('aria-label') || await page.locator('#send').textContent(), /Send(?: message)?/);
+      assert.equal(await page.locator('#send svg[aria-hidden="true"]').count(), 1);
+      assert.equal(await page.locator('#chat-heading').evaluate(node => node === document.activeElement), true);
+      const summary = page.locator('#chat-options > summary');
+      await summary.focus(); await page.keyboard.press('Enter');
+      assert.equal(await page.locator('#chat-options').evaluate(node => node.open), true);
+      assert.equal(await page.locator('#runtime-label').isVisible(), true);
+      for (const id of ['clear', 'unload']) {
+        assert.equal(await page.locator('#' + id).isVisible(), true);
+        const bounds = await page.locator('#' + id).boundingBox();
+        assert.ok(bounds && bounds.width >= 44 && bounds.height >= 44, id + ' touch target');
+      }
+      await page.keyboard.press('Tab');
+      assert.equal(await page.locator('#chat-options').evaluate(node => node.contains(document.activeElement)), true, 'keyboard enters native disclosure content');
+      await page.keyboard.press('Escape');
+      assert.equal(await page.locator('#chat-options').evaluate(node => node.open), false);
+      assert.equal(await summary.evaluate(node => node === document.activeElement), true, 'Escape returns focus to the disclosure summary');
+      await page.keyboard.press('Enter');
+      await page.locator('#prompt').click();
+      assert.equal(await page.locator('#chat-options').evaluate(node => node.open), false, 'outside pointer closes secondary actions');
+      assert.equal(await page.locator('#prompt').evaluate(node => node === document.activeElement), true);
+      await summary.focus(); await page.keyboard.press('Enter');
+      await summary.focus(); await page.keyboard.press('Enter');
+      assert.equal(await page.locator('#chat-options').evaluate(node => node.open), false);
+      assert.equal(await summary.evaluate(node => node === document.activeElement), true);
+      assert.equal(await page.locator('#clear').isVisible(), false);
+      await noOverflow(page);
+    } finally { await page.close(); }
+  });
 
   await check('cold measured loading, indeterminate initialization, draft handoff and desktop layout', async () => {
     const page = await newPage();
@@ -328,8 +380,8 @@ try {
       assert.equal(await page.locator('#download').isVisible(), false); assert.equal(await page.locator('#download').isDisabled(), true);
       assert.equal(await page.locator('.file-choice').isVisible(), false); assert.equal(await page.locator('#local-file').isDisabled(), true);
       assert.equal(await page.locator('#cancel').isVisible(), false); assert.equal(await page.locator('#load-progress').isVisible(), false);
-      assert.match(await page.locator('#unsupported-hint').textContent(), /Retrying or choosing a local file cannot add it/);
-      assert.match(await page.locator('#unsupported-hint').textContent(), /Physical iPhone support is not yet verified/);
+      assert.match(await page.locator('#unsupported-hint').textContent(), /Retry or a local file cannot add it/);
+      assert.match(await page.locator('#unsupported-hint').textContent(), /draft is preserved/);
       // Disabled controls are not the lifecycle boundary: even a dispatched File
       // event must be refused without calling the adapter a second time.
       await page.evaluate(() => {
@@ -393,7 +445,7 @@ try {
       await phase(page, 'downloading');
       await ready(page);
       await page.locator('#prompt').fill('Preserve this unsent message when unloading.');
-      await page.locator('#unload').click();
+      await revealControl(page, 'unload'); await page.locator('#unload').click();
       await phase(page, 'cancelled');
       assert.equal(await page.locator('#draft').inputValue(), 'Preserve this unsent message when unloading.');
       assert.ok(await page.evaluate(() => window.__loaderFixture.disposals) >= 2);
@@ -409,7 +461,7 @@ try {
       const names = await page.locator('#scene, #scene *').evaluateAll(nodes => nodes.map(node => getComputedStyle(node).animationName));
       assert.ok(names.every(name => name === 'none'), JSON.stringify(names));
       await page.emulateMedia({ reducedMotion: 'no-preference' });
-      await page.locator('#effects').uncheck();
+      await revealControl(page, 'effects'); await page.locator('#effects').uncheck();
       assert.equal(await page.locator('#app').evaluate(node => node.classList.contains('quiet')), true);
       const quietNames = await page.locator('#scene, #scene *').evaluateAll(nodes => nodes.map(node => getComputedStyle(node).animationName));
       assert.ok(quietNames.every(name => name === 'none'), JSON.stringify(quietNames));
@@ -423,7 +475,8 @@ try {
     try {
       await page.locator('#draft').fill('Private fixture draft must never enter diagnostics.');
       await fixture(page, 'mode', 'init-wait'); await page.locator('#download').click(); await phase(page, 'initializing');
-      assert.match(await page.locator('#init-stage').textContent(), /Creating the conversation context.*Fixture context creation/);
+      assert.match(await page.locator('#init-stage').textContent(), /Creating the conversation context/);
+      assert.match(JSON.parse(await page.locator('#diagnostic-report').inputValue()).stageDetail, /Fixture context creation/);
       assert.match(await page.locator('#cancel').textContent(), /Stop initialization/);
       await page.waitForFunction(() => document.getElementById('init-timing').textContent.startsWith('1s elapsed'));
       assert.equal(await page.locator('#load-progress').getAttribute('value'), null);
@@ -435,11 +488,12 @@ try {
         worker.onmessage({ data: { id: worker.requests[0].id, type: 'progress', value: { phase: 'initializing', stage: 'context-create', detail: 'Fixture context creation has not completed' } } });
       });
       assert.equal(await page.locator('#init-guidance').isVisible(), true);
-      assert.match(await page.locator('#init-guidance').textContent(), /does not prove the engine is responding/);
+      assert.match(await page.locator('#init-guidance').textContent(), /stop and retry cached bytes/);
+      assert.match(await page.locator('#init-guidance').textContent(), /three minutes/);
       await phase(page, 'error'); assert.match(await page.locator('#error').textContent(), /waiting limit, not proof.*Cached bytes were not removed/);
       assert.match(await page.locator('#load-status').textContent(), /waiting limit reached/);
       assert.equal(await page.locator('#draft').inputValue(), 'Private fixture draft must never enter diagnostics.');
-      assert.match(await page.locator('#recovery-hint').textContent(), /Retry to check existing cached bytes first/);
+      assert.match(await page.locator('#recovery-hint').textContent(), /Retry.*cache first/);
       assert.equal(await page.evaluate(() => window.__loaderFixture.waitWorkers[0].terminations), 1);
       const report = JSON.parse(await page.locator('#diagnostic-report').inputValue());
       assert.equal(report.errorCode, 'INIT_WAIT_LIMIT'); assert.equal(report.lastConfirmedStage, 'context-create');
@@ -458,7 +512,7 @@ try {
       await phase(page, 'error'); assert.match(await page.locator('#init-stage').textContent(), /Creating the conversation context/);
       await fixture(page, 'mode', 'cached'); await page.locator('#download').click(); await ready(page, true);
       assert.equal(await page.locator('#prompt').inputValue(), 'Private fixture draft must never enter diagnostics.');
-      await page.locator('#unload').click(); await phase(page, 'cancelled');
+      await revealControl(page, 'unload'); await page.locator('#unload').click(); await phase(page, 'cancelled');
       await fixture(page, 'mode', 'init-wait'); await page.locator('#download').click(); await phase(page, 'initializing');
       await page.locator('#cancel').click(); await phase(page, 'cancelled');
       assert.equal(await page.evaluate(() => window.__loaderFixture.waitWorkers[1].terminations), 1);
@@ -508,7 +562,7 @@ try {
       await page.locator('#diagnostics').evaluate(node => { node.open = true; });
       await noOverflow(page); await screenshot(page, 'runtime-abort-fixture.png');
       await fixture(page, 'mode', 'cached'); await page.locator('#download').click(); await ready(page, true);
-      await page.locator('#unload').click(); await phase(page, 'cancelled');
+      await revealControl(page, 'unload'); await page.locator('#unload').click(); await phase(page, 'cancelled');
       await page.locator('#download').click(); await phase(page, 'checking');
       const absent = JSON.parse(await page.locator('#diagnostic-report').inputValue());
       assert.equal(absent.errorDetail, null); assert.equal(absent.stageDetail, null);
@@ -517,7 +571,7 @@ try {
   });
 
   await check('fixture boundary: no engine, runtime, model, external requests or page errors', async () => {
-    assert.equal(adapterReplacements, 10);
+    assert.equal(adapterReplacements, 11);
     assert.deepEqual(unexpectedRequests, []);
     assert.deepEqual(pageErrors, []);
     for (const identity of sourceIdentity) {

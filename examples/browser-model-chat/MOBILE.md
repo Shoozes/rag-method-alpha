@@ -4,6 +4,20 @@ The live preview is <https://shoozes.github.io/rag-method-alpha/model-chat/>.
 The exact model and runtime identities are in [model-contract.mjs](./model-contract.mjs).
 This is a browser application; installing it as a native app is outside this slice.
 
+## Current device observation
+
+The user reported success ("Bingo") on their iPhone after source `19eb228`
+bound the selected Memory32 resources. Exact device, iOS version and browser
+container remain unknown. That success is a user report, rather than an
+independently instrumented physical-device run. Actual local browser
+before/after captures ground this UI polish. This observation does not close
+every device/cache/recovery acceptance below.
+
+The current polish keeps that runtime, model and cache unchanged. Chat options
+contains Clear conversation, Unload model and runtime details. Model details and
+Loading report hold secondary loading information. No permanent hero or extra
+technical copy occupies the ready chat.
+
 ## Short iPhone check
 
 1. Record the iPhone model, iOS version and browser/version, including whether
@@ -26,8 +40,11 @@ This is a browser application; installing it as a native app is outside this sli
    Files, try selecting it separately. Record tab reloads, storage failures and
    unexpected network transfers rather than treating them as platform limits.
 4. Send a short question. Open the keyboard, type a long draft and rotate. The
-   composer should remain reachable; the draft should survive. Scroll upward
-   during a reply, then use Latest messages to return. Try Stop and a fresh load.
+   composer should remain reachable; the draft should survive. Try horizontal
+   swipes and ordinary page pan at default scale: the chat should stay anchored.
+   Keep native pinch zoom available. Scroll upward during a reply, then use
+   Latest messages to return. Open Chat options by touch and keyboard, close with
+   Escape where available, and check focus return. Try Stop and a fresh load.
 5. Reload and check cache reuse, then interrupted-transfer/bad-cache recovery and
    background/foreground behavior. Conversation text is session-only. Record
    crashes, browser eviction and recovery; do not infer memory safety from file size.
@@ -68,9 +85,14 @@ Run `node tests/model-chat-mobile.mjs` with the existing Playwright/Chrome setup
 from [README.md](./README.md). Its labeled adapter fixture checks actual DOM
 interaction at 320x568, 390x844, 390x480 and 844x390, including touch targets,
 contained scrolling, streamed growth, reading position, manual Latest messages,
-visible conversation limits, draft retention and teardown. A narrow chat reserves
-the available visual viewport for its log and composer; short layouts compact
-secondary text. Local-file selection has a 44px target. Input text remains 16px.
+visible conversation limits, draft retention and teardown. It also checks entry
+from a scrolled loading screen without a corrective test scroll, document pan
+refusal at default scale, actual Chrome 2x page zoom and separately labeled
+synthetic keyboard/viewport offsets. Chat reserves the available visual viewport
+for its log and composer; secondary actions use native disclosure. Loading
+position is restored after unloading. Touch targets remain at least 44px and
+input text remains 16px. The viewport fixture does not emulate Safari chrome,
+physical keyboard/IME behavior or OS rubber-banding.
 
 `node tests/model-chat-pages.mjs` separately verifies the published HTTPS assets,
 hashes/MIME/404s, refusal before weights, and real initialization/chat using an
