@@ -9,6 +9,7 @@ import { startServer } from '../examples/browser-model-chat/serve.mjs';
 
 const prefix = 'rag-memory-delivery-';
 const coreSource = 'export const memoryDeliveryFixture = "bounded-local-core";\n';
+const graphSource = 'export const graphDeliveryFixture = "bounded-local-graph";\n';
 const wasmBytes = Buffer.from([0, 97, 115, 109, 1, 0, 0, 0]);
 const normalize = path => process.platform === 'win32' ? resolve(path).toLowerCase() : resolve(path);
 
@@ -33,9 +34,11 @@ async function fixture(t) {
     writeFile(join(root, 'ordinary.mjs'), 'export const ordinary = true;\n'),
     writeFile(join(root, 'payload.unlisted'), 'A non-executable fixture.'),
     writeFile(join(root, 'memory', 'rag-core.mjs'), 'ROOT-LOOKALIKE-MUST-NOT-APPEAR'),
+    writeFile(join(root, 'memory', 'graph-renderer.mjs'), 'ROOT-LOOKALIKE-MUST-NOT-APPEAR'),
     writeFile(join(root, 'memory', 'citations.mjs'), 'export const historicalCitationFixture = true;\n'),
     writeFile(join(runtimeRoot, 'wllama.wasm'), wasmBytes),
     writeFile(join(memoryCoreRoot, 'rag-core.mjs'), coreSource),
+    writeFile(join(memoryCoreRoot, 'graph-renderer.mjs'), graphSource),
     writeFile(join(memoryCoreRoot, 'private.mjs'), 'GENERATED-EXTRA-MUST-NOT-APPEAR'),
     writeFile(join(outside, 'rag-core.mjs'), 'OUTSIDE-SECRET-MUST-NOT-APPEAR'),
   ]);
@@ -100,6 +103,38 @@ test('the memory core mount is disabled by default, including example-root looka
   const files = await fixture(t);
   const server = await files.start({});
   for (const path of ['/memory/rag-core.mjs', '/memory/rag-core.mjs?cache=1']) blocked(await request(server.url, path), path);
+});
+
+test('the graph mount is independently explicit with exact GET/HEAD JavaScript and no missing-file fallback', async t => {
+  const files = await fixture(t);
+  const disabled = await files.start({ memoryCoreRoot: files.memoryCoreRoot });
+  blocked(await request(disabled.url, '/memory/graph-renderer.mjs'), 'core mount cannot enable graph');
+  const enabled = await files.start({ memoryGraphRoot: files.memoryCoreRoot });
+  blocked(await request(enabled.url, '/memory/rag-core.mjs'), 'graph mount cannot enable core');
+  for (const method of ['GET', 'HEAD']) {
+    const response = await request(enabled.url, '/memory/graph-renderer.mjs?cache=1', method);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers['content-type'], 'application/javascript; charset=utf-8');
+    assert.equal(Number(response.headers['content-length']), Buffer.byteLength(graphSource));
+    assert.equal(response.body.toString(), method === 'GET' ? graphSource : '');
+  }
+  for (const path of ['/memory/graph-renderer.mjs.map', '/memory/graph-renderer.mjs/missing', '/memory/private.mjs']) {
+    blocked(await request(enabled.url, path), path);
+  }
+  await rm(join(files.memoryCoreRoot, 'graph-renderer.mjs'));
+  blocked(await request(enabled.url, '/memory/graph-renderer.mjs'), 'missing generated graph');
+});
+
+test('the generated graph mount refuses canonical-root escape', async t => {
+  const files = await fixture(t), path = join(files.memoryCoreRoot, 'graph-renderer.mjs');
+  await rm(path);
+  try { await symlink(join(files.outside, 'rag-core.mjs'), path, 'file'); }
+  catch (error) {
+    if (process.platform !== 'win32' || !['EPERM', 'EACCES', 'ENOTSUP'].includes(error.code)) throw error;
+    await symlink(files.outside, path, 'junction');
+  }
+  const server = await files.start({ memoryGraphRoot: files.memoryCoreRoot });
+  blocked(await request(server.url, '/memory/graph-renderer.mjs'), 'generated graph escape');
 });
 
 test('only the generated core filename is mounted and missing files never fall back to the example root', async t => {

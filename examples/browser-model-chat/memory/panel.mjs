@@ -1,256 +1,279 @@
-/** Private, explicit memory controls. The stores own validation and retrieval. */
-export function mountMemoryPanel({ conversation, memory, retrieval, events, graph, context, onChange } = {}) {
-  const doc = document;
-  const options = doc.getElementById('chat-options');
-  if (!options?.parentElement || doc.getElementById('memory-dialog')) throw new Error('Memory panel needs an unmounted chat header.');
+/** Real saved memories and their cited user messages; bounded view, no admission. */
+export function projectMemoryMap({ active, turns, graphData, preferredRecordIds = [], limit = 6 }) {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 6) throw RangeError('Memory map admits at most six current records.');
+  const records = new Map(active.map(item => [item.id, item]));
+  const originals = new Map(turns.filter(turn => turn.role === 'user').map(turn => [turn.id, turn]));
+  const actual = graphData ? new Set(graphData.nodes.map(node => node.id)) : null;
+  const ordered = [...new Set([...preferredRecordIds, ...active.slice().reverse().map(item => item.id)])]
+    .map(id => records.get(id)).filter(item => item && (!actual || actual.has('record:' + item.id))).slice(0, limit);
+  const nodes = [], links = [], sources = new Set();
+  const excerpt = value => { const words = value.replace(/\s+/gu, ' ').trim(); return [...words].slice(0, 58).join('') + ([...words].length > 58 ? '…' : ''); };
+  for (const item of ordered) {
+    const id = 'record:' + item.id;
+    nodes.push({ id, kind: 'record', recordId: item.id, version: item.version, label: excerpt(item.text) });
+    const sourceId = item.sourceTurnIds.find(source => originals.has(source) && (!actual || actual.has('turn:' + source)));
+    if (!sourceId) continue;
+    const target = 'turn:' + sourceId;
+    if (!sources.has(target)) { nodes.push({ id: target, kind: 'source', sourceTurnId: sourceId, label: 'From chat' }); sources.add(target); }
+    const recordEvents = graphData?.links.filter(link => link.target === id).map(link => link.source);
+    if (!graphData || graphData.links.some(link => recordEvents.includes(link.source) && link.target === target)) {
+      links.push({ id: JSON.stringify([id, target]), source: id, target, kind: 'source' });
+    }
+  }
+  return { nodes, links };
+}
+
+/** Storage and retrieval retain authority; this view owns only presentation. */
+export function mountMemoryPanel({ conversation, memory, retrieval, events, graph, onChange, rendererBackend = 'auto' } = {}) {
+  if (!['auto', 'webgl2'].includes(rendererBackend)) throw Error('Unsupported memory graph backend.');
+  const doc = document, options = doc.getElementById('chat-options');
+  const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
+  if (!options?.parentElement || doc.getElementById('memory-dialog')) throw Error('Memory needs an unmounted chat header.');
   const listeners = new AbortController();
   const listen = (node, type, callback) => node.addEventListener(type, callback, { signal: listeners.signal });
-  const element = (tag, text, attrs = {}) => {
-    const node = doc.createElement(tag);
-    if (text !== undefined) node.textContent = text;
+  const el = (tag, value, attrs = {}) => {
+    const node = doc.createElement(tag); if (value !== undefined) node.textContent = value;
     for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
     return node;
   };
-  const control = (text, id) => element('button', text, { type: 'button', id, class: 'secondary' });
-  const field = (label, node) => {
-    const wrapper = element('label', undefined, { class: 'memory-field' });
-    wrapper.append(element('span', label), node);
-    return wrapper;
-  };
-  const stylesheet = doc.getElementById('memory-panel-style') ? null : element('link', undefined, {
+  const control = (value, id) => el('button', value, { type: 'button', id, class: 'secondary' });
+  const field = (label, node) => { const wrapper = el('label', undefined, { class: 'memory-field' }); wrapper.append(el('span', label), node); return wrapper; };
+  const stylesheet = doc.getElementById('memory-panel-style') ? null : el('link', undefined, {
     id: 'memory-panel-style', rel: 'stylesheet', href: new URL('./panel.css', import.meta.url).href,
   });
   if (stylesheet) doc.head.append(stylesheet);
-  const button = control('Memory', 'memory-open');
-  button.classList.add('memory-open');
-  button.setAttribute('aria-haspopup', 'dialog');
-  button.setAttribute('aria-controls', 'memory-dialog');
-  options.before(button);
-  const dialog = element('dialog', undefined, { id: 'memory-dialog', class: 'memory-dialog', 'aria-labelledby': 'memory-title' });
-  const header = element('header', undefined, { class: 'memory-panel-header' });
-  const close = control('Close', 'memory-close');
-  header.append(element('h2', 'Memory', { id: 'memory-title' }), close);
-  const body = element('div', undefined, { class: 'memory-panel-body' });
-  const intro = element('p', 'Older context is selected automatically from your messages when the prompt fills. Selection is lossy, not a general semantic summary. Save exact words only when you want a separate saved record.', { class: 'memory-note' });
-  const contextMethod = element('p', '', { id: 'memory-context-method', class: 'memory-note' });
-  const source = element('select', undefined, { id: 'memory-source-turn' });
-  const record = element('select', undefined, { id: 'memory-record' });
-  const text = element('textarea', undefined, { id: 'memory-text', rows: '3', maxlength: '4000', 'aria-describedby': 'memory-source-hint' });
-  const hint = element('p', 'Select a user message, then keep all or part of its exact text.', { id: 'memory-source-hint', class: 'memory-note' });
-  const save = control('Save', 'memory-save');
-  const correct = control('Correct', 'memory-correct');
-  const forget = control('Forget saved record', 'memory-forget');
-  const forgetHint = element('p', 'Forgetting a saved record does not erase the transcript or other messages that repeat it.', { id: 'memory-forget-hint', class: 'memory-note' });
+  const button = control('Memory', 'memory-open'); button.classList.add('memory-open');
+  button.setAttribute('aria-haspopup', 'dialog'); button.setAttribute('aria-controls', 'memory-dialog'); options.before(button);
+  const dialog = el('dialog', undefined, { id: 'memory-dialog', class: 'memory-dialog', 'aria-labelledby': 'memory-title' });
+  const header = el('header', undefined, { class: 'memory-panel-header' });
+  const back = control('Back', 'memory-back'), close = control('Close', 'memory-close'); back.hidden = true;
+  const title = el('h2', 'Memory', { id: 'memory-title' }); header.append(back, title, close);
+  const body = el('div', undefined, { class: 'memory-panel-body' });
+  const searchForm = el('form', undefined, { id: 'memory-recall-form', class: 'memory-search-form' });
+  const query = el('input', undefined, { id: 'memory-query', type: 'search', maxlength: '1024', placeholder: 'Search saved words', 'aria-label': 'Search saved words', enterkeyhint: 'search' });
+  const clear = control('×', 'memory-query-clear'); clear.setAttribute('aria-label', 'Clear search'); clear.hidden = true;
+  const recall = control('Search', 'memory-recall'); recall.type = 'submit'; searchForm.append(query, clear, recall);
+  const map = el('div', undefined, { class: 'memory-map' });
+  const picture = el('div', undefined, { id: 'memory-graph', class: 'memory-graph', 'aria-label': 'Saved memories and their sources' });
+  const canvas = el('canvas', undefined, { class: 'memory-canvas', 'aria-hidden': 'true' }); canvas.hidden = true;
+  const empty = el('p', 'No saved memories yet.', { class: 'memory-empty' }); picture.append(canvas, empty); map.append(picture);
+  const detail = el('section', undefined, { id: 'memory-detail', class: 'memory-detail', 'aria-labelledby': 'memory-detail-title' }); detail.hidden = true;
+  const detailTitle = el('h3', 'Saved words', { id: 'memory-detail-title', tabindex: '-1' });
+  const detailText = el('p', '', { id: 'memory-detail-text', class: 'memory-record-text' });
+  const detailSources = el('div', undefined, { id: 'memory-detail-sources', class: 'memory-sources' });
+  const edit = control('Edit', 'memory-edit'), forget = control('Forget saved record', 'memory-forget');
+  const forgetHint = el('p', 'Forgetting a saved record does not erase the transcript or other messages that repeat it.', { id: 'memory-forget-hint', class: 'memory-note' });
   forget.setAttribute('aria-describedby', 'memory-forget-hint');
-  const actions = element('div', undefined, { class: 'memory-actions' });
-  actions.append(save, correct, forget);
-  const editor = element('section', undefined, { 'aria-label': 'Save or change memory', class: 'memory-section' });
-  const selectors = element('div', undefined, { class: 'memory-selectors' });
-  selectors.append(field('User message', source), field('Saved record', record));
-  editor.append(selectors, field('Exact words to save', text), hint, actions, forgetHint);
-  const status = element('p', '', { id: 'memory-status', role: 'status', 'aria-live': 'polite' });
-  const recordsSection = element('section', undefined, { class: 'memory-section', 'aria-labelledby': 'memory-records-title' });
-  const recordsTitle = element('h3', 'Saved records', { id: 'memory-records-title' });
-  const recordsList = element('ul', undefined, { id: 'memory-records', class: 'memory-list' });
-  recordsSection.append(recordsTitle, recordsList);
-  const recallSection = element('section', undefined, { class: 'memory-section', 'aria-labelledby': 'memory-recall-title' });
-  const recallForm = element('form', undefined, { id: 'memory-recall-form', class: 'memory-recall-form' });
-  const query = element('input', undefined, { id: 'memory-query', type: 'search', maxlength: '1024', placeholder: 'Search saved words' });
-  const recall = control('Recall', 'memory-recall');
-  recall.type = 'submit';
-  recallForm.append(field('Query', query), recall);
-  const results = element('ul', undefined, { id: 'memory-results', class: 'memory-list', 'aria-live': 'polite' });
-  recallSection.append(element('h3', 'Recall', { id: 'memory-recall-title' }), recallForm, results);
-  const activity = element('section', undefined, { class: 'memory-section', 'aria-labelledby': 'memory-activity-title' });
-  const picture = element('div', undefined, { id: 'memory-graph', class: 'memory-graph' });
-  const eventList = element('ol', undefined, { id: 'memory-event-list', class: 'memory-event-list' });
-  activity.append(element('h3', 'Activity', { id: 'memory-activity-title' }), picture, eventList);
-  body.append(intro, contextMethod, editor, status, recordsSection, recallSection, activity);
-  dialog.append(header, body);
-  doc.body.append(dialog);
+  const detailActions = el('div', undefined, { class: 'memory-actions' }); detailActions.append(edit, forget);
+  detail.append(detailTitle, detailText, detailSources, detailActions, forgetHint); map.append(detail);
+  const editor = el('section', undefined, { id: 'memory-editor', class: 'memory-editor', 'aria-label': 'Save exact words from your chat' }); editor.hidden = true;
+  const source = el('select', undefined, { id: 'memory-source-turn' });
+  const text = el('textarea', undefined, { id: 'memory-text', rows: '5', maxlength: '4000', 'aria-describedby': 'memory-source-hint' });
+  const hint = el('p', 'Keep all or part of the exact words in your message.', { id: 'memory-source-hint', class: 'memory-note' });
+  const save = control('Save', 'memory-save'), correct = control('Save correction', 'memory-correct'), cancel = control('Cancel', 'memory-cancel');
+  const editorActions = el('div', undefined, { class: 'memory-actions' }); editorActions.append(save, correct, cancel);
+  editor.append(field('From your chat', source), field('Exact words', text), hint, editorActions);
+  const add = control('Save from chat', 'memory-add'); add.classList.add('memory-add');
+  const status = el('p', '', { id: 'memory-status', role: 'status', 'aria-live': 'polite' });
+  body.append(searchForm, map, editor, status, add); dialog.append(header, body); doc.body.append(dialog);
 
-  let disposed = false, busy = false, selectedVersion = null, hits = null, querySequence = 0, skipFocusReturn = false;
+  let disposed = false, busy = false, hits = null, sequence = 0, selected = null, editRecord = null, skipFocusReturn = false;
+  let renderer = null, rendererModule = null, rendererPromise = null, rendererGeneration = 0, topology = '', currentMap = { nodes: [], links: [] };
+  const nodeButtons = new Map();
   const snapshot = () => conversation.snapshot();
-  const scope = () => {
-    const value = snapshot();
-    if (!value.actorId || !value.conversationId) throw new Error('Conversation scope is unavailable.');
-    return { actorId: value.actorId, conversationId: value.conversationId };
-  };
+  const scope = () => { const value = snapshot(); return { actorId: value.actorId, conversationId: value.conversationId }; };
+  const active = () => memory.active(scope());
   const userTurns = () => snapshot().turns.filter(turn => turn.role === 'user');
   const selectedSource = () => userTurns().find(turn => turn.id === source.value);
-  const selectedRecord = () => memory.active(scope()).find(item => item.id === record.value);
-  const setStatus = (message, error = false) => {
-    status.textContent = message;
-    status.classList.toggle('memory-error', error);
-    status.setAttribute('role', error ? 'alert' : 'status');
-  };
-  const errorMessage = error => {
-    try { if (typeof error?.message === 'string') return error.message.slice(0, 180); } catch { /* Error reporting cannot own the operation. */ }
-    return 'The memory operation could not finish.';
-  };
-  const persistenceMessage = error => typeof error === 'string' ? error.slice(0, 180) : errorMessage(error);
-  function updateButtons() {
-    const authored = selectedSource();
-    const valid = Boolean(authored && text.value.length && authored.content.includes(text.value));
-    save.disabled = busy || !valid;
-    correct.disabled = busy || !valid || !record.value || selectedVersion === null;
-    forget.disabled = busy || !record.value;
-    recall.disabled = busy || !query.value.trim();
-    for (const input of [source, record, text, query]) input.disabled = busy;
+  const selectedRecord = () => selected?.kind === 'record' ? active().find(item => item.id === selected.recordId) : null;
+  const setStatus = (value, error = false) => { status.textContent = value; status.classList.toggle('memory-error', error); status.setAttribute('role', error ? 'alert' : 'status'); status.hidden = !value; };
+  const errorText = error => typeof error?.message === 'string' ? error.message.slice(0, 180) : 'The memory operation could not finish.';
+  function buttons() {
+    const authored = selectedSource(), valid = Boolean(authored && text.value.length && text.value.length <= 4000 && authored.content.includes(text.value));
+    save.disabled = busy || !valid; correct.disabled = busy || !valid || !editRecord;
+    for (const node of [source, text, query, recall, clear, add, edit, forget, cancel, back]) node.disabled = busy;
+    recall.disabled = busy || !query.value.trim(); clear.hidden = !query.value;
+    add.hidden = !editor.hidden || selected !== null || userTurns().length === 0;
   }
-  function sourceLinks(turnIds) {
-    const links = element('span', undefined, { class: 'memory-sources' });
-    for (const id of turnIds ?? []) links.append(element('a', id, { href: `#turn-${id}`, 'data-memory-source': id }));
-    return links;
+  function sourceLinks(ids) {
+    detailSources.replaceChildren();
+    for (const id of ids) detailSources.append(el('a', 'Open in chat', { href: '#turn-' + id, 'data-memory-source': id }));
   }
-  function drawRecords(active) {
-    recordsTitle.textContent = `Saved records (${active.length})`;
-    recordsList.replaceChildren();
-    if (!active.length) recordsList.append(element('li', 'No saved records yet.', { class: 'memory-note' }));
-    for (const item of active) {
-      const row = element('li');
-      row.append(element('p', item.text, { class: 'memory-record-text' }), element('span', `${item.id} · v${item.version}`, { class: 'memory-record-id' }), sourceLinks(item.sourceTurnIds));
-      recordsList.append(row);
+  function matchingNodeIds() {
+    if (!hits) return [];
+    const current = new Map(active().map(item => [item.id, item]));
+    return hits.filter(hit => current.get(hit.recordId)?.version === hit.version)
+      .flatMap(hit => ['record:' + hit.recordId, ...hit.sourceTurnIds.map(id => 'turn:' + id)])
+      .filter(id => currentMap.nodes.some(node => node.id === id));
+  }
+  function showDetail(node, focus = false) {
+    selected = node; editor.hidden = true; map.hidden = false; searchForm.hidden = false; detail.hidden = !node;
+    back.hidden = !node; title.textContent = 'Memory'; editRecord = null;
+    if (node) {
+      const record = node.kind === 'record' ? active().find(item => item.id === node.recordId) : null;
+      const original = node.kind === 'source' ? userTurns().find(turn => turn.id === node.sourceTurnId) : null;
+      if (!record && !original) { selected = null; detail.hidden = true; back.hidden = true; query.focus(); return; }
+      detailTitle.textContent = record ? 'Saved words' : 'From your chat'; detailText.textContent = record?.text ?? original.content;
+      sourceLinks(record?.sourceTurnIds ?? [original.id]); edit.hidden = !record; forget.hidden = !record; forgetHint.hidden = !record;
+      if (focus) detailTitle.focus({ preventScroll: true });
+    }
+    for (const [id, target] of nodeButtons) target.setAttribute('aria-pressed', String(selected?.id === id));
+    renderer?.setInteractionState(selected?.id ?? null, matchingNodeIds()); buttons();
+  }
+  function overlayPositions() {
+    if (!renderer) return;
+    for (const target of renderer.diagnostics().node_targets) {
+      const node = nodeButtons.get(target.node_id); if (!node) continue;
+      node.style.setProperty('--node-x', target.x + 'px'); node.style.setProperty('--node-y', target.y + 'px'); node.hidden = !target.visible;
     }
   }
-  function drawHits() {
-    results.replaceChildren();
-    if (hits === null) return;
-    if (!hits.length) results.append(element('li', 'No matching active memories.', { class: 'memory-note' }));
-    for (const hit of hits) {
-      const row = element('li');
-      row.append(element('p', hit.text, { class: 'memory-record-text' }), element('span', `${hit.recordId} · v${hit.version}`, { class: 'memory-record-id' }), sourceLinks(hit.sourceTurnIds));
-      results.append(row);
-    }
+  function stopRenderer() {
+    ++rendererGeneration; renderer?.dispose(); renderer = null; rendererPromise = null; topology = ''; canvas.hidden = true;
   }
-  function drawGraph() {
-    picture.replaceChildren();
-    eventList.replaceChildren();
-    const actualEvents = events.list();
-    for (const event of actualEvents.slice(-8)) {
-      const row = element('li', `${event.id} · ${event.type}`);
-      const ids = event.recordId ? [event.recordId] : event.recordIds ?? [];
-      if (ids.length) row.append(element('span', ` · ${ids.join(', ')}`));
-      if (event.priorEventIds?.length) row.append(element('span', ` · after ${event.priorEventIds.join(', ')}`));
-      row.append(sourceLinks(event.sourceTurnIds));
-      eventList.append(row);
+  function fallback(reason = '') {
+    renderer?.dispose(); renderer = null; topology = ''; canvas.hidden = true;
+    picture.dataset.renderer = 'list'; picture.classList.add('is-fallback');
+    for (const node of nodeButtons.values()) node.hidden = false;
+    if (reason) setStatus('Graph unavailable. Your saved words are still available.', true);
+  }
+  function drawRenderer() {
+    if (!renderer || !rendererModule) return;
+    const key = JSON.stringify(currentMap);
+    if (topology !== key) {
+      const data = { view: 'evidence', nodes: currentMap.nodes.map(node => ({ ...node, kind: node.kind === 'record' ? 'chunk' : 'source',
+        record_id: node.recordId ?? null, source_id: node.sourceTurnId ?? node.recordId, path: 'memory/' + (node.recordId ?? node.sourceTurnId) })),
+        links: currentMap.links, total_nodes: currentMap.nodes.length, total_links: currentMap.links.length, omitted_nodes: 0, omitted_links: 0 };
+      const positioned = rendererModule.layoutRagGraph(data, hits?.map(hit => hit.recordId) ?? []);
+      renderer.render({ ...positioned, nodes: positioned.nodes.map(node => ({ ...node, x: node.x * 2.5, y: node.y * 2.5 })) }); topology = key;
     }
-    if (!actualEvents.length) picture.append(element('p', 'No memory events yet.', { class: 'memory-note' }));
-    if (actualEvents.length > 8) eventList.prepend(element('li', `Latest 8 of ${actualEvents.length} actual events.`, { class: 'memory-note' }));
-    if (!graph) return;
-    try {
-      const data = graph.snapshot();
-      const eventIds = new Set(data.nodes.filter(node => node.kind === 'event').slice(-6).map(node => node.id));
-      const related = new Set(data.links.filter(link => eventIds.has(link.source)).map(link => link.target));
-      const eventNodes = data.nodes.filter(node => eventIds.has(node.id));
-      const nodes = [...eventNodes, ...data.nodes.filter(node => related.has(node.id) && !eventIds.has(node.id)).slice(0, 30 - eventNodes.length)];
-      if (!nodes.length) return;
-      const ns = 'http://www.w3.org/2000/svg';
-      const svgNode = (tag, attrs = {}, content) => {
-        const node = doc.createElementNS(ns, tag);
-        for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
-        if (content !== undefined) node.textContent = content;
-        return node;
-      };
-      const rows = { event: 0, record: 0, source: 0 }, x = { event: 32, record: 236, source: 438 }, positions = new Map();
-      for (const node of nodes) positions.set(node.id, { x: x[node.kind], y: 28 + rows[node.kind]++ * 28 });
-      const height = Math.max(3, ...Object.values(rows)) * 28 + 20;
-      const svg = svgNode('svg', { viewBox: `0 0 600 ${height}`, role: 'img', 'aria-label': `${nodes.length} actual memory event, record and source nodes. Connections are listed below.` });
-      for (const link of data.links) {
-        const from = positions.get(link.source), to = positions.get(link.target);
-        if (from && to) svg.append(svgNode('path', { d: `M${from.x},${from.y} Q${(from.x + to.x) / 2},${from.y} ${to.x},${to.y}`, class: 'memory-edge' }));
+    renderer.setInteractionState(selected?.id ?? null, matchingNodeIds()); renderer.refreshViewport(); overlayPositions();
+  }
+  async function ensureRenderer() {
+    if (!graph || !dialog.open || !editor.hidden || !currentMap.nodes.length || disposed) return;
+    if (renderer) { drawRenderer(); return; } if (rendererPromise) return;
+    const generation = ++rendererGeneration; picture.dataset.renderer = 'loading'; picture.classList.add('is-fallback');
+    rendererPromise = (async () => {
+      // Avoid starting Three with a null WebGL context on devices without a GPU.
+      let backend = rendererBackend, hasWebGpu = false;
+      if (backend === 'auto' && navigator.gpu) {
+        try { hasWebGpu = Boolean(await navigator.gpu.requestAdapter()); } catch { /* Try the supported fallback below. */ }
       }
-      for (const node of nodes) {
-        const point = positions.get(node.id);
-        const label = node.kind === 'event' ? `${node.seq} ${node.type}` : node.recordId ?? node.sourceTurnId;
-        svg.append(svgNode('circle', { cx: point.x, cy: point.y, r: '4', class: `memory-node memory-node-${node.kind}` }), svgNode('text', { x: point.x + 10, y: point.y + 4 }, label));
+      if (!hasWebGpu) {
+        const probe = doc.createElement('canvas'), context = probe.getContext('webgl2');
+        if (!context) throw Error('No supported graph backend.');
+        context.getExtension('WEBGL_lose_context')?.loseContext(); backend = 'webgl2';
       }
-      picture.append(svg, element('p', `Showing ${nodes.length} of ${data.nodes.length} actual graph nodes.`, { class: 'memory-note' }));
-    } catch { picture.append(element('p', 'Graph unavailable. The actual event list is shown below.', { class: 'memory-note' })); }
+      const module = await import('./graph-renderer.mjs');
+      if (generation !== rendererGeneration || disposed || !dialog.open) return;
+      canvas.hidden = false;
+      const value = await module.createTslRagGraphRenderer({ canvas, backend, onNodeActivate: id => {
+        const node = currentMap.nodes.find(node => node.id === id); if (node) showDetail(node, true);
+      }, onTerminalFailure: () => fallback('device unavailable') });
+      if (generation !== rendererGeneration || disposed || !dialog.open) { value.dispose(); return; }
+      renderer = value; rendererModule = module; renderer.setMotionEnabled(!motionPreference.matches);
+      picture.dataset.renderer = 'tsl'; picture.dataset.backend = renderer.backend; picture.classList.remove('is-fallback'); drawRenderer();
+    })().catch(() => { if (generation === rendererGeneration && !disposed) fallback('initialization failed'); })
+      .finally(() => { if (generation === rendererGeneration) rendererPromise = null; });
+  }
+  function drawMap() {
+    currentMap = projectMemoryMap({ active: active(), turns: snapshot().turns, graphData: graph?.snapshot() ?? null, preferredRecordIds: hits?.map(hit => hit.recordId) ?? [] });
+    const ids = new Set(currentMap.nodes.map(node => node.id)), matches = new Set(matchingNodeIds());
+    for (const [id, button] of nodeButtons) if (!ids.has(id)) {
+      const focused = doc.activeElement === button; button.remove(); nodeButtons.delete(id); if (focused) query.focus();
+    }
+    for (const node of currentMap.nodes) {
+      let target = nodeButtons.get(node.id);
+      if (!target) {
+        target = control('', ''); target.removeAttribute('id'); target.className = 'memory-map-node';
+        target.append(el('span', '', { class: 'memory-node-label', 'aria-hidden': 'true' }));
+        target.dataset.memoryNode = node.id; target.dataset.memoryKind = node.kind;
+        listen(target, 'click', () => { const current = currentMap.nodes.find(item => item.id === node.id); if (current) showDetail(current, true); });
+        picture.append(target); nodeButtons.set(node.id, target);
+      }
+      target.firstChild.textContent = node.label; target.setAttribute('aria-label', (node.kind === 'record' ? 'Memory: ' : 'Source message ' + node.sourceTurnId + ': ') + node.label);
+      target.dataset.matched = String(matches.has(node.id)); target.setAttribute('aria-pressed', String(selected?.id === node.id));
+    }
+    picture.classList.toggle('has-query', hits !== null); empty.hidden = currentMap.nodes.length > 0;
+    if (!currentMap.nodes.length) { stopRenderer(); picture.dataset.renderer = 'empty'; }
+    else if (!graph) fallback(); else void ensureRenderer();
+    if (renderer) drawRenderer();
   }
   function refresh() {
     if (disposed) return;
-    const strategy = context?.snapshot?.().compacted?.strategy;
-    contextMethod.textContent = strategy === 'source-linked-automatic-extractive-v1'
-      ? 'Context: automatically selected exact passages from older user messages. Some context is omitted; original transcript kept.'
-      : strategy === 'source-linked-structured-extractive-v1'
-      ? 'Context: marked facts and constraints retained as source-linked quotes. Unmarked narrative omitted; original transcript kept.'
-      : strategy === 'source-linked-lossy-window-v1' || strategy === 'source-linked-extractive-window-v1'
-        ? 'Context: lossy recent-message window. Older meaning may be omitted; original transcript kept.'
-        : strategy ? 'Context: method unavailable; original transcript kept.' : 'Context: recent conversation; no compaction applied.';
-    button.hidden = options.hidden;
-    if (button.hidden && dialog.open) dialog.close();
-    const oldSource = source.value, oldRecord = record.value;
-    source.replaceChildren(element('option', 'Choose a user message', { value: '' }));
-    for (const turn of userTurns()) source.append(element('option', `${turn.id} · ${turn.content.slice(0, 70)}`, { value: turn.id }));
-    source.value = oldSource;
-    const active = memory.active(scope());
-    record.replaceChildren(element('option', 'Choose a saved record', { value: '' }));
-    for (const item of active) record.append(element('option', `${item.id} · v${item.version}`, { value: item.id }));
-    record.value = oldRecord;
-    if (!record.value) selectedVersion = null;
-    if (hits) hits = hits.filter(hit => active.some(item => item.id === hit.recordId && item.version === hit.version));
-    drawRecords(active); drawHits(); drawGraph(); updateButtons();
+    button.hidden = options.hidden; if (button.hidden && dialog.open) dialog.close();
+    if (hits) hits = hits.filter(hit => active().some(item => item.id === hit.recordId && item.version === hit.version));
+    if (selected && editor.hidden) showDetail(currentMap.nodes.find(node => node.id === selected.id) ?? selected);
+    drawMap(); buttons();
+  }
+  function graphView(returnFocus = true) {
+    const from = selected?.id; selected = null; editRecord = null; editor.hidden = true; detail.hidden = true; map.hidden = false; searchForm.hidden = false;
+    back.hidden = true; title.textContent = 'Memory'; refresh();
+    if (returnFocus) (nodeButtons.get(from) ?? query).focus({ preventScroll: true });
+  }
+  function beginEdit(record = null, sourceId) {
+    editRecord = record ? { id: record.id, version: record.version } : null;
+    stopRenderer(); editor.hidden = false; map.hidden = true; searchForm.hidden = true; detail.hidden = true; back.hidden = false;
+    title.textContent = record ? 'Edit memory' : 'Save from chat'; source.replaceChildren(el('option', 'Choose a message', { value: '' }));
+    for (const turn of userTurns()) source.append(el('option', turn.content.replace(/\s+/g, ' ').slice(0, 80), { value: turn.id }));
+    source.value = sourceId ?? record?.sourceTurnIds[0] ?? userTurns().at(-1)?.id ?? '';
+    text.value = record?.text ?? selectedSource()?.content ?? ''; save.hidden = Boolean(record); correct.hidden = !record;
+    setStatus(''); buttons(); source.focus({ preventScroll: true });
   }
   async function write(operation, success) {
-    if (busy || disposed) return;
-    busy = true; updateButtons();
-    let committed = false;
+    if (busy || disposed) return; busy = true; buttons(); let committed = false;
     try {
-      const changed = await operation(); committed = true; hits = null;
-      if (!disposed && changed?.status === 'active') {
-        refresh(); record.value = changed.id; selectedVersion = changed.version;
+      const changed = await operation(); committed = true; hits = null; query.value = '';
+      const persisted = await onChange?.();
+      if (!disposed) {
+        graphView(false); const node = currentMap.nodes.find(node => node.recordId === changed?.id);
+        if (node && changed.status === 'active') showDetail(node, true); else query.focus({ preventScroll: true });
+        setStatus(persisted?.error ? 'Changed in this session; saving did not finish. ' + String(persisted.error).slice(0, 180) : success, Boolean(persisted?.error));
       }
-      const persisted = await onChange?.();
-      if (!disposed) setStatus(persisted?.error ? `Changed in this session; persistence did not finish. ${persistenceMessage(persisted.error)}` : success, Boolean(persisted?.error));
-    } catch (error) {
-      if (!disposed) setStatus(committed ? `Changed in this session; persistence did not finish. ${errorMessage(error)}` : errorMessage(error), true);
-    } finally { busy = false; if (!disposed) refresh(); }
-  }
-  listen(source, 'change', () => { text.value = selectedSource()?.content ?? ''; updateButtons(); });
-  listen(record, 'change', () => {
-    const item = selectedRecord(); selectedVersion = item?.version ?? null;
-    if (item) { source.value = item.sourceTurnIds.find(id => userTurns().some(turn => turn.id === id)) ?? ''; text.value = item.text; }
-    updateButtons();
-  });
-  listen(text, 'input', updateButtons); listen(query, 'input', updateButtons);
-  listen(save, 'click', () => write(() => memory.save({ text: text.value, sourceTurnIds: [source.value], scope: scope(), modelSafe: true }), 'Saved from your message.'));
-  listen(correct, 'click', () => write(() => memory.correct({ recordId: record.value, text: text.value, sourceTurnIds: [source.value], expectedVersion: selectedVersion }), 'Memory corrected.'));
-  listen(forget, 'click', () => write(() => memory.forget({ recordId: record.value }), 'Memory forgotten.'));
-  listen(recallForm, 'submit', async event => {
-    event.preventDefault();
-    if (busy || !query.value.trim()) return;
-    busy = true; updateButtons();
-    try {
-      const result = await retrieval.search({ query: query.value.trim(), records: memory.snapshot().records, scope: scope(), queryId: `panel-${Date.now()}-${++querySequence}` });
-      if (!disposed) hits = result.hits;
-      const persisted = await onChange?.();
-      if (!disposed) setStatus(persisted?.error ? `Recall completed; persistence did not finish. ${persistenceMessage(persisted.error)}` : `${hits.length} matching active ${hits.length === 1 ? 'memory' : 'memories'}.`, Boolean(persisted?.error));
-    } catch (error) { if (!disposed) setStatus(errorMessage(error), true); }
+    } catch (error) { if (!disposed) setStatus((committed ? 'Changed in this session. ' : '') + errorText(error), true); }
     finally { busy = false; if (!disposed) refresh(); }
+  }
+  listen(source, 'change', () => { text.value = selectedSource()?.content ?? ''; buttons(); }); listen(text, 'input', buttons);
+  listen(add, 'click', () => beginEdit()); listen(edit, 'click', () => { const item = selectedRecord(); if (item) beginEdit(item); });
+  listen(cancel, 'click', () => graphView()); listen(back, 'click', () => graphView());
+  listen(save, 'click', () => write(() => memory.save({ text: text.value, sourceTurnIds: [source.value], scope: scope(), modelSafe: true }), 'Saved from your message.'));
+  listen(correct, 'click', () => write(() => memory.correct({ recordId: editRecord.id, text: text.value, sourceTurnIds: [source.value], expectedVersion: editRecord.version }), 'Memory corrected.'));
+  listen(forget, 'click', () => {
+    const item = selectedRecord(); if (!item || item.version !== selected.version) { graphView(); setStatus('That memory changed. Select it again.', true); return; }
+    void write(() => memory.forget({ recordId: item.id }), 'Memory forgotten.');
   });
-  listen(button, 'click', () => { options.open = false; refresh(); dialog.showModal(); body.scrollTop = 0; close.focus({ preventScroll: true }); });
+  listen(query, 'input', () => { hits = null; if (selected) showDetail(null); setStatus(''); drawMap(); buttons(); });
+  const clearQuery = () => { query.value = ''; hits = null; if (selected) showDetail(null); setStatus(''); drawMap(); buttons(); query.focus({ preventScroll: true }); };
+  listen(clear, 'click', clearQuery);
+  listen(searchForm, 'submit', async event => {
+    event.preventDefault(); if (busy || !query.value.trim()) return; busy = true; buttons();
+    try {
+      const result = await retrieval.search({ query: query.value.trim(), records: memory.snapshot().records, scope: scope(), queryId: 'panel-' + Date.now() + '-' + ++sequence });
+      if (!disposed) hits = result.hits.filter(hit => active().some(item => item.id === hit.recordId && item.version === hit.version));
+      const persisted = await onChange?.();
+      if (!disposed) setStatus(persisted?.error ? 'Search completed; saving did not finish.' : hits.length ? 'Matching memories are lit up.' : 'No matching saved memories.', Boolean(persisted?.error));
+    } catch (error) { if (!disposed) setStatus(errorText(error), true); }
+    finally { busy = false; if (!disposed) { refresh(); query.focus({ preventScroll: true }); } }
+  });
+  listen(canvas, 'rag-camera-frame', overlayPositions);
+  listen(motionPreference, 'change', () => renderer?.setMotionEnabled(!motionPreference.matches));
+  const viewport = () => { dialog.style.setProperty('--memory-viewport-height', (window.visualViewport?.height ?? window.innerHeight) + 'px'); renderer?.refreshViewport(); };
+  if (window.visualViewport) listen(window.visualViewport, 'resize', viewport); listen(window, 'resize', viewport); viewport();
+  listen(button, 'click', () => { options.open = false; graphView(false); dialog.showModal(); refresh(); query.focus({ preventScroll: true }); });
   listen(close, 'click', () => dialog.close());
-  listen(dialog, 'close', () => { if (!skipFocusReturn && !button.hidden && !disposed) button.focus({ preventScroll: true }); skipFocusReturn = false; });
+  listen(dialog, 'cancel', event => { if (!editor.hidden || selected) { event.preventDefault(); graphView(); } else if (query.value) { event.preventDefault(); clearQuery(); } });
+  listen(dialog, 'close', () => { stopRenderer(); if (!skipFocusReturn && !button.hidden && !disposed) button.focus({ preventScroll: true }); skipFocusReturn = false; });
   listen(dialog, 'click', event => {
-    const anchor = event.target.closest?.('a[data-memory-source]');
-    if (!anchor) return;
-    event.preventDefault();
-    const target = doc.getElementById(`turn-${anchor.dataset.memorySource}`);
-    if (!target) { setStatus('That source turn is not present in this conversation view.', true); return; }
-    skipFocusReturn = true; dialog.close();
-    const oldTabindex = target.getAttribute('tabindex');
+    const anchor = event.target.closest?.('a[data-memory-source]'); if (!anchor) return;
+    event.preventDefault(); const target = doc.getElementById('turn-' + anchor.dataset.memorySource);
+    if (!target) { setStatus('That source is not in this conversation view.', true); return; }
+    skipFocusReturn = true; dialog.close(); const old = target.getAttribute('tabindex');
     target.setAttribute('tabindex', '-1'); target.scrollIntoView({ block: 'center', behavior: 'auto' }); target.focus({ preventScroll: true });
-    target.addEventListener('blur', () => { if (oldTabindex === null) target.removeAttribute('tabindex'); else target.setAttribute('tabindex', oldTabindex); }, { once: true });
+    target.addEventListener('blur', () => { if (old === null) target.removeAttribute('tabindex'); else target.setAttribute('tabindex', old); }, { once: true });
   });
-  const observer = new MutationObserver(refresh);
-  observer.observe(options, { attributes: true, attributeFilter: ['hidden'] });
-  const unsubscribe = events.subscribe(refresh);
-  refresh();
+  const observer = new MutationObserver(refresh); observer.observe(options, { attributes: true, attributeFilter: ['hidden'] });
+  const unsubscribe = events.subscribe(refresh); refresh();
   return Object.freeze({ button, dialog, refresh, dispose() {
-    if (disposed) return;
-    disposed = true; observer.disconnect(); unsubscribe(); listeners.abort();
-    if (dialog.open) dialog.close();
-    dialog.remove(); button.remove(); stylesheet?.remove();
+    if (disposed) return; disposed = true; stopRenderer(); observer.disconnect(); unsubscribe(); listeners.abort();
+    if (dialog.open) dialog.close(); dialog.remove(); button.remove(); stylesheet?.remove();
   } });
 }

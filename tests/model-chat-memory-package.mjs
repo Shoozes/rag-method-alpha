@@ -18,14 +18,17 @@ const playwright = process.env.BROWSER_MODEL_PLAYWRIGHT_MODULE?.trim() || proces
 if (!playwright) throw new Error('Set BROWSER_MODEL_PLAYWRIGHT_MODULE (or PLAYWRIGHT_MODULE) to an already-installed Playwright module file. Automatic installation is disabled.');
 const prefix = '/portable/preview/';
 const memoryAssets = ['workspace', 'store', 'events', 'context', 'structured-context', 'automatic-context', 'rag-adapter',
-  'restore-events', 'citations', 'panel', 'rag-core'].map(name => `memory/${name}.mjs`).concat('memory/panel.css');
+  'restore-events', 'citations', 'panel', 'rag-core', 'graph-renderer'].map(name => `memory/${name}.mjs`).concat('memory/panel.css');
 const payloadPaths = ['index.html', 'style.css', 'app.mjs', 'loader-controller.mjs', 'model-contract.mjs',
   'runtime-adapter.mjs', 'engine-worker.mjs', 'runtime-errors.mjs', 'wasm-memory.mjs', 'runtime-profile.mjs',
   'capabilities.mjs', 'bootstrap.mjs', 'theme/aurel-gold.css', 'runtime/index.js', 'runtime/wllama.wasm',
   'runtime/LICENSE', 'runtime/compat/wllama.js', 'runtime/compat/wllama.wasm', 'LICENSES/rag-method.txt',
-  'LICENSES/lfm-open-license-1.0.txt', 'NOTICE.txt', 'README.txt', ...memoryAssets].sort();
+  'LICENSES/lfm-open-license-1.0.txt', 'LICENSES/forcegraph-tsl.txt', 'LICENSES/three.txt', 'NOTICE.txt', 'README.txt', ...memoryAssets].sort();
 const expectedFiles = [...payloadPaths, 'site-manifest.json'].sort();
 const pinned = {
+  'memory/graph-renderer.mjs': 'c85fda05a2a6ac5596dc41f5f197064eb3063932eaf574ae93f5f7141d179edd',
+  'LICENSES/forcegraph-tsl.txt': '1a897e0ee6f1fc65889976eadb848acefac9db7f9c97274a6c490f52390cd474',
+  'LICENSES/three.txt': '8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc',
   'LICENSES/lfm-open-license-1.0.txt': '30adf9d6478191fb87f2424f63ba0728598335aaf99cd2848ef17e8e545fe94b',
   'runtime/LICENSE': '5866e3bd7e3cbd3f7c8bea6efd8a1e7fa7cc8de68c30f428aff7c6584a0fb720',
   'runtime/index.js': '2ed031e8d61cebd1d4c7d4956a6350f5afc7fa7c678c3a324d66f6df958f67db',
@@ -107,17 +110,18 @@ try {
       boundary: { actualNativeCalls: previous.boundary?.actualNativeCalls, runtimeWorkersCreated: previous.boundary?.runtimeWorkersCreated,
         externalRequestCount: previous.boundary?.externalRequests?.length, pageErrorCount: previous.boundary?.pageErrors?.length } });
   }
-  await check('exact 34-file payload, complete license pins, source and manifest identities', async () => {
+  await check('exact 37-file payload, complete license pins, source and manifest identities', async () => {
     assert.ok(inside(resolve(root, '.artifacts/model-chat'), packageRoot), 'package stays in its explicitly owned artifact parent');
     assert.equal(await realpath(packageRoot), packageRoot, 'package root has no linked ancestor');
     assert.deepEqual(await filesBelow(packageRoot), expectedFiles);
-    assert.equal(payloadPaths.length, 34); assert.equal(expectedFiles.length, 35);
+    assert.equal(payloadPaths.length, 37); assert.equal(expectedFiles.length, 38);
     const manifestBytes = await readFile(join(packageRoot, 'site-manifest.json'));
     manifest = JSON.parse(manifestBytes);
     const { identitySha256, ...body } = manifest;
     assert.equal(manifest.schema, 'rag-model-chat-static/v1'); assert.equal(manifest.memoryPreview, true);
     assert.equal(manifest.publicReleaseQualified, false); assert.equal(identitySha256, digest(JSON.stringify(body)));
     assert.deepEqual(manifest.files.map(file => file.path).sort(), payloadPaths);
+    assert.equal(manifest.graph.bundleSha256, pinned['memory/graph-renderer.mjs']); assert.equal(manifest.graph.layoutBackend, 'local');
     assert.equal(manifest.model.weightsIncluded, false);
     assert.equal(manifest.model.licensePath, 'LICENSES/lfm-open-license-1.0.txt');
     assert.equal(manifest.model.licenseSha256, pinned[manifest.model.licensePath]);
@@ -145,10 +149,11 @@ try {
     const notice = await readFile(join(packageRoot, 'NOTICE.txt'), 'utf8');
     assert.match(notice, /Complete pinned model license: LICENSES\/lfm-open-license-1\.0\.txt/);
     assert.match(notice, /First-party.*MIT/); assert.match(notice, /@wllama\/wllama 3\.5\.1: MIT/);
+    assert.match(notice, /@ours\/forcegraph-tsl 0\.3\.0-alpha\.1: MIT/); assert.match(notice, /Three\.js 0\.185\.0: MIT/);
     const readme = await readFile(join(packageRoot, 'README.txt'), 'utf8');
     assert.match(readme, /no special markup is required/); assert.match(readme, /lossy extractive context, not general semantic summarization/);
     assert.match(readme, /not full product-release or iOS qualification/);
-    observations.push({ packagePath: portable(relative(root, packageRoot)), filesIncludingManifest: 35,
+    observations.push({ packagePath: portable(relative(root, packageRoot)), filesIncludingManifest: 38,
       manifestSha256: digest(manifestBytes), manifestIdentitySha256: identitySha256, sourceHead: manifest.source.head,
       sourceDirtyAtStage: manifest.source.dirty, sourceFingerprintSha256: manifest.source.fingerprintSha256,
       packageBytes: packageIdentity.reduce((sum, file) => sum + file.bytes, 0) + manifestBytes.length });
@@ -171,6 +176,7 @@ try {
   await check('private paths, models, source roots and unknown routes have no mount or HTML fallback', async () => {
     const probes = ['/index.html', '/memory/workspace.mjs', '/examples/browser-model-chat/index.html',
       prefix + 'PRIVATE_LOCAL_ONLY', prefix + 'memory/PRIVATE_LOCAL_ONLY', prefix + 'memory/PREVIEW_READINESS.md',
+      prefix + 'memory/build-graph.mjs', prefix + 'worker/force-worker-entry.js',
       prefix + '.git/config', prefix + '.aws/credentials', prefix + '.env', prefix + 'node_modules/playwright/index.mjs',
       prefix + 'tests/model-chat-memory-package.mjs', prefix + 'modules/browser-rag-ts/src/index.ts',
       prefix + 'source/workspace.html', prefix + 'runtime/model.gguf', prefix + manifest.model.file,
@@ -208,14 +214,15 @@ try {
     await page.goto(origin + prefix + '?memory=1', { waitUntil: 'networkidle' });
     await page.waitForFunction(() => window.localMemoryPreview?.workspace && document.getElementById('memory-dialog'));
     assert.equal(await page.locator('#app').getAttribute('data-phase'), 'idle');
-    assert.equal(await page.locator('#memory-dialog').count(), 1); assert.equal(await page.locator('#memory-forget').textContent(), 'Forget saved record');
-    assert.equal(await page.locator('#memory-save').count(), 1); assert.equal(await page.locator('#memory-graph').count(), 1);
+    assert.equal(await page.locator('#memory-dialog').count(), 1); assert.equal(await page.locator('#memory-query').getAttribute('type'), 'search');
+    assert.equal(await page.locator('#memory-recall').textContent(), 'Search'); assert.equal(await page.locator('#memory-graph').count(), 1);
+    assert.equal(await page.locator('#memory-graph [data-memory-node]').count(), 0, 'empty memory does not fabricate graph nodes');
     assert.equal(await page.locator('[role="alert"]:visible').filter({ hasText: /\S/ }).count(), 0);
     const state = await page.evaluate(() => ({ turns: window.localMemoryPreview.workspace.conversation.snapshot().turns.length,
       records: window.localMemoryPreview.workspace.memory.snapshot().records.length, retained: localStorage.length }));
     assert.deepEqual(state, { turns: 0, records: 0, retained: 0 });
     const loaded = new Set(browserRequests);
-    for (const name of memoryAssets.filter(name => name.endsWith('.mjs'))) assert.ok(loaded.has(prefix + name), 'production module closure: ' + name);
+    for (const name of memoryAssets.filter(name => name.endsWith('.mjs') && name !== 'memory/graph-renderer.mjs')) assert.ok(loaded.has(prefix + name), 'production module closure: ' + name);
     assert.equal(workers, 0); assert.ok(!browserRequests.some(path => path.includes('/runtime/') || path.endsWith('/engine-worker.mjs')));
     observations.push({ originalBootstrapResponse: true, bootstrapResponseReplaced: false, initialStorageEmpty: true,
       freshTemporaryProfile: true, cacheClearedAndDisabled: true, nonLoopbackRequestsBlocked: true });
@@ -265,7 +272,7 @@ try {
       savedRecordsCreated: 0, strategy: fixture.strategy, sourceCount: fixture.sources.length, originalHash: fixture.originalHash,
       requestSha256: fixture.requestSha256, fixtureMeterIsNotNativeTokenProof: true });
   });
-  await check('unchanged production bootstrap restores fixture answer links and a real event graph without retrieval resurrection', async () => {
+  await check('production bootstrap restores answer links without turning historical activity into saved graph nodes', async () => {
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForFunction(() => window.localMemoryPreview?.workspace && document.getElementById('memory-dialog'));
     assert.equal(await page.locator('#app').getAttribute('data-phase'), 'idle');
@@ -274,11 +281,12 @@ try {
       sources: window.localMemoryPreview.workspace.sourcesForAnswer(answerTurnId),
       graphNodeCount: window.localMemoryPreview.workspace.graph.snapshot().nodes.length }), fixture.answerTurnId);
     assert.equal(restored.conversation, fixture.after); assert.deepEqual(restored.sources, fixture.sources); assert.deepEqual(restored.records, []);
-    assert.ok(restored.graphNodeCount > 0, 'graph derives from real retained fixture execution events');
+    assert.ok(restored.graphNodeCount > 0, 'internal execution history remains separate from saved memory presentation');
     const links = await page.locator(`#turn-${fixture.answerTurnId} .memory-sources a`).evaluateAll(nodes => nodes.map(node => node.getAttribute('href')));
     assert.deepEqual(links, fixture.sources.map(source => '#turn-' + source.turnId));
     assert.equal(await page.locator(`#turn-${fixture.original.id} .content`).textContent(), fixture.original.content);
-    assert.ok(await page.locator('#memory-graph svg').count() > 0);
+    assert.equal(await page.locator('#memory-graph [data-memory-node]').count(), 0, 'no saved records means no saved graph nodes despite historical events');
+    assert.equal(await page.locator('#memory-graph svg').count(), 0, 'no substitute SVG renderer');
     assert.equal(workers, 0); assert.equal(await page.locator('[role="alert"]:visible').filter({ hasText: /\S/ }).count(), 0);
   });
   await check('offline browser and immutable package boundaries remain intact after reload', async () => {

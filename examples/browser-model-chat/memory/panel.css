@@ -1,41 +1,68 @@
 .memory-open{flex:none;min-width:64px;padding-inline:12px;font-size:12px}
-.memory-dialog{color:inherit;background:#11110f;border:1px solid var(--line,#d8b77940);border-radius:4px;padding:0;width:min(680px,calc(100vw - 24px));max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);overflow:hidden;box-shadow:0 16px 60px #0008}
-.memory-dialog[open]{display:grid;grid-template-rows:auto minmax(0,1fr)}
+.memory-dialog{color:inherit;background:#11110f;border:1px solid var(--line,#d8b77940);border-radius:4px;padding:0;width:min(940px,calc(100vw - 32px));height:min(720px,calc(var(--memory-viewport-height,100dvh) - 32px));max-width:calc(100vw - 32px);max-height:calc(var(--memory-viewport-height,100dvh) - 32px);overflow:auto;box-shadow:0 16px 60px #0008;overscroll-behavior:contain}
+.memory-dialog[open]{display:flex;flex-direction:column}
 .memory-dialog::backdrop{background:#0009}
-.memory-panel-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 16px;border-bottom:1px solid var(--line,#d8b77926)}
-.memory-panel-header h2{font:400 25px/1.2 Georgia,serif;letter-spacing:-.03em;margin:0}
-.memory-panel-header button,.memory-dialog button{min-height:44px}
-.memory-panel-body{padding:0 16px 16px;min-height:0;max-height:calc(100dvh - 106px);overflow:auto;overscroll-behavior:contain}
-.memory-dialog h3{font:400 19px/1.35 Georgia,serif;margin:0 0 12px}
-.memory-dialog .memory-note{font-size:12px;line-height:1.6;color:var(--subtle,#bcb2a2);margin:12px 0;overflow-wrap:anywhere}
-.memory-section{border-top:1px solid var(--line,#d8b77926);padding-top:16px;margin-top:16px;min-width:0}
-.memory-selectors{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
-.memory-field{display:grid;gap:7px;min-width:0;font-size:12px;color:var(--muted,#c2b9aa);margin-bottom:12px}
-.memory-dialog select,.memory-dialog input,.memory-dialog textarea{min-width:0;width:100%;max-width:100%;font:16px/1.5 "Segoe UI",sans-serif;color:inherit;background:#181712;border:1px solid #ad916455;border-radius:3px;padding:9px 10px}
+.memory-panel-header{display:flex;flex:none;align-items:center;gap:12px;min-width:0;padding:8px 16px;border-bottom:1px solid var(--line,#d8b77926)}
+.memory-panel-header h2{flex:1;min-width:0;font:400 25px/1.2 Georgia,serif;letter-spacing:-.03em;margin:0}
+.memory-dialog button{min-width:44px;min-height:44px}
+.memory-panel-header button{flex:none;padding-inline:12px}
+.memory-panel-body{position:relative;display:flex;flex:1;flex-direction:column;gap:12px;min-width:0;min-height:0;padding:16px;overflow:auto;overscroll-behavior:contain}
+.memory-dialog h3{font:400 20px/1.3 Georgia,serif;letter-spacing:-.02em;margin:0 0 12px}
+.memory-dialog .memory-note{font-size:12px;line-height:1.6;color:var(--subtle,#bcb2a2);margin:8px 0;overflow-wrap:anywhere}
+.memory-search-form{display:flex;flex:none;align-items:center;gap:6px;min-width:0}
+.memory-search-form .memory-field{flex:1;min-width:0;margin:0}
+.memory-search-form #memory-query{flex:1;width:0;min-width:0}
+.memory-search-form #memory-query::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none}
+.memory-search-form .memory-field #memory-query{width:100%}
+.memory-search-form button{flex:none;padding-inline:10px}
+.memory-search-form #memory-recall{display:grid;place-items:center;width:44px;padding:0}
+#memory-recall svg,#memory-back svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#memory-query-clear{font-size:12px}
+.memory-dialog select,.memory-dialog input,.memory-dialog textarea{min-width:0;max-width:100%;font:16px/1.5 "Segoe UI",sans-serif;color:inherit;background:#181712;border:1px solid #ad916455;border-radius:3px;padding:9px 10px}
 .memory-dialog select,.memory-dialog input{min-height:44px}
-.memory-dialog textarea{min-height:96px;max-height:240px;resize:vertical}
+.memory-dialog select,.memory-dialog textarea{width:100%}
 .memory-dialog select option{background:#181712;color:#eee7dc}
-.memory-actions{display:flex;flex-wrap:wrap;gap:8px}
-.memory-actions button{flex:1;min-width:72px;padding-inline:12px}
-#memory-status{font-size:12px;line-height:1.65;margin:12px 0;overflow-wrap:anywhere;min-height:1.65em;color:var(--gold,#e8c991)}
+.memory-dialog textarea{min-height:112px;max-height:240px;resize:vertical}
+.memory-dialog :is(button,a,select,input,textarea):focus-visible{outline:2px solid #ffe6b6;outline-offset:2px}
+.memory-map{position:relative;flex:1;min-width:0;min-height:160px}
+.memory-graph{position:absolute;inset:0;min-width:0;min-height:0;isolation:isolate}
+.memory-canvas{position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:pan-x pan-y pinch-zoom}
+/* The renderer owns the dots and edges. These are transparent text controls. */
+.memory-dialog .memory-map-node{position:absolute;z-index:1;left:var(--node-x,50%);top:var(--node-y,50%);transform:translate(-50%,-50%);display:block;width:44px;max-width:44px;height:44px;min-height:44px;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;color:var(--muted,#c2b9aa);font:12px/1.35 "Segoe UI",sans-serif;text-align:center;overflow-wrap:anywhere;text-shadow:0 1px 3px #11110f,0 -1px 3px #11110f;cursor:pointer}
+.memory-node-label{position:absolute;left:50%;top:100%;transform:translateX(-50%);width:112px;max-width:32vw;pointer-events:none;visibility:hidden}
+.memory-map-node:is(:hover,:focus-visible,[aria-pressed=true]) .memory-node-label{visibility:visible}
+.memory-dialog .memory-map-node[data-memory-kind=source]{font-size:11px;color:var(--subtle,#bcb2a2)}
+.memory-dialog .memory-map-node:hover,.memory-dialog .memory-map-node:focus-visible{color:#fff0d5;text-decoration:underline;text-underline-offset:3px;background:transparent}
+.memory-dialog .memory-map-node[data-matched=true]{color:var(--gold,#e8c991);font-weight:600;text-decoration:underline;text-underline-offset:3px}
+.memory-dialog .memory-map-node:is([aria-pressed=true],[data-selected=true]){color:#fff0d5;font-weight:600;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px}
+.memory-empty{position:absolute;inset:0;display:grid;place-content:center;text-align:center;padding:24px;color:var(--subtle,#bcb2a2);font:14px/1.6 "Segoe UI",sans-serif;overflow-wrap:anywhere}
+.memory-empty p{margin:4px 0}
+.memory-graph.is-fallback{position:relative;display:flex;flex-direction:column;gap:2px;max-height:100%;overflow:auto;overscroll-behavior:contain}
+.memory-graph.is-fallback .memory-canvas{display:none}
+.memory-dialog .memory-graph.is-fallback .memory-map-node{position:static;transform:none;display:block;width:100%;max-width:none;height:auto;min-height:44px;padding:10px 8px;text-align:left;text-shadow:none}
+.memory-graph.is-fallback .memory-node-label{position:static;display:block;transform:none;width:auto;max-width:none;pointer-events:none;visibility:visible}
+.memory-graph.is-fallback .memory-empty{position:static;min-height:160px}
+.memory-detail{position:absolute;z-index:2;inset-inline:16px;bottom:16px;max-height:45%;min-width:0;padding:16px;background:#151410;border-top:1px solid #b89b6755;overflow:auto;overscroll-behavior:contain;scroll-padding-block:12px}
+#memory-detail-text{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.65;margin:0 0 8px}
+.memory-detail .memory-note{margin-block:6px}
+.memory-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.memory-actions button{flex:none;max-width:100%;padding-inline:14px}
+.memory-detail .memory-actions{margin-top:8px}
+.memory-editor{flex:1;min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 2px 4px;scroll-padding-block:12px}
+.memory-field{display:grid;gap:7px;min-width:0;font-size:12px;color:var(--muted,#c2b9aa);margin-bottom:12px}
+.memory-selectors{display:grid;grid-template-columns:minmax(0,1fr);gap:0}
+.memory-editor .memory-actions{margin-top:12px}
+#memory-add{align-self:flex-start;flex:none;padding-inline:12px;font-size:12px}
+#memory-status{flex:none;max-height:20%;overflow:auto;overflow-wrap:anywhere;font-size:12px;line-height:1.6;margin:0;color:var(--gold,#e8c991)}
+#memory-status:empty{display:none}
 #memory-status.memory-error{color:#f0bca2}
-.memory-list{list-style:none;margin:0;padding:0;min-width:0}
-.memory-list li{padding:12px 0;border-bottom:1px solid var(--line,#d8b77926);min-width:0}
-.memory-record-text{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.6;margin:0 0 8px}
-.memory-record-id{font:11px/1.6 ui-monospace,monospace;color:var(--subtle,#bcb2a2);overflow-wrap:anywhere}
+/* Shared by contextual details and the historical source links in chat. */
 .memory-sources{display:inline-flex;flex-wrap:wrap;gap:4px 12px;max-width:100%;margin-left:12px;vertical-align:middle}
 .memory-sources a{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;max-width:100%;font:12px/1.5 ui-monospace,monospace;color:var(--gold,#e8c991);overflow-wrap:anywhere}
-.memory-recall-form{display:flex;align-items:end;gap:8px;min-width:0}
-.memory-recall-form .memory-field{flex:1;margin:0;min-width:0}
-.memory-recall-form button{flex:none}
-.memory-graph{min-width:0}
-.memory-graph svg{width:100%;height:auto;max-height:320px;display:block;margin-top:8px}
-.memory-graph text{fill:var(--muted,#c2b9aa);font:11px ui-monospace,monospace}
-.memory-edge{fill:none;stroke:#c6ab6c50;stroke-width:1}
-.memory-node{fill:var(--gold,#e8c991)}
-.memory-node-record{fill:#beb7aa}.memory-node-source{fill:#c8a668}
-.memory-event-list{padding-left:22px;font-size:12px;line-height:1.6;color:var(--muted,#c2b9aa);overflow-wrap:anywhere}
-.memory-event-list li{padding-block:4px}
-@media(max-width:420px){.memory-dialog{width:calc(100vw - 16px);max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px)}.memory-panel-header{padding-inline:12px}.memory-panel-body{padding-inline:12px;max-height:calc(100dvh - 98px)}.memory-selectors{grid-template-columns:minmax(0,1fr);gap:0}.memory-open{min-width:60px;padding-inline:8px}.memory-sources{margin-left:6px}.header-actions:has(.memory-open:not([hidden])){flex-wrap:wrap;justify-content:flex-end}.header-actions:has(.memory-open:not([hidden])) .session{flex-basis:100%;order:2;text-align:right}}
+.memory-detail .memory-sources{margin-left:0}
+@media(min-width:772px) and (min-height:652px){.memory-dialog{min-width:740px;min-height:min(620px,calc(var(--memory-viewport-height,100dvh) - 32px))}}
+@media(max-width:600px){.memory-dialog{width:calc(100vw - 16px);height:calc(var(--memory-viewport-height,100dvh) - 16px);max-width:calc(100vw - 16px);max-height:calc(var(--memory-viewport-height,100dvh) - 16px)}.memory-panel-header{padding:6px 12px;gap:6px}.memory-panel-header h2{font-size:23px}.memory-panel-header button{padding-inline:10px}.memory-panel-body{padding:12px;gap:8px}.memory-search-form{gap:4px}.memory-search-form button{padding-inline:8px}.memory-detail{inset-inline:12px;bottom:12px;padding:12px}.memory-dialog .memory-map-node{max-width:42%;font-size:12px}.memory-open{min-width:60px;padding-inline:8px}.memory-sources{margin-left:6px}.header-actions:has(.memory-open:not([hidden])){flex-wrap:wrap;justify-content:flex-end}.header-actions:has(.memory-open:not([hidden])) .session{flex-basis:100%;order:2;text-align:right}}
+/* Short/zoomed views scroll real content; selection must not trap its actions. */
+@media(max-height:480px){.memory-dialog{min-height:0}.memory-panel-header{padding-block:4px}.memory-panel-body{flex:1 0 auto;min-height:240px;overflow:visible;padding-block:8px;gap:8px}.memory-map{flex:none;min-height:260px}.memory-detail{position:relative;inset:auto;max-height:none;flex:none;margin-top:-4px;padding:12px 0;background:transparent}.memory-editor{flex:none;overflow:visible}.memory-dialog textarea{min-height:88px;max-height:160px}#memory-status{max-height:none;overflow:visible}}
 @media(prefers-reduced-motion:reduce){.memory-dialog,.memory-dialog *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
-@media(forced-colors:active){.memory-dialog{border:1px solid CanvasText;box-shadow:none}.memory-dialog select,.memory-dialog input,.memory-dialog textarea{border-color:CanvasText}.memory-node{fill:CanvasText}.memory-edge{stroke:CanvasText}.memory-graph text{fill:CanvasText}}
+@media(forced-colors:active){.memory-dialog,.memory-detail{background:Canvas;color:CanvasText;border-color:CanvasText;box-shadow:none}.memory-dialog :is(select,input,textarea){background:Field;color:FieldText;border-color:FieldText}.memory-dialog :is(button,a,select,input,textarea):focus-visible{outline-color:Highlight}.memory-dialog .memory-map-node,.memory-dialog .memory-map-node[data-memory-kind=source]{color:CanvasText;text-shadow:none}.memory-dialog .memory-map-node[data-matched=true],.memory-dialog .memory-map-node:is([aria-pressed=true],[data-selected=true]){color:LinkText;text-decoration:underline}.memory-sources a,#memory-status,#memory-status.memory-error{color:LinkText}}

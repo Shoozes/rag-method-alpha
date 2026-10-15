@@ -15,14 +15,22 @@ const screenshotName = 'live-memory-mobile.png';
 const profilePrefix = 'rag-memory-live-';
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const checks = [], assets = [], privatePaths = [], forbiddenRequests = [], pageErrors = [], failedResponses = [], browserPaths = [], observations = [];
+const savedFixtureCheck = 'labeled synthetic saved memories exercise the production HTTPS TSL graph and real search';
+const fixtureScopes = new Map([
+  ['real panel binding and graph-disabled assembly work without loading a model', 'Binding-only presentation fixture: exposes the existing Memory entry while the model controller stays idle.'],
+  [savedFixtureCheck, 'Synthetic saved-memory fixture only: explicitly authored exact records, actual production bootstrap/storage/renderer/retrieval; no model loaded.'],
+]);
 const cleanup = { browserContextClosed: false, ownedTemporaryProfileRemoved: false };
 const memoryFiles = ['workspace', 'store', 'events', 'context', 'structured-context', 'automatic-context', 'rag-adapter',
-  'restore-events', 'citations', 'panel', 'rag-core'].map(name => `memory/${name}.mjs`).concat('memory/panel.css');
+  'restore-events', 'citations', 'panel', 'rag-core', 'graph-renderer'].map(name => `memory/${name}.mjs`).concat('memory/panel.css');
 const payloadPaths = ['index.html', 'style.css', 'app.mjs', 'loader-controller.mjs', 'model-contract.mjs',
   'runtime-adapter.mjs', 'engine-worker.mjs', 'runtime-errors.mjs', 'wasm-memory.mjs', 'runtime-profile.mjs',
   'capabilities.mjs', 'bootstrap.mjs', 'theme/aurel-gold.css', 'runtime/index.js', 'runtime/wllama.wasm',
   'runtime/LICENSE', 'runtime/compat/wllama.js', 'runtime/compat/wllama.wasm', 'LICENSES/rag-method.txt',
-  'LICENSES/lfm-open-license-1.0.txt', 'NOTICE.txt', 'README.txt', ...memoryFiles].sort();
+  'LICENSES/lfm-open-license-1.0.txt', 'LICENSES/forcegraph-tsl.txt', 'LICENSES/three.txt', 'NOTICE.txt', 'README.txt', ...memoryFiles].sort();
+const graphPins = { 'memory/graph-renderer.mjs': 'c85fda05a2a6ac5596dc41f5f197064eb3063932eaf574ae93f5f7141d179edd',
+  'LICENSES/forcegraph-tsl.txt': '1a897e0ee6f1fc65889976eadb848acefac9db7f9c97274a6c490f52390cd474',
+  'LICENSES/three.txt': '8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc' };
 const expectedPaths = [...payloadPaths, 'site-manifest.json'].sort();
 const executableMime = new Set(['application/javascript', 'text/javascript']);
 let base, manifest, manifestSha256, context, profile, page, browserVersion, screenshot, failure, workers = 0, httpRequests = 0, decodedBytes = 0;
@@ -34,8 +42,9 @@ function required(name, pattern) {
 }
 async function check(name, run) {
   const at = Date.now();
-  try { await run(); checks.push({ name, status: 'pass', durationMs: Date.now() - at }); console.log('PASS experimental memory live: ' + name); }
-  catch (error) { checks.push({ name, status: 'fail', durationMs: Date.now() - at, message: error.message }); throw error; }
+  const evidence = { fixture: fixtureScopes.has(name), ...(fixtureScopes.has(name) ? { fixtureScope: fixtureScopes.get(name) } : {}) };
+  try { await run(); checks.push({ name, status: 'pass', durationMs: Date.now() - at, ...evidence }); console.log('PASS experimental memory live: ' + name); }
+  catch (error) { checks.push({ name, status: 'fail', durationMs: Date.now() - at, message: error.message, ...evidence }); throw error; }
 }
 async function request(path, method = 'GET', limit = 128 * 1024) {
   if (++httpRequests > 100) throw new Error('Finite 100-request HTTP proof budget exceeded.');
@@ -91,7 +100,7 @@ try {
   const chrome = required('MODEL_CHAT_BROWSER');
   base = new URL(process.env.BROWSER_MEMORY_PREVIEW_URL || 'https://shoozes.github.io/rag-method-alpha/model-chat/');
   assert.equal(base.href, 'https://shoozes.github.io/rag-method-alpha/model-chat/', 'explicitly reviewed experimental Pages destination');
-  await check('reviewed HTTPS manifest binds the exact public source and 34-file payload', async () => {
+  await check('reviewed HTTPS manifest binds the exact public source and 37-file payload', async () => {
     const { response, bytes } = await request('site-manifest.json');
     assert.equal(response.status, 200); assert.ok(correctMime('site-manifest.json', response.headers.get('content-type')?.split(';')[0]));
     manifestSha256 = digest(bytes); assert.equal(manifestSha256, expectedManifest);
@@ -103,12 +112,15 @@ try {
     assert.equal(manifest.source.head, expectedHead); assert.equal(manifest.source.dirty, false);
     assert.equal(manifest.source.fingerprintSha256, digest(JSON.stringify(manifest.source.files)));
     if (process.env.BROWSER_MEMORY_EXPECTED_SOURCE_FINGERPRINT) assert.equal(manifest.source.fingerprintSha256, process.env.BROWSER_MEMORY_EXPECTED_SOURCE_FINGERPRINT);
-    assert.deepEqual(manifest.files.map(file => file.path).sort(), payloadPaths); assert.equal(manifest.files.length, 34);
+    assert.deepEqual(manifest.files.map(file => file.path).sort(), payloadPaths); assert.equal(manifest.files.length, 37);
+    assert.equal(expectedPaths.length, 38); assert.equal(manifest.graph.bundleSha256, graphPins['memory/graph-renderer.mjs']);
+    assert.equal(manifest.graph.layoutBackend, 'local');
+    for (const [path, hash] of Object.entries(graphPins)) assert.equal(manifest.files.find(file => file.path === path)?.sha256, hash, path);
     assert.equal(manifest.model.licensePath, 'LICENSES/lfm-open-license-1.0.txt');
     assert.equal(manifest.model.licenseSha256, '30adf9d6478191fb87f2424f63ba0728598335aaf99cd2848ef17e8e545fe94b');
     assert.equal(manifest.files.find(file => file.path === manifest.model.licensePath)?.sha256, manifest.model.licenseSha256);
   });
-  await check('all 35 HTTPS files match reviewed GET bytes and GET/HEAD MIME', async () => {
+  await check('all 38 HTTPS files match reviewed GET bytes and GET/HEAD MIME', async () => {
     for (let offset = 0; offset < expectedPaths.length; offset += 4) {
       const settled = await Promise.allSettled(expectedPaths.slice(offset, offset + 4).map(async path => {
         const expected = path === 'site-manifest.json' ? { sha256: expectedManifest, bytes: 128 * 1024 } : manifest.files.find(file => file.path === path);
@@ -126,6 +138,7 @@ try {
   });
   await check('finite private browser-path probes return genuine 404 status', async () => {
     for (const path of ['memory/PRIVATE_LOCAL_ONLY', 'memory/README.md', 'memory/PREVIEW_READINESS.md', 'memory/build-core.mjs',
+      'memory/build-graph.mjs', 'worker/force-worker-entry.js',
       'memory/serve-local.mjs', 'memory-proof/runtime-probe.mjs', '.artifacts/proof/local-memory/receipt.json', '.git/config', '.env',
       'tests/model-chat-memory-live.mjs', 'node_modules/playwright/index.mjs', 'source/workspace.html', 'modules/browser-rag-ts/src/core/index.ts']) {
       const { response, bytes } = await request(path, 'HEAD', 0);
@@ -159,24 +172,28 @@ try {
   await check('unmodified production memory bootstrap initializes on mobile with reduced motion', async () => {
     const state = await productionPage('?memory=1'); assert.equal(state.graphEnabled, true);
     const loaded = new Set(browserPaths);
-    for (const path of memoryFiles.filter(path => path.endsWith('.mjs'))) assert.ok(loaded.has(base.pathname + path), 'actual dynamic import closure: ' + path);
+    for (const path of memoryFiles.filter(path => path.endsWith('.mjs') && path !== 'memory/graph-renderer.mjs')) assert.ok(loaded.has(base.pathname + path), 'actual dynamic import closure: ' + path);
     await settle();
     const geometry = await page.evaluate(() => ({ width: innerWidth, height: innerHeight, document: document.documentElement.scrollWidth,
       body: document.body.scrollWidth, reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
       activeSceneAnimations: [...document.querySelectorAll('#scene *')].filter(node => getComputedStyle(node).animationName !== 'none').length }));
     assert.equal(geometry.width, 390); assert.equal(geometry.height, 844); assert.ok(geometry.document <= 391 && geometry.body <= 391);
     assert.equal(geometry.reducedMotion, true); assert.equal(geometry.activeSceneAnimations, 0); observations.push({ mobileGeometry: geometry });
-    assert.equal(await page.locator('#memory-save').count(), 1); assert.equal(await page.locator('#memory-forget').textContent(), 'Forget saved record');
+    assert.equal(await page.locator('#memory-query').getAttribute('type'), 'search'); assert.equal(await page.locator('#memory-recall').textContent(), 'Search');
+    assert.equal(await page.locator('#memory-graph [data-memory-node]').count(), 0);
   });
   await check('real panel binding and graph-disabled assembly work without loading a model', async () => {
     // The production entry is intentionally hidden until a model is ready.
-    // Programmatic clicking tests its binding only; this does not claim ready UI.
+    // This explicit presentation fixture tests its binding without a ready UI.
+    await page.evaluate(() => { document.getElementById('chat-options').hidden = false; });
+    assert.equal(await page.locator('#app').getAttribute('data-phase'), 'idle');
     await page.locator('#memory-open').evaluate(button => button.click());
     assert.equal(await page.locator('#memory-dialog').evaluate(dialog => dialog.open), true);
     const bounds = await page.locator('#memory-dialog').boundingBox(); assert.ok(bounds && bounds.x >= -1 && bounds.y >= -1 && bounds.x + bounds.width <= 391 && bounds.y + bounds.height <= 845);
     await page.locator('#memory-close').click();
     const state = await productionPage('?memory=1&graph=0'); assert.equal(state.graphEnabled, false);
-    assert.equal(await page.locator('#memory-graph svg, #memory-graph canvas').count(), 0);
+    assert.equal(await page.locator('#memory-graph svg, #memory-graph canvas:visible').count(), 0);
+    assert.equal(await page.locator('#memory-graph [data-memory-node]').count(), 0);
     observations.push({ panelOpenedProgrammaticallyWhileModelUnloaded: true, graphDisabledAssemblyVerified: true });
   });
   await check('essential screenshot shows actual idle HTTPS preview and its visible experimental notice', async () => {
@@ -193,6 +210,93 @@ try {
     assert.ok(!browserPaths.some(path => /(?:\/runtime\/|\/engine-worker\.mjs$|\.gguf$)/i.test(path)));
     const { response, bytes } = await request('site-manifest.json'); assert.equal(response.status, 200); assert.equal(digest(bytes), expectedManifest);
   });
+  await check(savedFixtureCheck, async () => {
+    const fixture = { label: 'SYNTHETIC SAVED-MEMORY FIXTURE - no model loaded', bootstrapReplaced: false,
+      seededRecords: 3, modelControllerPhase: 'idle', originalTranscriptPreserved: false,
+      workspaceDisposed: false, syntheticStorageRemoved: false, trueIdleRestored: false };
+    observations.push({ savedMemoryFixture: fixture });
+    let fixtureFailure;
+    try {
+      const seeded = await page.evaluate(async () => {
+        const workspace = window.localMemoryPreview.workspace;
+        const scope = { actorId: 'local-user', conversationId: 'local-chat' };
+        if (workspace.conversation.snapshot().turns.length || workspace.memory.snapshot().records.length || localStorage.length) throw Error('Synthetic fixture requires the fresh empty production workspace.');
+        const shared = workspace.conversation.append({ role: 'user', content: 'SYNTHETIC FIXTURE: The harbor access code is CEDAR-731. The delivery day is Thursday.' });
+        const drink = workspace.conversation.append({ role: 'user', content: 'SYNTHETIC FIXTURE: The preferred hot drink is ginger tea.' });
+        for (const text of ['The harbor access code is CEDAR-731.', 'The delivery day is Thursday.']) {
+          await workspace.memory.save({ text, sourceTurnIds: [shared.id], scope, modelSafe: true });
+        }
+        await workspace.memory.save({ text: 'The preferred hot drink is ginger tea.', sourceTurnIds: [drink.id], scope, modelSafe: true });
+        const result = await workspace.persist();
+        if (!result.durable || result.error) throw Error('Synthetic fixture did not persist through the production storage contract.');
+        return { conversation: workspace.conversation.exportState(), sourceTurnId: shared.id, sourceText: shared.content };
+      });
+      // Reload the unmodified production bootstrap so its own transcript
+      // renderer creates canonical source anchors. The controller stays idle.
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.waitForFunction(() => window.localMemoryPreview?.workspace && document.getElementById('memory-dialog'));
+      assert.equal(await page.locator('#app').getAttribute('data-phase'), 'idle');
+      assert.equal(await page.evaluate(() => window.localMemoryPreview.app.controller.getState().phase), 'idle');
+      assert.equal(await page.evaluate(() => window.localMemoryPreview.workspace.conversation.exportState()), seeded.conversation);
+      await page.evaluate(label => {
+        // Presentation-only entry exposure; no controller/model-ready change.
+        document.getElementById('chat-options').hidden = false;
+        const badge = document.createElement('p'); badge.id = 'live-saved-memory-fixture-label'; badge.textContent = label;
+        badge.style.cssText = 'margin:0;padding:6px;color:#ffedc8;background:#252014;font:10px/1.4 ui-monospace,monospace;pointer-events:none';
+        document.querySelector('#memory-dialog .memory-panel-body').prepend(badge);
+      }, fixture.label);
+      await page.locator('#memory-open').evaluate(button => button.click());
+      await page.waitForFunction(() => ['tsl', 'list', 'empty'].includes(document.getElementById('memory-graph').dataset.renderer), null, { timeout: 20_000 });
+      const renderer = await page.locator('#memory-graph').evaluate(node => ({ mode: node.dataset.renderer, backend: node.dataset.backend }));
+      assert.equal(renderer.mode, 'tsl', 'the live saved-memory fixture must exercise the actual renderer');
+      assert.ok(['webgpu', 'webgl2'].includes(renderer.backend)); fixture.renderer = renderer;
+      assert.equal(await page.locator('#memory-graph canvas:visible').count(), 1);
+      assert.equal(await page.locator('#live-saved-memory-fixture-label').isVisible(), true);
+      assert.ok(browserPaths.includes(base.pathname + 'memory/graph-renderer.mjs'), 'actual on-demand production graph module was fetched');
+      assert.equal(await page.locator('[data-memory-kind="record"]').count(), 3);
+      assert.equal(await page.locator('[data-memory-kind="source"]').count(), 2);
+      const selected = () => page.locator('[data-memory-node][data-matched="true"]').evaluateAll(nodes => nodes.map(node => node.dataset.memoryNode).sort());
+      await page.locator('#memory-query').fill('harbor access code'); await page.locator('#memory-query').press('Enter');
+      await page.waitForFunction(() => !document.getElementById('memory-query').disabled && document.getElementById('memory-status').textContent === 'Matching memories are lit up.');
+      assert.deepEqual(await selected(), ['record:m-0001', 'turn:t-0001']);
+      await page.locator('#memory-query').fill('flying violet whale'); assert.deepEqual(await selected(), []);
+      await page.locator('#memory-query').press('Enter');
+      await page.waitForFunction(() => !document.getElementById('memory-query').disabled && document.getElementById('memory-status').textContent === 'No matching saved memories.');
+      assert.deepEqual(await selected(), []); await page.locator('#memory-query-clear').click();
+      assert.equal(await page.locator('#memory-query').inputValue(), ''); assert.deepEqual(await selected(), []);
+      const record = page.locator('[data-memory-node="record:m-0001"]');
+      await record.focus(); await page.keyboard.press('Enter');
+      assert.equal(await record.getAttribute('aria-pressed'), 'true');
+      assert.equal(await page.locator('[data-memory-node][aria-pressed="true"]').count(), 1);
+      assert.equal(await page.locator('#memory-detail-text').textContent(), 'The harbor access code is CEDAR-731.');
+      const sourceLink = page.locator('#memory-detail-sources [data-memory-source="t-0001"]');
+      assert.equal(await sourceLink.getAttribute('href'), '#turn-' + seeded.sourceTurnId);
+      assert.equal(await page.locator('#turn-' + seeded.sourceTurnId + ' .content').textContent(), seeded.sourceText);
+      await page.locator('#memory-back').click();
+      assert.equal(await record.evaluate(node => document.activeElement === node), true);
+      assert.equal(await page.locator('[data-memory-node][aria-pressed="true"]').count(), 0);
+      await page.keyboard.press('Enter'); await sourceLink.click();
+      assert.equal(await page.locator('#memory-dialog').evaluate(dialog => dialog.open), false);
+      assert.equal(await page.evaluate(() => window.localMemoryPreview.workspace.conversation.exportState()), seeded.conversation);
+      fixture.originalTranscriptPreserved = true;
+      fixture.sourceLinkVerifiedAgainstCanonicalTurn = true;
+      assert.equal(await page.locator('#app').getAttribute('data-phase'), 'idle');
+    } catch (error) { fixtureFailure = error; }
+    finally {
+      try {
+        await page.evaluate(async () => {
+          const { storageKey } = await import('./memory/workspace.mjs');
+          window.localMemoryPreview?.workspace.dispose(); localStorage.removeItem(storageKey);
+          document.getElementById('live-saved-memory-fixture-label')?.remove();
+        });
+        fixture.workspaceDisposed = true; fixture.syntheticStorageRemoved = true;
+        await productionPage('?memory=1'); fixture.trueIdleRestored = true;
+      } catch (error) { fixtureFailure ||= error; }
+    }
+    assert.deepEqual(forbiddenRequests, []); assert.deepEqual(pageErrors, []); assert.deepEqual(failedResponses, []); assert.equal(workers, 0);
+    assert.ok(!browserPaths.some(path => /(?:\/runtime\/|\/engine-worker\.mjs$|\.gguf$)/i.test(path)));
+    if (fixtureFailure) throw fixtureFailure;
+  });
 } catch (error) { failure = error; }
 finally {
   try { if (context) { await context.close(); cleanup.browserContextClosed = true; } } catch (error) { failure ||= error; }
@@ -205,13 +309,15 @@ finally {
     startedAt: new Date(started).toISOString(), durationMs: Date.now() - started, node: process.version, browser: browserVersion,
     url: base?.href, verifierSha256: digest(await readFile(fileURLToPath(import.meta.url))),
     manifest: manifest && { sha256: manifestSha256, identitySha256: manifest.identitySha256, sourceHead: manifest.source.head,
-      sourceFingerprintSha256: manifest.source.fingerprintSha256, filesIncludingManifest: 35 },
+      sourceFingerprintSha256: manifest.source.fingerprintSha256, filesIncludingManifest: 38 },
     checks, assets: assets.sort((left, right) => left.path.localeCompare(right.path)), privatePaths, observations, screenshot,
-    boundary: { fixture: false, productionBootstrapReplaced: false, providerCalls: 0, actualNativeCalls: 0, modelDownloads: 0,
+    boundary: { fixture: checks.some(check => check.fixture), fixtureCases: checks.filter(check => check.fixture).map(({ name, fixtureScope }) => ({ name, fixtureScope })),
+      productionBootstrapReplaced: false, providerCalls: 0, actualNativeCalls: 0, modelDownloads: 0,
       runtimeWorkersCreated: workers, forbiddenRequests, pageErrors, failedResponses, browserPaths: [...new Set(browserPaths)].sort(),
       httpRequests, decodedStaticBytes: decodedBytes, localServerStarted: false, packageCopies: 0 }, cleanup,
     limitations: ['Mobile viewport/reduced-motion emulation in configured desktop Chromium, not physical iOS.',
-      'Actual idle loading UI and module binding only; no model loading, inference, cache or answer-quality proof.',
+      'Production idle checks plus two explicitly scoped presentation/saved-memory fixtures; no model loading, inference, cache or answer-quality proof.',
+      'Synthetic source anchors are verified while unloaded; actual ready-chat source focus is covered by the separate local fixture suite.',
       'Finite path probes do not prove arbitrary unknown paths or Git-history disclosure boundaries.'],
     ...(failure ? { error: failure.message } : {}) }, null, 2) + '\n');
 }

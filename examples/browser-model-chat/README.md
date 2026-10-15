@@ -5,7 +5,7 @@ An optional, separate browser entry point for one pinned local model and a bound
 Live static preview: **https://shoozes.github.io/rag-method-alpha/model-chat/**.
 The limited [memory preview](https://shoozes.github.io/rag-method-alpha/model-chat/?memory=1)
 adds automatic selected-passage compaction, optional exact-word saved memory and
-a small read-only graph. It is an experiment: context selection is lossy and the
+a small read-only TSL graph with compact search. It is an experiment: context selection is lossy and the
 230M model can omit or invent details. See [memory setup and limits](./memory/README.md).
 The runtime automatically selects a pinned Memory32 compatibility build when
 Memory64 or JSPI is unavailable. OPFS remains required. The user reported a
@@ -60,6 +60,53 @@ node examples/browser-model-chat/stage-static.mjs
 ```
 
 The default output is `.artifacts/model-chat/site/`. `--output` selects another safe descendant of the checkout, and `--runtime-root` selects already prepared, exact-hash runtime inputs. The stager copies only an explicit browser asset allowlist plus licenses, notice and setup text. Its `site-manifest.json` records file sizes/hashes and source identity. It excludes models, caches, proof, tests, servers and preparer scripts. It refuses foreign directories, changed managed output, symlink escapes and hard-linked managed output before refreshing. This creates an **unreviewed local candidate**, not a release or deployment.
+
+### Prepare the optional TSL graph offline
+
+The graph reuses the existing `createTslRagGraphRenderer` and `layoutRagGraph`
+implementations from `modules/browser-rag-ts/src/application/`. The admitted
+`@ours/forcegraph-tsl` 0.3.0-alpha.1 archive is already under that module's
+`vendor/`; its exact SHA-256 and source snapshot are in `vendor/graph-package.json`.
+Three.js 0.185.0 is fixed by the existing lockfile. No CDN or dependency fetch
+occurs in the graph builder.
+
+Supply one prepared dependency root, normally `.artifacts/memory/dependencies/`:
+
+- `@ours/forcegraph-tsl/`: the exact vendored package, including its MIT license.
+- `three/`: the locked package's `package.json`, `LICENSE`, `build/three.core.js`,
+  `build/three.webgpu.js` and `build/three.tsl.js` at their original relative paths.
+
+These inputs can be extracted from already-retained, integrity-verified archives;
+do not substitute another Three version or copy an unrelated dependency tree.
+With an already prepared esbuild module, run from the repository root:
+
+```powershell
+$env:BROWSER_MEMORY_ESBUILD_MODULE = (Resolve-Path 'path/to/prepared/esbuild/lib/main.js').Path
+$env:BROWSER_MEMORY_GRAPH_DEPENDENCY_ROOT = (Resolve-Path '.artifacts/memory/dependencies').Path
+node examples/browser-model-chat/memory/build-core.mjs
+node examples/browser-model-chat/memory/build-graph.mjs
+node examples/browser-model-chat/stage-static.mjs --memory-preview --output .artifacts/model-chat/site
+```
+
+The builder verifies prepared package bytes and emits one self-contained
+`.artifacts/memory/graph-renderer.mjs`, plus complete graph/Three MIT texts.
+The explicit memory export contains **37 payload files plus its manifest**;
+the added destinations are `memory/graph-renderer.mjs`,
+`LICENSES/forcegraph-tsl.txt` and `LICENSES/three.txt`. Preserve those full notices
+alongside the first-party/runtime MIT texts and separate LFM model license.
+Prepared dependencies and build scripts are source/setup inputs, not browser files.
+These commands reuse prepared inputs; they do not constitute a fresh-host install proof.
+
+The renderer tries WebGPU and can use Three's WebGL2 backend. When graphics
+initialization fails or graphics are disabled, accessible saved-memory controls
+and search remain available as HTML. Graph layout is local and bounded; no graph
+Worker is required. Device loss is handled as a failure, not a promise of seamless
+backend migration. Desktop browser evidence does not qualify physical iOS graphics.
+
+The restrained graph/search interaction references the existing
+[TSL search-scan example](https://shoozes.github.io/tsl-smooth-graph-alpha/showcase/examples/search-scan/index.html).
+It reuses the renderer's selection/highlight path. The full showcase remains
+separate; no private donor code, data or shaders are included in this chat preview.
 
 Asset URLs are relative, including the stylesheet, bootstrap, runtime import and WASM. The exported directory can sit beneath a host prefix without a router rewrite. Serve actual missing files as 404, modules as JavaScript and WASM as `application/wasm`; an HTML fallback for missing assets is invalid. A future public host still needs HTTPS, its own policy/CORS checks and a license/release review. Hosting is not configured by this command.
 

@@ -23,9 +23,13 @@ const browserFiles = ['index.html', 'style.css', 'app.mjs', 'loader-controller.m
 const helperFiles = ['runtime-errors.mjs', 'wasm-memory.mjs', 'runtime-profile.mjs'];
 const memoryFiles = ['memory/workspace.mjs', 'memory/store.mjs', 'memory/events.mjs', 'memory/context.mjs',
   'memory/structured-context.mjs', 'memory/automatic-context.mjs', 'memory/rag-adapter.mjs', 'memory/restore-events.mjs',
-  'memory/citations.mjs', 'memory/panel.mjs', 'memory/panel.css', 'memory/rag-core.mjs'];
+  'memory/citations.mjs', 'memory/panel.mjs', 'memory/panel.css', 'memory/rag-core.mjs', 'memory/graph-renderer.mjs'];
 const modelLicensePath = 'LICENSES/lfm-open-license-1.0.txt';
-const previewAdded = [...memoryFiles, modelLicensePath];
+const graphAdded = ['memory/graph-renderer.mjs', 'LICENSES/forcegraph-tsl.txt', 'LICENSES/three.txt'];
+const previewAdded = [...memoryFiles, modelLicensePath, ...graphAdded.filter(name => name.startsWith('LICENSES/'))];
+const graphPins = { 'memory/graph-renderer.mjs': 'c85fda05a2a6ac5596dc41f5f197064eb3063932eaf574ae93f5f7141d179edd',
+  'LICENSES/forcegraph-tsl.txt': '1a897e0ee6f1fc65889976eadb848acefac9db7f9c97274a6c490f52390cd474',
+  'LICENSES/three.txt': '8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc' };
 const modelLicenseSha256 = '30adf9d6478191fb87f2424f63ba0728598335aaf99cd2848ef17e8e545fe94b';
 
 async function privateFixture(t) {
@@ -92,7 +96,7 @@ test('missing or wrong pinned runtime bytes fail before creating output', async 
   assert.equal(await exists(output), false);
 });
 
-test('explicit preview export has exactly 34 hashed payload files plus manifest, complete licenses and safe refresh', async t => {
+test('explicit preview export has exactly 37 hashed payload files plus manifest, complete licenses and safe refresh', async t => {
   // The intended delivery site is the sole delivery output. No second runtime tree
   // or model is created; failure cases above use only a few fixture bytes.
   const staged = await stageStatic();
@@ -115,7 +119,7 @@ test('explicit preview export has exactly 34 hashed payload files plus manifest,
     'runtime/LICENSE', 'runtime/compat/wllama.js', 'runtime/compat/wllama.wasm', 'LICENSES/rag-method.txt', 'NOTICE.txt', 'README.txt',
     ...previewAdded].sort();
   assert.deepEqual(manifest.files.map(file => file.path).sort(), expected);
-  assert.equal(manifest.files.length, 34);
+  assert.equal(manifest.files.length, 37);
   const actual = [];
   async function visit(directory, prefix = '') {
     for (const item of await readdir(directory, { withFileTypes: true })) {
@@ -125,7 +129,7 @@ test('explicit preview export has exactly 34 hashed payload files plus manifest,
   }
   await visit(site);
   assert.deepEqual(actual.sort(), [...expected, 'site-manifest.json'].sort());
-  assert.equal(actual.length, 35, 'no additional files, source, models or private products');
+  assert.equal(actual.length, 38, 'no additional files, source, models or private products');
   for (const file of manifest.files) {
     const bytes = await readFile(join(site, file.path));
     assert.equal(bytes.length, file.bytes, file.path);
@@ -136,8 +140,8 @@ test('explicit preview export has exactly 34 hashed payload files plus manifest,
     assert.equal(hash(await readFile(join(site, 'runtime', name))), contract.sha256, 'retained runtime: ' + name);
   }
   for (const helperPath of [...helperFiles, ...memoryFiles]) {
-    const helperSource = await readFile(helperPath === 'memory/rag-core.mjs'
-      ? join(root, '.artifacts/memory/rag-core.mjs') : join(root, 'examples/browser-model-chat', helperPath));
+    const helperSource = await readFile(['memory/rag-core.mjs', 'memory/graph-renderer.mjs'].includes(helperPath)
+      ? join(root, '.artifacts', helperPath) : join(root, 'examples/browser-model-chat', helperPath));
     const helperManifest = manifest.files.find(file => file.path === helperPath);
     assert.equal(helperManifest.bytes, helperSource.length, helperPath);
     assert.equal(helperManifest.sha256, hash(helperSource), helperPath);
@@ -150,6 +154,10 @@ test('explicit preview export has exactly 34 hashed payload files plus manifest,
   assert.deepEqual(modelLicense, await readFile(join(root, 'examples/browser-model-chat/licenses/LFM-Open-License-1.0.txt')));
   assert.match(modelLicense.toString(), /LFM Open License v1\.0/);
   assert.match(modelLicense.toString(), /END OF TERMS/);
+  for (const [name, expectedHash] of Object.entries(graphPins)) assert.equal(hash(await readFile(join(site, name))), expectedHash, name);
+  assert.equal(manifest.graph.bundleSha256, graphPins['memory/graph-renderer.mjs']);
+  assert.equal(manifest.graph.layoutBackend, 'local');
+  assert.ok(manifest.source.files.some(file => file.path === 'examples/browser-model-chat/memory/build-graph.mjs'));
   const notices = await readFile(join(site, 'NOTICE.txt'), 'utf8');
   assert.match(notices, /@wllama\/wllama 3\.5\.1: MIT/);
   assert.match(notices, /@wllama\/wllama-compat 3\.5\.1: MIT/);
@@ -159,6 +167,8 @@ test('explicit preview export has exactly 34 hashed payload files plus manifest,
   assert.ok(notices.includes(modelLicensePath));
   assert.match(notices, /weights are not included/);
   assert.match(notices, /used Thursday instead of Tuesday but omitted the codename and city/);
+  assert.match(notices, /@ours\/forcegraph-tsl 0\.3\.0-alpha\.1: MIT/);
+  assert.match(notices, /Three\.js 0\.185\.0: MIT/);
   const launch = await readFile(join(site, 'README.txt'), 'utf8');
   assert.match(launch, /main wllama 3\.5\.1 runtime requires WebAssembly Memory64/);
   assert.match(launch, /compatibility runtime uses Memory32 and Asyncify/);
@@ -170,6 +180,7 @@ test('explicit preview export has exactly 34 hashed payload files plus manifest,
   assert.match(launch, /Sources sent at the time, not answer truth/);
   assert.match(launch, /failed unrelated-question abstention and answer-format adherence/);
   assert.match(launch, /omitted the codename and city in a multi-field answer; answer completeness is not guaranteed/);
+  assert.match(launch, /Three WebGPU with a WebGL2 backend fallback/);
   assert.doesNotMatch(launch, /must write|Fact\[key\]/);
   assert.doesNotMatch(JSON.stringify(manifest), /[A-Za-z]:\\|\/Users\/|\/home\/|file:\/\//);
   assert.deepEqual((await stageStatic()).manifest, manifest, 'an intact managed site refreshes deterministically without another output tree');
@@ -181,7 +192,7 @@ test('explicit preview export has exactly 34 hashed payload files plus manifest,
   assert.equal(await readFile(join(foreign, '.env'), 'utf8'), 'PRIVATE-FIXTURE-KEEP');
 });
 
-test('the sole managed site migrates exact old 21-file and prior payloads; partial or extra memory sets are refused', async () => {
+test('the sole managed site migrates exact old 35-file, 21-file and prior payloads; partial memory sets are refused', async () => {
   const manifestBytes = await readFile(join(site, 'site-manifest.json'));
   const manifest = JSON.parse(manifestBytes);
   const retained = new Map();
@@ -190,6 +201,7 @@ test('the sole managed site migrates exact old 21-file and prior payloads; parti
   }
   try {
     for (const absent of [
+      graphAdded,
       previewAdded,
       [...previewAdded, 'wasm-memory.mjs', 'runtime-profile.mjs'],
       [...previewAdded, ...helperFiles],
@@ -278,6 +290,7 @@ test('curated output alone serves every module and dynamic import with exact GET
       ['site-manifest.json', 'application/json; charset=utf-8'],
       ...memoryFiles.map(name => [name, name.endsWith('.css') ? 'text/css; charset=utf-8' : 'application/javascript; charset=utf-8']),
       [modelLicensePath, 'application/octet-stream'],
+      ...graphAdded.filter(name => name.startsWith('LICENSES/')).map(name => [name, 'application/octet-stream']),
     ];
     for (const [asset, mime] of expected) {
       for (const method of ['GET', 'HEAD']) {
@@ -298,21 +311,40 @@ test('curated output alone serves every module and dynamic import with exact GET
       assert.ok(new URL(match[1], server.baseUrl).pathname.startsWith(prefix), 'HTML asset retains nested prefix: ' + match[1]);
     }
     const dynamicImports = [];
+    let dormantWorkerReferences = 0;
     for (const module of [...browserFiles, ...memoryFiles].filter(name => name.endsWith('.mjs'))) {
       const text = await readFile(join(site, module), 'utf8');
-      for (const match of text.matchAll(/(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)['"]([^'"]+)['"]|new URL\(\s*['"]([^'"]+)['"]\s*,/g)) {
+      // A quoted "from" argument in the minified renderer is not an import
+      // keyword. Valid import/export keywords cannot begin after a quote.
+      for (const match of text.matchAll(/(?<!['"`])(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)['"]([^'"]+)['"]|new URL\(\s*['"]([^'"]+)['"]\s*,/g)) {
         const target = match[1] || match[2];
         if (/^(?:https?:|data:|node:)/.test(target)) continue;
+        if (module === 'memory/graph-renderer.mjs' && target === '../worker/force-worker-entry.js') {
+          dormantWorkerReferences++;
+          assert.match(await readFile(join(root, 'modules/browser-rag-ts/src/application/graphRenderer.ts'), 'utf8'), /layout: \{ backend: "local", autoStart: false/);
+          continue;
+        }
         const resolved = new URL(target, new URL(module, server.baseUrl));
         assert.ok(resolved.pathname.startsWith(prefix), 'module asset retains nested prefix: ' + module + ' -> ' + target);
         assert.equal((await fetch(resolved, { method: 'HEAD' })).status, 200, 'module asset exists: ' + target);
         if (/^import\s*\(/.test(match[0])) dynamicImports.push(resolved.pathname.slice(prefix.length));
       }
     }
-    assert.deepEqual(dynamicImports.sort(), ['memory/panel.mjs', 'memory/rag-core.mjs', 'memory/workspace.mjs']);
+    assert.deepEqual(dynamicImports.sort(), ['memory/graph-renderer.mjs', 'memory/panel.mjs', 'memory/rag-core.mjs', 'memory/workspace.mjs']);
+    assert.equal(dormantWorkerReferences, 1, 'only the exact admitted unused worker branch is exempted');
+    const graph = await import(pathToFileURL(join(site, 'memory/graph-renderer.mjs')).href);
+    assert.deepEqual(Object.keys(graph).sort(), ['createTslRagGraphRenderer', 'layoutRagGraph']);
+    const previousWorker = globalThis.Worker; let workers = 0;
+    globalThis.Worker = class { constructor() { workers++; throw new Error('Local graph layout must not start a Worker.'); } };
+    try {
+      const positioned = graph.layoutRagGraph({ view: 'evidence', nodes: [{ id: 'fixture', kind: 'source', path: 'fixture', source_id: 'fixture', record_id: null }],
+        links: [], total_nodes: 1, total_links: 0, omitted_nodes: 0, omitted_links: 0 });
+      assert.equal(positioned.nodes.length, 1); assert.equal(workers, 0);
+    } finally { if (previousWorker === undefined) delete globalThis.Worker; else globalThis.Worker = previousWorker; }
     for (const missing of ['missing.mjs', 'missing.js', 'missing.wasm', 'serve.mjs', 'prepare-runtime.mjs', 'stage-static.mjs',
       'tests/loader-controller.test.mjs', '.git/config', '.env', 'runtime/private.txt', 'runtime/compat/private.js', MODEL.file, 'cache/model.gguf',
-      'memory/PRIVATE_LOCAL_ONLY', 'memory/README.md', 'memory/PREVIEW_READINESS.md', 'memory/build-core.mjs', 'memory/serve-local.mjs',
+      'memory/PRIVATE_LOCAL_ONLY', 'memory/README.md', 'memory/PREVIEW_READINESS.md', 'memory/build-core.mjs', 'memory/build-graph.mjs', 'memory/serve-local.mjs',
+      'worker/force-worker-entry.js',
       'memory-proof/runtime-probe.mjs', 'examples/browser-model-chat/licenses/LFM-Open-License-1.0.txt', '.artifacts/proof/local-memory/receipt.json',
       'agent-workspace/source/workspace.html', 'modules/browser-rag-ts/src/core/index.ts']) {
       const response = await fetch(new URL(missing, server.baseUrl));

@@ -19,9 +19,14 @@ const memoryFiles = Object.freeze([
   'memory/workspace.mjs', 'memory/store.mjs', 'memory/events.mjs', 'memory/context.mjs',
   'memory/structured-context.mjs', 'memory/automatic-context.mjs', 'memory/rag-adapter.mjs',
   'memory/restore-events.mjs', 'memory/citations.mjs', 'memory/panel.mjs', 'memory/panel.css',
-  'memory/rag-core.mjs',
+  'memory/rag-core.mjs', 'memory/graph-renderer.mjs',
 ]);
 const memoryCoreSha256 = 'c282ebb3965c4a25b48fb66082ce18c72184449f2123633a901ffceb9939ace6';
+const graphRendererSha256 = 'c85fda05a2a6ac5596dc41f5f197064eb3063932eaf574ae93f5f7141d179edd';
+const graphLicenses = Object.freeze({
+  'LICENSES/forcegraph-tsl.txt': '1a897e0ee6f1fc65889976eadb848acefac9db7f9c97274a6c490f52390cd474',
+  'LICENSES/three.txt': '8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc',
+});
 const modelLicenseSource = 'examples/browser-model-chat/licenses/LFM-Open-License-1.0.txt';
 const modelLicensePath = 'LICENSES/lfm-open-license-1.0.txt';
 const modelLicenseSha256 = '30adf9d6478191fb87f2424f63ba0728598335aaf99cd2848ef17e8e545fe94b';
@@ -32,7 +37,8 @@ const payloadPaths = Object.freeze([...browserFiles, 'theme/aurel-gold.css',
 const preMemoryPayloadPaths = payloadPaths.filter(name => !['wasm-memory.mjs', 'runtime-profile.mjs'].includes(name));
 const priorPayloadPaths = preMemoryPayloadPaths.filter(name => name !== 'runtime-errors.mjs');
 const legacyPayloadPaths = priorPayloadPaths.filter(name => !name.startsWith('runtime/compat/'));
-const memoryPayloadPaths = Object.freeze([...payloadPaths, ...memoryFiles, modelLicensePath].sort());
+const previousMemoryPayloadPaths = Object.freeze([...payloadPaths, ...memoryFiles.filter(name => name !== 'memory/graph-renderer.mjs'), modelLicensePath].sort());
+const memoryPayloadPaths = Object.freeze([...payloadPaths, ...memoryFiles, modelLicensePath, ...Object.keys(graphLicenses)].sort());
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const portable = value => value.split(sep).join('/');
 const table = payload => [...payload].map(([path, bytes]) => ({ path, bytes: bytes.length, sha256: hash(bytes) })).sort((a, b) => a.path.localeCompare(b.path));
@@ -93,7 +99,7 @@ async function managedOutput(destination, memoryPreview) {
   const previousPaths = previous.files?.map(file => file.path).sort();
   if (previous.schema !== schema || previous.managedBy !== managedBy || identitySha256 !== identity(body)
       || previous.publicReleaseQualified !== false || !Array.isArray(previous.files)
-      || ![...(memoryPreview ? [memoryPayloadPaths] : []), payloadPaths, preMemoryPayloadPaths, priorPayloadPaths, legacyPayloadPaths]
+      || ![...(memoryPreview ? [memoryPayloadPaths, previousMemoryPayloadPaths] : []), payloadPaths, preMemoryPayloadPaths, priorPayloadPaths, legacyPayloadPaths]
         .some(paths => JSON.stringify(previousPaths) === JSON.stringify(paths))) {
     throw new Error('Refusing output with a foreign or changed managed manifest.');
   }
@@ -149,15 +155,28 @@ export async function stageStatic({ output = join(workspace, '.artifacts/model-c
   }
   if (memoryPreview) {
     for (const name of memoryFiles) {
-      const sourcePath = name === 'memory/rag-core.mjs' ? '.artifacts/memory/rag-core.mjs' : 'examples/browser-model-chat/' + name;
-      const bytes = await ordinaryBytes(join(workspace, sourcePath), sourcePath);
+      const generated = name === 'memory/rag-core.mjs' || name === 'memory/graph-renderer.mjs';
+      const sourcePath = generated ? '.artifacts/' + name : 'examples/browser-model-chat/' + name;
+      const bytes = await ordinaryBytes(join(workspace, sourcePath), sourcePath, generated ? 4 * 1024 * 1024 : 1024 * 1024);
       if (name === 'memory/rag-core.mjs' && hash(bytes) !== memoryCoreSha256) throw new Error('Pinned memory core SHA-256 mismatch.');
+      if (name === 'memory/graph-renderer.mjs' && hash(bytes) !== graphRendererSha256) throw new Error('Pinned graph renderer SHA-256 mismatch.');
       payload.set(name, bytes); source.set(sourcePath, bytes);
     }
     const modelLicense = await ordinaryBytes(join(workspace, modelLicenseSource), modelLicenseSource, 64 * 1024);
     if (hash(modelLicense) !== modelLicenseSha256) throw new Error('Pinned model license SHA-256 mismatch.');
     payload.set(modelLicensePath, modelLicense); source.set(modelLicenseSource, modelLicense);
     source.set('examples/browser-model-chat/memory/build-core.mjs', await ordinaryBytes(join(example, 'memory/build-core.mjs'), 'memory core build source'));
+    for (const [path, expected] of Object.entries(graphLicenses)) {
+      const sourcePath = '.artifacts/memory/' + path;
+      const bytes = await ordinaryBytes(join(workspace, sourcePath), sourcePath, 64 * 1024);
+      if (hash(bytes) !== expected) throw new Error('Pinned graph license SHA-256 mismatch: ' + path);
+      payload.set(path, bytes); source.set(sourcePath, bytes);
+    }
+    for (const path of ['examples/browser-model-chat/memory/build-graph.mjs',
+      'modules/browser-rag-ts/src/application/graphRenderer.ts', 'modules/browser-rag-ts/src/application/layoutGraph.ts',
+      'modules/browser-rag-ts/src/application/graphPalette.ts', 'modules/browser-rag-ts/src/presentation/nodeSpawnMotion.js',
+      'modules/browser-rag-ts/vendor/graph-package.json', 'modules/browser-rag-ts/vendor/ours-forcegraph-tsl-0.3.0-alpha.1.tgz',
+      'modules/browser-rag-ts/package-lock.json']) source.set(path, await ordinaryBytes(join(workspace, path), path));
   }
   const theme = await ordinaryBytes(join(workspace, 'modules/browser-rag-ts/demo/aurel-gold.css'), 'Aurel Gold stylesheet');
   payload.set('theme/aurel-gold.css', theme); source.set('modules/browser-rag-ts/demo/aurel-gold.css', theme);
@@ -177,6 +196,11 @@ export async function stageStatic({ output = join(workspace, '.artifacts/model-c
     'Model license: LFM Open License v1.0 (distinct from the application/runtime MIT licenses).',
     MODEL.license,
     ...(memoryPreview ? ['Complete pinned model license: ' + modelLicensePath + '.'] : []),
+    ...(memoryPreview ? [
+      '@ours/forcegraph-tsl 0.3.0-alpha.1: MIT. Complete retained text: LICENSES/forcegraph-tsl.txt.',
+      'Three.js 0.185.0: MIT. Complete retained text: LICENSES/three.txt.',
+      'The graph bundle reuses the existing admitted TSL renderer and local layout; no graph worker or remote dependency is required.',
+    ] : []),
     'Model weights are not included in this static payload. Download is an explicit browser action.',
     'The model license applies to model use and redistribution; inspect its pinned terms before deployment.', '',
     ...(memoryPreview ? [
@@ -199,7 +223,9 @@ export async function stageStatic({ output = join(workspace, '.artifacts/model-c
     'JSPI absence alone is not a loading gate.',
     'The model download, cache, and inference run only after an explicit browser action.',
     ...(memoryPreview ? [
-      'Open ?memory=1 for this one-chat memory preview; add &graph=0 to omit the optional read-only SVG event graph.',
+      'Open ?memory=1 for this one-chat memory preview; add &graph=0 for its searchable HTML memory list without the optional TSL graph.',
+      'The pinned TSL renderer uses Three WebGPU with a WebGL2 backend fallback; unavailable graphics retain accessible memory controls.',
+      'Graph startup or device loss is not a guarantee of mobile GPU support. No new iOS qualification follows from this package.',
       'Older context is selected automatically as source-linked exact passages; no special markup is required.',
       'Automatic passage selection is lossy extractive context, not general semantic summarization or verified fact admission.',
       'Explicit Save stores selected exact user words separately for keyword retrieval; Forget does not erase the transcript.',
@@ -221,6 +247,8 @@ export async function stageStatic({ output = join(workspace, '.artifacts/model-c
     model: { id: MODEL.id, file: MODEL.file, revision: MODEL.revision, bytes: MODEL.bytes,
       sha256: MODEL.sha256, url: MODEL.url, license: 'LFM Open License v1.0', licenseUrl: MODEL.license,
       ...(memoryPreview ? { licensePath: modelLicensePath, licenseSha256: modelLicenseSha256 } : {}), weightsIncluded: false },
+    ...(memoryPreview ? { graph: { package: '@ours/forcegraph-tsl', version: '0.3.0-alpha.1', threeVersion: '0.185.0',
+      bundlePath: 'memory/graph-renderer.mjs', bundleSha256: graphRendererSha256, layoutBackend: 'local', licenses: graphLicenses } } : {}),
     runtime: { package: '@wllama/wllama', version: RUNTIME.version, license: 'MIT', licensePath: 'runtime/LICENSE' },
     compatibilityRuntime: { package: COMPAT.package, version: COMPAT.version, gitHead: COMPAT.gitHead,
       profile: 'Memory32/Asyncify', license: 'MIT', licensePath: 'runtime/LICENSE' },
