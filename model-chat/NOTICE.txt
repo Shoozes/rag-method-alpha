@@ -11,5 +11,9 @@ Model: LiquidAI/LFM2.5-230M-GGUF / LFM2.5-230M-Q4_K_M.gguf
 Model revision: fa224d4cb60cffe61eb58726712ef255bb64d0b7
 Model license: LFM Open License v1.0 (distinct from the application/runtime MIT licenses).
 https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF/blob/fa224d4cb60cffe61eb58726712ef255bb64d0b7/LICENSE
+Complete pinned model license: LICENSES/lfm-open-license-1.0.txt.
 Model weights are not included in this static payload. Download is an explicit browser action.
 The model license applies to model use and redistribution; inspect its pinned terms before deployment.
+
+Experimental model limitation: after a correction, the model used Thursday instead of Tuesday but omitted the codename and city in a multi-field answer.
+Automatic passage/provenance checks do not establish generated-answer completeness or truth.

@@ -3,7 +3,7 @@ import { createRuntimeAdapter } from './runtime-adapter.mjs';
 import { MODEL, RUNTIME } from './model-contract.mjs';
 import { formatRuntimeError } from './runtime-errors.mjs';
 
-export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions } = {}) {
+export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, workspace } = {}) {
   const $ = id => document.getElementById(id);
   const app = $('app');
   const busyPhases = new Set(['checking', 'downloading', 'verifying', 'initializing']);
@@ -18,6 +18,7 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions }
     unsupported: 'This browser cannot run this runtime.',
   };
   let previousPhase = '', messages = [], pendingMessage, latestReport = '';
+  let preparingContext = false;
   const log = $('messages');
   let followTail = true, viewportFrame, documentFrame, loadingScrollY = 0;
   function scrollLatest(force = false) {
@@ -155,13 +156,26 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions }
     }
     previousPhase = state.phase;
   }
-  function message(role, text, pending = false) {
+  function message(role, text, pending = false, turnId) {
     $('chat-empty').hidden = true;
     const node = document.createElement('article');
     node.className = `message ${role}${pending ? ' pending' : ''}`;
+    if (turnId) { node.id = 'turn-' + turnId; node.tabIndex = -1; }
     const name = document.createElement('p'); name.className = 'speaker'; name.textContent = role === 'user' ? 'You' : 'LFM2.5';
     const content = document.createElement('p'); content.className = 'content'; content.textContent = text;
     node.append(name, content); log.append(node); scrollLatest(); return node;
+  }
+  function answerSources(node, turnId) {
+    const references = workspace?.sourcesForAnswer(turnId) || [];
+    if (!references.length) return;
+    const sources = document.createElement('p'); sources.className = 'memory-sources';
+    sources.append('Sources sent at the time: ');
+    for (const source of references) {
+      const link = document.createElement('a'); link.href = '#turn-' + source.turnId;
+      const label = source.kind === 'saved-record' ? `${source.recordId} v${source.version}` : source.key;
+      link.textContent = `${label} · ${source.turnId}`; sources.append(link, ' ');
+    }
+    node.append(sources);
   }
   async function load(source, file) {
     try { await controller.load({ source, file }); }
@@ -211,6 +225,7 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions }
   $('unload').addEventListener('click', async () => { $('draft').value = $('prompt').value; await controller.cancel(); });
   $('stop').addEventListener('click', () => controller.cancel());
   $('clear').addEventListener('click', () => {
+    if (workspace) return; // Canonical preview history stays intact; no silent reset.
     options.open = false;
     messages = [];
     $('chat-error').hidden = true;
@@ -221,34 +236,48 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions }
   });
   $('composer').addEventListener('submit', async event => {
     event.preventDefault();
-    if (controller.getState().phase !== 'ready') return;
+    if (controller.getState().phase !== 'ready' || preparingContext) return;
     const text = $('prompt').value.trim();
     if (!text) { $('prompt').focus(); return; }
     // Keep this preview bounded; no attachment/context injection or tool execution.
-    if (messages.length >= 12 || messages.reduce((sum, item) => sum + item.content.length, text.length) > 6000) {
+    if (!workspace && (messages.length >= 12 || messages.reduce((sum, item) => sum + item.content.length, text.length) > 6000)) {
       $('chat-error').hidden = false; $('chat-error').textContent = 'This preview has reached its conversation limit. Clear the conversation to start fresh.'; return;
     }
+    preparingContext = Boolean(workspace); // Reserve before persistence can yield.
     $('chat-error').hidden = true;
-    messages.push({ role: 'user', content: text }); message('user', text);
+    const userTurn = workspace?.conversation.append({ role: 'user', content: text });
+    messages.push({ role: 'user', content: text }); message('user', text, false, userTurn?.id);
     $('prompt').value = ''; $('draft').value = '';
     resizePrompt();
     $('prompt').focus({ preventScroll: true });
     pendingMessage = message('assistant', '', true);
     try {
-      const answer = await controller.send([{ role: 'system', content: 'You are a concise, helpful assistant. Answer in plain text.' }, ...messages]);
+      if (workspace) await workspace.persist();
+      if (workspace) { $('send').disabled = true; $('session-status').textContent = 'Preparing context'; }
+      const prepared = workspace ? await workspace.prepare() : null;
+      const answer = await controller.send(prepared?.messages || [{ role: 'system', content: 'You are a concise, helpful assistant. Answer in plain text.' }, ...messages]);
       pendingMessage.querySelector('.content').textContent = answer;
       pendingMessage.classList.remove('pending');
+      if (workspace) {
+        const accepted = workspace.conversation.append({ role: 'assistant', content: answer });
+        pendingMessage.id = 'turn-' + accepted.id; pendingMessage.tabIndex = -1;
+        await workspace.captureAnswerSources({ answerTurnId: accepted.id, requestSha256: prepared.measurement.requestSha256 });
+        answerSources(pendingMessage, accepted.id);
+        await workspace.persist();
+      }
       scrollLatest();
       messages.push({ role: 'assistant', content: answer });
-    } catch {
+    } catch (error) {
       pendingMessage.classList.remove('pending'); pendingMessage.classList.add('interrupted');
       if (!pendingMessage.querySelector('.content').textContent) pendingMessage.querySelector('.content').textContent = 'No completed answer.';
       // Incomplete attempts remain visible, but are not silently sent as accepted history.
-      messages.pop();
-    } finally { pendingMessage = null; }
+      if (workspace) { $('chat-error').hidden = false; $('chat-error').textContent = error.message; await workspace.persist(); }
+      else messages.pop();
+    } finally { pendingMessage = null; preparingContext = false; render(controller.getState()); }
   });
   window.addEventListener('pagehide', () => {
     void controller.dispose(); document.removeEventListener('visibilitychange', visibility);
+    workspace?.dispose();
     document.removeEventListener('keydown', closeOptions);
     document.removeEventListener('pointerdown', closeOptions);
     window.removeEventListener('resize', fitViewport);
@@ -257,6 +286,15 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions }
     cancelAnimationFrame(viewportFrame);
     cancelAnimationFrame(documentFrame);
   }, { once: true });
+  if (workspace) {
+    const turns = workspace.conversation.snapshot().turns;
+    messages = turns.map(({ role, content }) => ({ role, content }));
+    for (const turn of turns) {
+      const node = message(turn.role, turn.content, false, turn.id);
+      if (turn.role === 'assistant') answerSources(node, turn.id);
+    }
+    $('clear').hidden = true;
+  }
   render(controller.getState());
   return { controller, getMessages: () => structuredClone(messages) };
 }

@@ -2,22 +2,28 @@
   "schema": "rag-model-chat-static/v1",
   "managedBy": "examples/browser-model-chat/stage-static.mjs",
   "publicReleaseQualified": false,
+  "memoryPreview": true,
   "source": {
-    "head": "6e5aa58f1c416ae6d4a20b37f219f8f59c4897d0",
+    "head": "84c21e337d2657cbc2b97a3832511c310357ba36",
     "dirty": false,
     "reviewStatus": "unreviewed",
-    "fingerprintScope": "allowlisted browser sources, theme, first-party license and packager",
-    "fingerprintSha256": "3221afdadd0bf4ced7434d93afc38d0b1ebadae7f7fe3435a86686702c92705f",
+    "fingerprintScope": "allowlisted browser sources, generated memory core, build source, theme, licenses and packager",
+    "fingerprintSha256": "57d987752525fcaf274c3d132401325abc80a23db520bb3a63acd16443aadd23",
     "files": [
       {
+        "path": ".artifacts/memory/rag-core.mjs",
+        "bytes": 128489,
+        "sha256": "c282ebb3965c4a25b48fb66082ce18c72184449f2123633a901ffceb9939ace6"
+      },
+      {
         "path": "examples/browser-model-chat/app.mjs",
-        "bytes": 15715,
-        "sha256": "c249a1d99b92cbb06f45dfd3cbf5da61d58d760881a341ff84648b3be106b77a"
+        "bytes": 18030,
+        "sha256": "532aebb9087bf61091bd2d5003ebd36098865399c22fcda6a6ed4e9f4c81bdc3"
       },
       {
         "path": "examples/browser-model-chat/bootstrap.mjs",
-        "bytes": 51,
-        "sha256": "0d5d7767dab4c3f9098568a951a312338514984a53d11ccf816cf8a009c54327"
+        "bytes": 1552,
+        "sha256": "61816724d02825def7caeed52d88e4f1ef3a589f0829f6d4bd363eedd9ce3d3a"
       },
       {
         "path": "examples/browser-model-chat/capabilities.mjs",
@@ -26,18 +32,83 @@
       },
       {
         "path": "examples/browser-model-chat/engine-worker.mjs",
-        "bytes": 14483,
-        "sha256": "d1f461d137703153ac31630686d351a748209dea8583a74d28ebad91bbaec6c5"
+        "bytes": 16460,
+        "sha256": "810c77779e459ca2af633bcc8a51c269938047baaf69808a3503f51a1aa23964"
       },
       {
         "path": "examples/browser-model-chat/index.html",
-        "bytes": 6662,
-        "sha256": "dd9a3c5a419c79d3731fbdcf153d66fb996cfa7e2f60f3a87905e73b758e79b1"
+        "bytes": 6915,
+        "sha256": "c51f7a788cdb405c46e0aad41b7146db61ae1195a2d2d97d614e589ca4c7429c"
+      },
+      {
+        "path": "examples/browser-model-chat/licenses/LFM-Open-License-1.0.txt",
+        "bytes": 10574,
+        "sha256": "30adf9d6478191fb87f2424f63ba0728598335aaf99cd2848ef17e8e545fe94b"
       },
       {
         "path": "examples/browser-model-chat/loader-controller.mjs",
         "bytes": 14420,
         "sha256": "d6e51cb1d9df39a2854eacd756fa31d6a22cecababb004aa2432f9ea992532a4"
+      },
+      {
+        "path": "examples/browser-model-chat/memory/automatic-context.mjs",
+        "bytes": 12338,
+        "sha256": "09a82a7dd813344b0a9e49b8657358214314a639a7ff0c41f0f333d3b452872d"
+      },
+      {
+        "path": "examples/browser-model-chat/memory/build-core.mjs",
+        "bytes": 3921,
+        "sha256": "655804b7f3db11e73b7742dbb40abc14304002328402b777f1efda7d9113a288"
+      },
+      {
+        "path": "examples/browser-model-chat/memory/citations.mjs",
+        "bytes": 12598,
+        "sha256": "a51f2de1202bffa5e36a52a86fe30ad937278e4867366898e2ff646b48e9f953"
+      },
+      {
+        "path": "examples/browser-model-chat/memory/context.mjs",
+        "bytes": 9434,
+        "sha256": "c144a6cd5f19d1a1f9dad828754f037183c91ecdf5e8d02635353873dcdbb598"
+      },
+      {
+        "path": "examples/browser-model-chat/memory/events.mjs",
+        "bytes": 6987,
+        "sha256": "201d9cf92c7e8c0bb1f0b0d6a3ab60c787531f99c202125938e0dcc0d2a775f3"
+      },
+      {
+        "path": "examples/browser-model-chat/memory/panel.css",
+        "bytes": 4489,
+        "sha256": "84c1ecbb8a201ead8dfd6cfcbff695f69a96e2e7b471064ae14bea1c849b6d04"
+      },
+      {
+        "path": "examples/browser-model-chat/memory/panel.mjs",
+        "bytes": 17521,
+        "sha256": "bede1c496ffce02a908547ee73ea5801f54290a4b57c3d633d8fc414ce4b8fc2"
+      },
+      {
+        "path": "examples/browser-model-chat/memory/rag-adapter.mjs",
+        "bytes": 7587,
+        "sha256": "234a6f588e80a5d833a3ffa1036fcdb4114031103350863107f20888eef817a8"
+      },
+      {
+        "path": "examples/browser-model-chat/memory/restore-events.mjs",
+        "bytes": 6346,
+        "sha256": "d24864e4927d94490bec59dea31a33ec0b111b26260440449b4c35c002a0965a"
+      },
+      {
+        "path": "examples/browser-model-chat/memory/store.mjs",
+        "bytes": 10921,
+        "sha256": "a608498d649df5c932862a6747721d850505dc4fefac5e5edb35fd71462e9c04"
+      },
+      {
+        "path": "examples/browser-model-chat/memory/structured-context.mjs",
+        "bytes": 7791,
+        "sha256": "a1242ebb149397b00e351724c49e21f8704c4f588ebf71f3ee5c082ee5e9abaa"
+      },
+      {
+        "path": "examples/browser-model-chat/memory/workspace.mjs",
+        "bytes": 4002,
+        "sha256": "b2ab07410d21dcd29e7385f6567b022a2186a199d646f28064219fd1ac077939"
       },
       {
         "path": "examples/browser-model-chat/model-contract.mjs",
@@ -46,8 +117,8 @@
       },
       {
         "path": "examples/browser-model-chat/runtime-adapter.mjs",
-        "bytes": 6238,
-        "sha256": "5194c55e780918f1423956f4ffdb89d40c1a6f11302db052c90e1151257f6875"
+        "bytes": 6618,
+        "sha256": "2023c54527a54b17a4f1296c6a980a56d001841c6e5483608312ca64ab4fba07"
       },
       {
         "path": "examples/browser-model-chat/runtime-errors.mjs",
@@ -61,8 +132,8 @@
       },
       {
         "path": "examples/browser-model-chat/stage-static.mjs",
-        "bytes": 13967,
-        "sha256": "842fee9eef96c148b094c417e932509c539708390261b0918c98d650358aee56"
+        "bytes": 18246,
+        "sha256": "7a7e6a35fb1cf8f39d041a5965f4ea83c16e66da76396ec07ae879669802adbf"
       },
       {
         "path": "examples/browser-model-chat/style.css",
@@ -95,6 +166,8 @@
     "url": "https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF/resolve/fa224d4cb60cffe61eb58726712ef255bb64d0b7/LFM2.5-230M-Q4_K_M.gguf",
     "license": "LFM Open License v1.0",
     "licenseUrl": "https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF/blob/fa224d4cb60cffe61eb58726712ef255bb64d0b7/LICENSE",
+    "licensePath": "LICENSES/lfm-open-license-1.0.txt",
+    "licenseSha256": "30adf9d6478191fb87f2424f63ba0728598335aaf99cd2848ef17e8e545fe94b",
     "weightsIncluded": false
   },
   "runtime": {
@@ -114,13 +187,13 @@
   "files": [
     {
       "path": "app.mjs",
-      "bytes": 15715,
-      "sha256": "c249a1d99b92cbb06f45dfd3cbf5da61d58d760881a341ff84648b3be106b77a"
+      "bytes": 18030,
+      "sha256": "532aebb9087bf61091bd2d5003ebd36098865399c22fcda6a6ed4e9f4c81bdc3"
     },
     {
       "path": "bootstrap.mjs",
-      "bytes": 51,
-      "sha256": "0d5d7767dab4c3f9098568a951a312338514984a53d11ccf816cf8a009c54327"
+      "bytes": 1552,
+      "sha256": "61816724d02825def7caeed52d88e4f1ef3a589f0829f6d4bd363eedd9ce3d3a"
     },
     {
       "path": "capabilities.mjs",
@@ -129,13 +202,18 @@
     },
     {
       "path": "engine-worker.mjs",
-      "bytes": 14483,
-      "sha256": "d1f461d137703153ac31630686d351a748209dea8583a74d28ebad91bbaec6c5"
+      "bytes": 16460,
+      "sha256": "810c77779e459ca2af633bcc8a51c269938047baaf69808a3503f51a1aa23964"
     },
     {
       "path": "index.html",
-      "bytes": 6662,
-      "sha256": "dd9a3c5a419c79d3731fbdcf153d66fb996cfa7e2f60f3a87905e73b758e79b1"
+      "bytes": 6915,
+      "sha256": "c51f7a788cdb405c46e0aad41b7146db61ae1195a2d2d97d614e589ca4c7429c"
+    },
+    {
+      "path": "LICENSES/lfm-open-license-1.0.txt",
+      "bytes": 10574,
+      "sha256": "30adf9d6478191fb87f2424f63ba0728598335aaf99cd2848ef17e8e545fe94b"
     },
     {
       "path": "LICENSES/rag-method.txt",
@@ -148,24 +226,84 @@
       "sha256": "d6e51cb1d9df39a2854eacd756fa31d6a22cecababb004aa2432f9ea992532a4"
     },
     {
+      "path": "memory/automatic-context.mjs",
+      "bytes": 12338,
+      "sha256": "09a82a7dd813344b0a9e49b8657358214314a639a7ff0c41f0f333d3b452872d"
+    },
+    {
+      "path": "memory/citations.mjs",
+      "bytes": 12598,
+      "sha256": "a51f2de1202bffa5e36a52a86fe30ad937278e4867366898e2ff646b48e9f953"
+    },
+    {
+      "path": "memory/context.mjs",
+      "bytes": 9434,
+      "sha256": "c144a6cd5f19d1a1f9dad828754f037183c91ecdf5e8d02635353873dcdbb598"
+    },
+    {
+      "path": "memory/events.mjs",
+      "bytes": 6987,
+      "sha256": "201d9cf92c7e8c0bb1f0b0d6a3ab60c787531f99c202125938e0dcc0d2a775f3"
+    },
+    {
+      "path": "memory/panel.css",
+      "bytes": 4489,
+      "sha256": "84c1ecbb8a201ead8dfd6cfcbff695f69a96e2e7b471064ae14bea1c849b6d04"
+    },
+    {
+      "path": "memory/panel.mjs",
+      "bytes": 17521,
+      "sha256": "bede1c496ffce02a908547ee73ea5801f54290a4b57c3d633d8fc414ce4b8fc2"
+    },
+    {
+      "path": "memory/rag-adapter.mjs",
+      "bytes": 7587,
+      "sha256": "234a6f588e80a5d833a3ffa1036fcdb4114031103350863107f20888eef817a8"
+    },
+    {
+      "path": "memory/rag-core.mjs",
+      "bytes": 128489,
+      "sha256": "c282ebb3965c4a25b48fb66082ce18c72184449f2123633a901ffceb9939ace6"
+    },
+    {
+      "path": "memory/restore-events.mjs",
+      "bytes": 6346,
+      "sha256": "d24864e4927d94490bec59dea31a33ec0b111b26260440449b4c35c002a0965a"
+    },
+    {
+      "path": "memory/store.mjs",
+      "bytes": 10921,
+      "sha256": "a608498d649df5c932862a6747721d850505dc4fefac5e5edb35fd71462e9c04"
+    },
+    {
+      "path": "memory/structured-context.mjs",
+      "bytes": 7791,
+      "sha256": "a1242ebb149397b00e351724c49e21f8704c4f588ebf71f3ee5c082ee5e9abaa"
+    },
+    {
+      "path": "memory/workspace.mjs",
+      "bytes": 4002,
+      "sha256": "b2ab07410d21dcd29e7385f6567b022a2186a199d646f28064219fd1ac077939"
+    },
+    {
       "path": "model-contract.mjs",
       "bytes": 1862,
       "sha256": "856e40c76f850e84915cbc96c035ab6d24566548c0458aeae7761826fd1cde34"
     },
     {
       "path": "NOTICE.txt",
-      "bytes": 1063,
-      "sha256": "0cf9b77717fa9996b9b4ec6bb3648e240cf9ed6aa9316f8d79abd95ab244231b"
+      "bytes": 1376,
+      "sha256": "e8e064660a56d6eddf65fbfbc74039a24a9beb01012a8c8535004197fdf9cad8"
     },
     {
       "path": "README.txt",
-      "bytes": 1292,
-      "sha256": "427629213e6fe9d88ef80f29c2937c850fc6f30eaec242d66ea00a982cc287f9"
+      "bytes": 2276,
+      "sha256": "a3ba8860b560aac3033fbc6b3353f0eedcc6c3700226153928440af1b046d384"
     },
     {
       "path": "runtime-adapter.mjs",
-      "bytes": 6238,
-      "sha256": "5194c55e780918f1423956f4ffdb89d40c1a6f11302db052c90e1151257f6875"
+      "bytes": 6618,
+      "sha256": "2023c54527a54b17a4f1296c6a980a56d001841c6e5483608312ca64ab4fba07"
     },
     {
       "path": "runtime-errors.mjs",
@@ -218,5 +356,5 @@
       "sha256": "4baf1abc8a47bb8eb7a41fdc1e924cf8ac80f4645f4524611a6d7ecb3712983e"
     }
   ],
-  "identitySha256": "fa79565c8bf07fc83fb1f41cee56075ee2cd0ac424fea977fc44868b902833b9"
+  "identitySha256": "c03f61648f8fee9c6fe1be837e35baa6a48bc624d55e2d3420602b755a596660"
 }

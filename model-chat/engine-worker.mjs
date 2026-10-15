@@ -14,6 +14,8 @@ let engine;
 let active = false;
 let rejectOperation;
 let nativeAbortFailure;
+// Experimental preview: native counts, never character estimates.
+let contextOverflow;
 const post = (id, type, value) => self.postMessage({ id, type, value });
 const errorField = (value, key) => { try { return value?.[key]; } catch { return undefined; } };
 
@@ -47,6 +49,13 @@ function engineLogger(milestone) {
     }
   };
   return { debug: log, log, warn() {}, error(...args) {
+    for (const value of args) {
+      try {
+        if (Number.isSafeInteger(value?.n_prompt_tokens) && Number.isSafeInteger(value?.n_ctx)) {
+          contextOverflow = { promptTokens: value.n_prompt_tokens, contextTokens: value.n_ctx };
+        }
+      } catch { /* Unknown log values are not token evidence. */ }
+    }
     const workerError = args.find(value => { try { return typeof ErrorEvent !== 'undefined' && value instanceof ErrorEvent; } catch { return false; } });
     if (workerError) { workerError.preventDefault(); failOperation('ENGINE_WORKER_ERROR', workerError); return; }
     // An abort can carry any structured-clone value. Its explicit signal is
@@ -210,6 +219,7 @@ async function prepare({ source, file }, progress) {
     throw failure;
   } finally { rejectOperation = undefined; initializing = false; }
   return { cached, modelId: MODEL.file, libllama: Wllama.getLibllamaVersion(), runtimeProfile,
+    context: { configured: 2048, reported: engine.getLoadedContextInfo().n_ctx, training: engine.getLoadedContextInfo().n_ctx_train },
     backend: compat ? 'Memory32 / Asyncify; single-thread CPU/WASM' : 'Memory64; single-thread CPU/WASM' };
 }
 
@@ -218,9 +228,26 @@ self.onmessage = async ({ data }) => {
   if (active) return post(id, 'error', 'The model is already working.');
   active = true;
   nativeAbortFailure = undefined;
+  contextOverflow = undefined;
   try {
     if (operation === 'prepare') post(id, 'result', await prepare(payload, event => post(id, 'progress', event)));
-    else if (operation === 'reply') {
+    else if (operation === 'measure' || operation === 'summarize') {
+      if (!engine?.isModelLoaded()) throw new Error('Load the model before measuring context.');
+      const maxTokens = operation === 'measure' ? 1 : 96;
+      if (!Array.isArray(payload.messages) || payload.messages.length > 128 || payload.messages.some(m => !['system', 'user', 'assistant'].includes(m.role) || typeof m.content !== 'string') || payload.messages.reduce((n, m) => n + m.content.length, 0) > 60_000) throw new Error('Context request exceeds its preview bound.');
+      try {
+        const response = await engine.createChatCompletion({ messages: payload.messages, stream: false, max_tokens: maxTokens, temperature: 0 });
+        const usage = response.usage;
+        if (!Number.isSafeInteger(usage?.prompt_tokens)) throw new Error('Native token usage unavailable.');
+        post(id, 'result', { promptTokens: usage.prompt_tokens, completionTokens: usage.completion_tokens,
+          contextTokens: engine.getLoadedContextInfo().n_ctx, overflow: false,
+          ...(operation === 'summarize' ? { text: response.choices?.[0]?.message?.content || '' } : {}) });
+      } catch (error) {
+        if (operation === 'measure' && contextOverflow && /exceeds the available context size/.test(safeError(error))) {
+          post(id, 'result', { ...contextOverflow, overflow: true });
+        } else throw error;
+      }
+    } else if (operation === 'reply') {
       if (!engine?.isModelLoaded()) throw new Error('Load the model before sending a message.');
       const stream = await engine.createChatCompletion({ messages: payload.messages, stream: true, max_tokens: 160, temperature: 0 });
       let text = '';

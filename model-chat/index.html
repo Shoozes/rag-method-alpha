@@ -16,13 +16,13 @@
     <div class="header-actions"><span id="session-status" class="session" role="status">Not loaded</span>
       <details id="chat-options" class="chat-options" hidden>
         <summary aria-label="Chat options"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg><span class="sr-only">Chat options</span></summary>
-        <div class="options-panel"><p id="runtime-label">LFM2.5-230M · on this device</p><p>Session only. This small model can make mistakes.</p><a class="model-link" href="https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF" target="_blank" rel="noopener noreferrer">Model &amp; license</a><button id="clear" class="secondary" type="button">Clear conversation</button><button id="unload" class="secondary" type="button">Unload model</button></div>
+        <div class="options-panel"><p id="runtime-label">LFM2.5-230M · on this device</p><p>Experimental preview. Memory mode stores this chat locally. Context selection is lossy; this small model can omit or invent details.</p><a class="model-link" href="https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF" target="_blank" rel="noopener noreferrer">Model &amp; license</a><button id="clear" class="secondary" type="button">Clear conversation</button><button id="unload" class="secondary" type="button">Unload model</button></div>
       </details>
     </div>
   </header>
   <section id="loading-stage" aria-labelledby="load-heading">
     <div class="hero">
-      <div class="introduction"><h1 id="load-heading">A little room<br>to <em>think.</em></h1><p class="lede">A small model. On your device.</p></div>
+      <div class="introduction"><h1 id="load-heading">A little room<br>to <em>think.</em></h1><p class="lede">Experimental preview. On your device.</p><p class="license">Optional memory selects older passages automatically and can omit context. Model answers can miss or invent details. Check the source links.</p></div>
       <div class="instrument">
         <div id="scene" class="scene" aria-hidden="true"><div class="halo"></div><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="core"><span>LFM</span><small>230M</small></div><svg viewBox="0 0 300 300"><circle class="track" cx="150" cy="150" r="136"/><circle id="arc" class="arc" cx="150" cy="150" r="136"/></svg></div>
         <div class="load-panel">
