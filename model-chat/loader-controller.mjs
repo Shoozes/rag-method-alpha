@@ -1,5 +1,7 @@
 /** Generic lifecycle only. The injected adapter owns model bytes, runtime and cache. */
-export function createLoaderController(adapter, onState = () => {}) {
+export function createLoaderController(adapter, onState = () => {}, {
+  now = Date.now, setIntervalFn = setInterval, clearIntervalFn = clearInterval,
+} = {}) {
   for (const method of ['prepare', 'reply', 'dispose']) {
     if (typeof adapter?.[method] !== 'function') throw new TypeError(`Loader adapter needs ${method}().`);
   }
@@ -9,14 +11,18 @@ export function createLoaderController(adapter, onState = () => {}) {
     phase: 'idle', source: null, modelId: null, cached: false, runtimeProfile: null,
     loaded: null, total: null, determinate: false, progress: null,
     text: '', error: null, errorCode: null, retryable: true, capabilities: [],
+    initStage: null, initDetail: null, initElapsedMs: 0, lastProgressAgeMs: 0, initEvents: [],
   };
   let generation = 0, active = null, ready = false, disposed = false, needsCleanup = false;
   let teardown = null, cancelling = null, disposing = null, unsupported = null;
+  let initStarted = null, lastProgressAt = null, initTick = null;
 
-  const getState = () => ({ ...state, capabilities: state.capabilities.map(item => ({ ...item })) });
+  const getState = () => ({ ...state, capabilities: state.capabilities.map(item => ({ ...item })), initEvents: state.initEvents.map(item => ({ ...item })) });
   const current = operation => !disposed && active === operation && generation === operation.id;
   const clearProgress = { loaded: null, total: null, determinate: false, progress: null };
   const isRuntimeProfile = value => value === 'memory64' || value === 'memory32-asyncify';
+  const stages = new Set(['runtime-start', 'model-read', 'model-load', 'context-create', 'warmup', 'ready']);
+  const clearInit = { initStage: null, initDetail: null, initElapsedMs: 0, lastProgressAgeMs: 0, initEvents: [] };
   const error = (message, code) => Object.assign(new Error(message), { code });
   const aborted = () => Object.assign(error('The operation was cancelled. Load the model again to continue.', 'CANCELLED'), { name: 'AbortError' });
   const messageOf = cause => cause instanceof Error && cause.message ? cause.message : String(cause || 'Unknown adapter failure');
@@ -30,6 +36,14 @@ export function createLoaderController(adapter, onState = () => {}) {
     state = { ...state, ...patch };
     // Rendering is an observer, not permission to interrupt adapter cleanup or ownership.
     try { onState(getState()); } catch { /* The caller owns observer error reporting. */ }
+  }
+
+  function stopInitClock() {
+    if (initTick !== null) clearIntervalFn(initTick);
+    initTick = null;
+  }
+  function initTiming() {
+    return { initElapsedMs: Math.max(0, now() - initStarted), lastProgressAgeMs: Math.max(0, now() - lastProgressAt) };
   }
 
   function available() {
@@ -74,10 +88,27 @@ export function createLoaderController(adapter, onState = () => {}) {
 
   function progress(operation, event) {
     if (!current(operation) || !event || !['checking', 'downloading', 'verifying', 'initializing'].includes(event.phase)) return;
+    if (initStarted !== null && event.phase !== 'initializing') return;
+    let initialization = {};
+    if (event.phase === 'initializing') {
+      if (initStarted === null) initStarted = now();
+      lastProgressAt = now();
+      initialization = { ...initTiming(),
+        ...(stages.has(event.stage) ? { initStage: event.stage } : {}),
+        ...(typeof event.detail === 'string' ? { initDetail: event.detail.slice(0, 240) } : {}),
+      };
+      if (stages.has(event.stage) && (event.stage !== state.initStage || initialization.initDetail !== state.initDetail)) {
+        initialization.initEvents = [...state.initEvents, { stage: event.stage, detail: initialization.initDetail || null, atMs: Math.max(0, now() - initStarted) }].slice(-8);
+      }
+      if (initTick === null) initTick = setIntervalFn(() => {
+        if (current(operation) && state.phase === 'initializing') publish(initTiming());
+      }, 1000);
+    }
     const measured = ['downloading', 'verifying'].includes(event.phase)
       && Number.isSafeInteger(event.loaded) && event.loaded >= 0
       && Number.isSafeInteger(event.total) && event.total > 0 && event.loaded <= event.total;
     publish({ phase: event.phase, ...clearProgress,
+      ...initialization,
       ...(measured ? { loaded: event.loaded, total: event.total, determinate: true, progress: event.loaded / event.total } : {}),
       ...(typeof event.cached === 'boolean' ? { cached: event.cached } : {}),
       ...(isRuntimeProfile(event.runtimeProfile) ? { runtimeProfile: event.runtimeProfile } : {}),
@@ -86,6 +117,7 @@ export function createLoaderController(adapter, onState = () => {}) {
 
   async function fail(operation, cause, label, cleanup = true) {
     if (!current(operation)) throw aborted();
+    stopInitClock();
     active = null; ready = false;
     let detail = messageOf(cause);
     if (cleanup) try { await unload(); } catch (failure) { detail += ` Cleanup also failed: ${messageOf(failure)}`; }
@@ -94,10 +126,20 @@ export function createLoaderController(adapter, onState = () => {}) {
     const capabilities = blocked && Array.isArray(cause.capabilities) ? cause.capabilities
       .filter(item => item && typeof item.id === 'string' && typeof item.label === 'string')
       .map(({ id, label, detail }) => ({ id, label, ...(typeof detail === 'string' ? { detail } : {}) })) : [];
-    const failure = error(`${label}: ${detail}`, blocked ? 'UNSUPPORTED_BROWSER' : operation.kind === 'load' ? 'LOAD_FAILED' : 'REPLY_FAILED');
+    const diagnosticCode = typeof cause?.code === 'string' && /^(?:INIT_WAIT_LIMIT|WORKER_ERROR|WORKER_MESSAGE_ERROR|ENGINE_[A-Z_]+|UNHANDLED_REJECTION)$/.test(cause.code) ? cause.code : null;
+    const failure = error(`${label}: ${detail}`, blocked ? 'UNSUPPORTED_BROWSER' : diagnosticCode || (operation.kind === 'load' ? 'LOAD_FAILED' : 'REPLY_FAILED'));
     failure.retryable = !blocked; failure.capabilities = capabilities.map(item => ({ ...item }));
     if (blocked) unsupported = { message: failure.message, capabilities };
-    publish({ phase: blocked ? 'unsupported' : 'error', modelId: null, cached: false, ...clearProgress,
+    const diagnostic = cause?.diagnostics;
+    const events = Array.isArray(diagnostic?.events) ? diagnostic.events.filter(event => stages.has(event?.stage)).slice(-8).map(event => ({
+      stage: event.stage, detail: typeof event.detail === 'string' ? event.detail.slice(0, 240) : null,
+      atMs: Number.isFinite(event.atMs) && event.atMs >= 0 ? Math.floor(event.atMs) : null,
+    })) : [];
+    publish({ phase: blocked ? 'unsupported' : 'error', modelId: null, ...clearProgress,
+      ...(initStarted !== null ? initTiming() : {}),
+      ...(stages.has(diagnostic?.stage) ? { initStage: diagnostic.stage } : {}),
+      ...(typeof diagnostic?.detail === 'string' ? { initDetail: diagnostic.detail.slice(0, 240) } : {}),
+      ...(events.length ? { initEvents: events } : {}),
       error: failure.message, errorCode: failure.code, retryable: !blocked, capabilities });
     throw failure;
   }
@@ -107,8 +149,9 @@ export function createLoaderController(adapter, onState = () => {}) {
     if (source !== 'remote' && source !== 'file') throw error('Choose a remote model or a local model file.', 'INVALID_SOURCE');
     if (source === 'file' && !file) throw error('Choose a local model file before loading.', 'FILE_REQUIRED');
     const replaceReadyModel = ready || needsCleanup, operation = begin('load');
+    stopInitClock(); initStarted = null; lastProgressAt = null;
     ready = false;
-    publish({ phase: 'checking', source, modelId: null, cached: false, runtimeProfile: null, ...clearProgress, text: '', error: null, errorCode: null, retryable: true, capabilities: [] });
+    publish({ phase: 'checking', source, modelId: null, cached: false, runtimeProfile: null, ...clearProgress, ...clearInit, text: '', error: null, errorCode: null, retryable: true, capabilities: [] });
     let prepared, preparationStarted = false;
     try {
       if (replaceReadyModel) await unload();
@@ -121,9 +164,12 @@ export function createLoaderController(adapter, onState = () => {}) {
         throw new Error('The adapter did not confirm a valid prepared model.');
       }
     } catch (cause) { return fail(operation, cause, 'Model loading failed', preparationStarted); }
-    active = null; ready = true;
+    stopInitClock(); active = null; ready = true;
     const runtimeProfile = isRuntimeProfile(prepared.runtimeProfile) ? prepared.runtimeProfile : state.runtimeProfile;
-    publish({ phase: 'ready', modelId: prepared.modelId, cached: prepared.cached, runtimeProfile, ...clearProgress, error: null });
+    const finishedTiming = initStarted !== null ? initTiming() : {};
+    initStarted = null; lastProgressAt = null;
+    publish({ phase: 'ready', modelId: prepared.modelId, cached: prepared.cached, runtimeProfile, ...clearProgress,
+      ...finishedTiming, error: null });
     return { cached: prepared.cached, modelId: prepared.modelId, ...(runtimeProfile ? { runtimeProfile } : {}) };
   }
 
@@ -132,7 +178,7 @@ export function createLoaderController(adapter, onState = () => {}) {
     if (!ready) throw error('Load a model successfully before sending a message.', 'NOT_READY');
     if (!Array.isArray(messages)) throw error('Messages must be an array.', 'INVALID_MESSAGES');
     const operation = begin('reply');
-    publish({ phase: 'generating', ...clearProgress, text: '', error: null });
+    publish({ phase: 'generating', ...clearProgress, ...clearInit, text: '', error: null });
     let reply;
     try {
       if (!current(operation)) throw aborted();
@@ -154,6 +200,7 @@ export function createLoaderController(adapter, onState = () => {}) {
     const completion = deferred(), pending = completion.promise;
     cancelling = pending;
     const operation = active, cancellation = ++generation;
+    stopInitClock();
     active = null; ready = false;
     operation?.controller.abort();
     (async () => {
@@ -178,6 +225,7 @@ export function createLoaderController(adapter, onState = () => {}) {
     const completion = deferred();
     disposing = completion.promise;
     disposed = true; ready = false; ++generation;
+    stopInitClock();
     const operation = active; active = null; operation?.controller.abort();
     (async () => {
       try { await unload(); }
@@ -185,7 +233,7 @@ export function createLoaderController(adapter, onState = () => {}) {
         publish({ phase: 'error', source: null, modelId: null, cached: false, ...clearProgress, error: `Model cleanup failed: ${messageOf(cause)}` });
         throw error(`Model cleanup failed: ${messageOf(cause)}`, 'CLEANUP_FAILED');
       }
-      publish({ phase: 'idle', source: null, modelId: null, cached: false, runtimeProfile: null, ...clearProgress, text: '', error: null, errorCode: null, retryable: true, capabilities: [] });
+      publish({ phase: 'idle', source: null, modelId: null, cached: false, runtimeProfile: null, ...clearProgress, ...clearInit, text: '', error: null, errorCode: null, retryable: true, capabilities: [] });
       return getState();
     })().then(completion.resolve, completion.reject);
     return disposing;

@@ -9,8 +9,47 @@ globalThis.document = Object.freeze({ baseURI: self.location.href });
 
 let engine;
 let active = false;
-const quiet = { debug() {}, log() {}, warn() {}, error() {} };
+let rejectOperation;
 const post = (id, type, value) => self.postMessage({ id, type, value });
+
+// The pinned vendor sends a child Worker's ErrorEvent to logger.error without
+// rejecting its pending task. Race that real failure with the owned operation;
+// the main-thread adapter then terminates the whole Worker lifetime. No vendor
+// bytes are patched, and ordinary native log lines do not become errors.
+function safeError(value) {
+  return String(value?.message || value || 'No browser error detail was supplied.')
+    .split('\n')[0].replace(/(?:https?|blob|file):\S+/gi, '[URL]')
+    .replace(/[A-Z]:[\\/][^\s]*/gi, '[path]').slice(0, 240);
+}
+
+function failOperation(code, value) {
+  rejectOperation?.(Object.assign(new Error(safeError(value)), { code, retryable: true }));
+}
+
+self.addEventListener('unhandledrejection', event => {
+  if (!rejectOperation) return;
+  event.preventDefault();
+  failOperation('ENGINE_UNHANDLED_REJECTION', event.reason);
+});
+
+function engineLogger(milestone) {
+  const log = (...args) => {
+    for (const value of args) {
+      if (typeof value !== 'string') continue;
+      // These are confirmations from this pinned runtime, not estimated tasks.
+      if (value === 'Calling wllamaStart...') milestone('runtime-start', 'WASM module opened; starting the engine.');
+      else if (value === 'Loading model...') milestone('model-load', 'Engine started; loading model tensors and context.');
+      else if (/^(?:llama_context: constructing llama_context|llama_init_from_model:)/.test(value)) milestone('context-create', 'Runtime reported context construction.');
+      else if (/warming up the model|running the model with an empty batch/.test(value)) milestone('warmup', 'Runtime reported model warmup.');
+    }
+  };
+  return { debug: log, log, warn() {}, error(...args) {
+    const workerError = args.find(value => typeof ErrorEvent !== 'undefined' && value instanceof ErrorEvent);
+    if (workerError) { workerError.preventDefault(); failOperation('ENGINE_WORKER_ERROR', workerError); return; }
+    const error = args.find(value => value instanceof Error);
+    if (error) failOperation('ENGINE_INIT_ERROR', error);
+  } };
+}
 
 function requireCapabilities(report) {
   if (report.supported) return;
@@ -96,7 +135,18 @@ async function prepare({ source, file }, progress) {
   const runtimeProfile = compat ? 'memory32-asyncify' : 'memory64';
   progress({ phase: 'checking', runtimeProfile });
   const workerCode = await validateRuntime(compat);
-  engine = new Wllama({ default: new URL('./runtime/wllama.wasm', import.meta.url).href }, { logger: quiet, suppressNativeLog: true, allowOffline: true });
+  const events = [];
+  let started;
+  let initializing = false;
+  const milestone = (stage, detail) => {
+    if (!initializing || events.at(-1)?.detail === detail) return;
+    events.push({ stage, detail, atMs: Math.round(performance.now() - started) });
+    if (events.length > 8) events.shift();
+    progress({ phase: 'initializing', cached, runtimeProfile, stage, detail });
+  };
+  // Native output is consumed only by this allowlist; no raw logs, model
+  // metadata or prompt text are posted to the page or diagnostic report.
+  engine = new Wllama({ default: new URL('./runtime/wllama.wasm', import.meta.url).href }, { logger: engineLogger(milestone), suppressNativeLog: false, allowOffline: true });
   // Keep the exact model and API. Missing Memory64/JSPI selects the maintained,
   // self-hosted Memory32/Asyncify build; never use the vendor's default CDN.
   engine.setCompat(compat ? { wasm: new URL('./runtime/compat/wllama.wasm', import.meta.url).href, worker: { code: workerCode } } : null, 'firefox_safari');
@@ -127,9 +177,19 @@ async function prepare({ source, file }, progress) {
     if (model) await model.remove(); // only this exact artifact, never another app's cache
     throw error;
   }
-  progress({ phase: 'initializing', cached });
-  await engine.loadModel(blobs, { n_ctx: 2048, n_batch: 128, n_threads: 1, n_gpu_layers: 0, seed: 42 });
-  if (!engine.isModelLoaded()) throw new Error('Runtime returned without a loaded model.');
+  initializing = true;
+  started = performance.now();
+  milestone('runtime-start', 'Verified model bytes; opening the WASM module.');
+  try {
+    const failure = new Promise((_, reject) => { rejectOperation = reject; });
+    await Promise.race([engine.loadModel(blobs, { n_ctx: 2048, n_batch: 128, n_threads: 1, n_gpu_layers: 0, seed: 42 }), failure]);
+    if (!engine.isModelLoaded()) throw new Error('Runtime returned without a loaded model.');
+    milestone('ready', 'Runtime confirmed the model is ready.');
+  } catch (error) {
+    const failure = error instanceof Error ? error : new Error(safeError(error));
+    failure.diagnostics = { stage: events.at(-1)?.stage, detail: events.at(-1)?.detail, events };
+    throw failure;
+  } finally { rejectOperation = undefined; initializing = false; }
   return { cached, modelId: MODEL.file, libllama: Wllama.getLibllamaVersion(), runtimeProfile,
     backend: compat ? 'Memory32 / Asyncify; single-thread CPU/WASM' : 'Memory64; single-thread CPU/WASM' };
 }
@@ -153,8 +213,10 @@ self.onmessage = async ({ data }) => {
       post(id, 'result', text);
     } else throw new Error('Unknown runtime operation.');
   } catch (error) {
-    self.postMessage({ id, type: 'error', value: error?.message || String(error),
-      ...(error?.code === 'UNSUPPORTED_BROWSER' ? { code: error.code, retryable: false, capabilities: error.capabilities || [] } : {}),
+    self.postMessage({ id, type: 'error', value: safeError(error),
+      ...(error?.code ? { code: error.code, retryable: error.retryable !== false } : {}),
+      ...(error?.capabilities ? { capabilities: error.capabilities } : {}),
+      ...(error?.diagnostics ? { diagnostics: error.diagnostics } : {}),
     });
   }
   finally { active = false; }
