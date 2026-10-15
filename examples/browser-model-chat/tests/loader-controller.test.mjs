@@ -72,13 +72,76 @@ test('unknown or contradictory byte totals remain indeterminate', async () => {
   adapter.loads[0].resolve(prepared); await loading;
 });
 
+test('runtime profile metadata accepts only known profiles, rejects stale progress and resets on a new load', async () => {
+  const adapter = fixtureAdapter(), controller = createLoaderController(adapter);
+  assert.equal(controller.getState().runtimeProfile, null);
+  const first = controller.load({ source: 'remote' }), old = adapter.loads[0];
+  old.onProgress({ phase: 'checking', runtimeProfile: '<untrusted-profile>' });
+  assert.equal(controller.getState().runtimeProfile, null);
+  old.onProgress({ phase: 'checking', runtimeProfile: 'memory32-asyncify' });
+  old.onProgress({ phase: 'initializing', runtimeProfile: { id: 'memory64' } });
+  assert.equal(controller.getState().runtimeProfile, 'memory32-asyncify');
+  old.resolve({ ...prepared, runtimeProfile: 'memory64' });
+  assert.deepEqual(await first, { ...prepared, runtimeProfile: 'memory64' });
+  assert.equal(controller.getState().runtimeProfile, 'memory64'); await controller.cancel();
+  const next = controller.load({ source: 'remote' });
+  assert.equal(controller.getState().runtimeProfile, null);
+  old.onProgress({ phase: 'checking', runtimeProfile: 'memory32-asyncify' });
+  assert.equal(controller.getState().runtimeProfile, null, 'Old Worker progress cannot select a new runtime');
+  adapter.loads[1].resolve({ ...prepared, runtimeProfile: 'unknown-runtime' });
+  assert.deepEqual(await next, prepared); assert.equal(controller.getState().runtimeProfile, null);
+  await controller.cancel();
+  const compatible = controller.load({ source: 'remote' });
+  adapter.loads[2].resolve({ ...prepared, runtimeProfile: 'memory32-asyncify' });
+  assert.deepEqual(await compatible, { ...prepared, runtimeProfile: 'memory32-asyncify' });
+  await controller.dispose(); assert.equal(controller.getState().runtimeProfile, null);
+});
+
 test('load errors dispose partial resources and permit an explicit retry', async () => {
   const adapter = fixtureAdapter(), controller = createLoaderController(adapter);
   const loading = controller.load({ source: 'remote' }); adapter.loads[0].reject(new Error('Fixture checksum mismatch'));
   await assert.rejects(loading, /Model loading failed: Fixture checksum mismatch/);
   assert.equal(controller.getState().phase, 'error'); assert.match(controller.getState().error, /checksum mismatch/);
+  assert.equal(controller.getState().retryable, true); assert.equal(controller.getState().errorCode, 'LOAD_FAILED');
   assert.equal(adapter.disposals, 1); await loadReady(controller, adapter, { ...prepared, cached: true });
   assert.equal(controller.getState().phase, 'ready'); assert.equal(controller.getState().error, null);
+});
+
+test('permanent secure-context, SIMD and OPFS refusals persist without futile retries or File loading', async () => {
+  for (const capability of [
+    { id: 'secure-context', label: 'Secure context', detail: 'HTTPS or loopback is required.' },
+    { id: 'simd', label: 'WebAssembly SIMD', detail: 'Required WASM instructions are unavailable.' },
+    { id: 'opfs', label: 'Browser storage (OPFS)', detail: 'The API is unavailable.' },
+  ]) {
+    const adapter = fixtureAdapter(), controller = createLoaderController(adapter);
+    const loading = controller.load({ source: 'remote' });
+    const cause = Object.assign(new Error(`${capability.label} is unavailable. No model was downloaded.`), {
+      code: 'UNSUPPORTED_BROWSER', retryable: false, capabilities: [capability],
+    });
+    adapter.loads[0].reject(cause);
+    await assert.rejects(loading, failure => failure.code === 'UNSUPPORTED_BROWSER' && failure.retryable === false);
+    const state = controller.getState();
+    assert.equal(state.phase, 'unsupported'); assert.equal(state.retryable, false);
+    assert.equal(state.errorCode, 'UNSUPPORTED_BROWSER'); assert.deepEqual(state.capabilities, [capability]);
+    assert.equal(adapter.disposals, 1);
+    state.capabilities[0].label = 'Mutated snapshot';
+    cause.capabilities[0] = { id: 'other', label: 'Mutated cause' };
+    assert.equal(controller.getState().capabilities[0].label, capability.label);
+    await assert.rejects(controller.load({ source: 'remote' }), code('UNSUPPORTED_BROWSER'));
+    await assert.rejects(controller.load({ source: 'file', file: { name: 'fixture.gguf' } }), code('UNSUPPORTED_BROWSER'));
+    await controller.cancel(); assert.equal(controller.getState().phase, 'unsupported');
+    await assert.rejects(controller.load({ source: 'remote' }), code('UNSUPPORTED_BROWSER'));
+    assert.equal(adapter.loads.length, 1, 'No further preparation can start');
+    await controller.dispose(); await assert.rejects(controller.load({ source: 'remote' }), code('DISPOSED'));
+  }
+});
+
+test('only an explicit non-retryable unsupported error permanently blocks preparation', async () => {
+  const adapter = fixtureAdapter(), controller = createLoaderController(adapter);
+  const loading = controller.load({ source: 'remote' });
+  adapter.loads[0].reject(Object.assign(new Error('Fixture storage temporarily busy'), { code: 'UNSUPPORTED_BROWSER', retryable: true }));
+  await assert.rejects(loading, code('LOAD_FAILED')); assert.equal(controller.getState().retryable, true);
+  assert.equal(controller.getState().phase, 'error'); await loadReady(controller, adapter);
 });
 
 test('active loads refuse overlap; cancel aborts and awaits disposal before a retry', async () => {

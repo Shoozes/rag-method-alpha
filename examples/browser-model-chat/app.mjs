@@ -6,12 +6,14 @@ export function mountApp(adapter = createRuntimeAdapter()) {
   const $ = id => document.getElementById(id);
   const app = $('app');
   const busyPhases = new Set(['checking', 'downloading', 'verifying', 'initializing']);
+  const profiles = { memory64: 'Memory64 CPU / WASM', 'memory32-asyncify': 'Memory32 compatibility / Asyncify (may be slower)' };
   const labels = {
     idle: 'Ready when you are.', checking: 'Checking this browser and its cache…',
     downloading: 'Bringing the model to your device…', verifying: 'Checking the model’s SHA-256…',
     initializing: 'Opening the model in WASM. This can take a moment…',
     ready: 'Your model is ready.', generating: 'Writing a reply on your device…',
     cancelled: 'Stopped. You can try again or choose a local file.', error: 'The model could not finish. You can retry below.',
+    unsupported: 'This browser cannot run this runtime.',
   };
   let previousPhase = '', messages = [], pendingMessage;
   const log = $('messages');
@@ -44,13 +46,25 @@ export function mountApp(adapter = createRuntimeAdapter()) {
   const controller = createLoaderController(adapter, render);
   function render(state) {
     const busy = busyPhases.has(state.phase);
+    const unsupported = state.phase === 'unsupported';
     const inChat = state.phase === 'ready' || state.phase === 'generating';
     app.dataset.phase = state.phase;
+    if (profiles[state.runtimeProfile]) app.dataset.runtimeProfile = state.runtimeProfile;
+    else delete app.dataset.runtimeProfile;
+    $('runtime-profile').textContent = profiles[state.runtimeProfile] || 'Automatic WASM runtime selection';
     app.classList.toggle('is-loading', busy);
     $('loading-stage').hidden = inChat;
     $('chat-stage').hidden = !inChat;
-    $('download').disabled = busy;
-    $('local-file').disabled = busy;
+    $('download').disabled = busy || unsupported;
+    $('download').hidden = unsupported;
+    $('local-file').disabled = busy || unsupported;
+    $('local-file').closest('.file-choice').hidden = unsupported;
+    $('unsupported-hint').hidden = !unsupported;
+    if (unsupported) $('error').setAttribute('aria-describedby', 'unsupported-hint');
+    else $('error').removeAttribute('aria-describedby');
+    $('load-progress').hidden = unsupported;
+    document.querySelector('.progress-notes').hidden = unsupported;
+    document.querySelector('.stages').hidden = unsupported;
     $('cancel').hidden = !busy;
     $('send').disabled = state.phase !== 'ready';
     $('stop').hidden = state.phase !== 'generating';
@@ -61,7 +75,8 @@ export function mountApp(adapter = createRuntimeAdapter()) {
     $('error').textContent = state.error || '';
     if (state.phase !== previousPhase) {
       $('load-status').textContent = labels[state.phase] || state.phase;
-      $('session-status').textContent = inChat ? (state.phase === 'generating' ? 'Writing locally' : 'Ready · CPU / WASM') : busy ? 'Preparing model' : 'Model not loaded';
+      $('session-status').textContent = inChat ? (state.phase === 'generating' ? 'Writing locally' : 'Ready · CPU / WASM') : busy ? 'Preparing model' : unsupported ? 'Browser unsupported' : 'Model not loaded';
+      if (unsupported) $('error').focus();
     }
     if (state.determinate) {
       $('load-progress').value = state.progress;
@@ -78,7 +93,7 @@ export function mountApp(adapter = createRuntimeAdapter()) {
     }
     if (state.phase === 'ready' && previousPhase !== 'ready' && previousPhase !== 'generating') {
       if (!$('prompt').value) $('prompt').value = $('draft').value;
-      $('runtime-label').textContent = `${MODEL.file} · ${state.cached ? 'cached bytes' : state.source === 'file' ? 'local file' : 'download verified'} · 2,048-token context`;
+      $('runtime-label').textContent = `${MODEL.file} · ${profiles[state.runtimeProfile] || 'Automatic WASM runtime selection'} · ${state.cached ? 'cached bytes' : state.source === 'file' ? 'local file' : 'download verified'} · 2,048-token context`;
       $('chat-heading').focus();
     }
     if (state.phase === 'generating' && pendingMessage) {

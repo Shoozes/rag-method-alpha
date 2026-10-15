@@ -9,7 +9,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { MODEL, RUNTIME } from '../examples/browser-model-chat/model-contract.mjs';
+import { MODEL, RUNTIME, COMPAT } from '../examples/browser-model-chat/model-contract.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const output = join(root, '.artifacts/proof/model-chat');
@@ -24,7 +24,7 @@ const { chromium } = await import(pathToFileURL(resolve(dependency)).href);
 const chrome = process.env.BROWSER_RAG_CHROMIUM_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const sleep = ms => new Promise(done => setTimeout(done, ms));
-const checks = [], files = [], exclusions = [], phases = [], externalRequests = [], pageErrors = [], screenshots = [];
+const checks = [], files = [], exclusions = [], phases = [], externalRequests = [], pageErrors = [], screenshots = [], runtimeRequests = [];
 const cleanup = { browserClosed: false, profileRemoved: false };
 const profilePrefix = 'rag-model-chat-pages-';
 const started = Date.now();
@@ -47,7 +47,7 @@ async function response(path, method = 'GET') {
   return fetch(new URL(path, live), { method, cache: 'no-store', signal: AbortSignal.timeout(30000) });
 }
 async function settled(page, expected = 'ready') {
-  await page.waitForFunction(() => ['ready', 'error', 'cancelled'].includes(document.getElementById('app').dataset.phase), null, { timeout: 120000 });
+  await page.waitForFunction(() => ['ready', 'error', 'cancelled', 'unsupported'].includes(document.getElementById('app').dataset.phase), null, { timeout: 120000 });
   assert.equal(await page.locator('#app').getAttribute('data-phase'), expected, await page.locator('#error').textContent());
 }
 function observe(page) {
@@ -83,7 +83,9 @@ try {
     assert.equal(manifest.source.dirty, false); assert.equal(manifest.model.weightsIncluded, false);
     assert.equal(manifest.model.sha256, MODEL.sha256); assert.equal(manifest.runtime.version, RUNTIME.version);
     if (process.env.BROWSER_MODEL_EXPECTED_SOURCE) assert.equal(manifest.source.head, process.env.BROWSER_MODEL_EXPECTED_SOURCE);
-    assert.equal(manifest.files.length, 16); // plus the manifest itself: 17 public files
+    // Required runtime files are explicit; the reviewed stage owns the complete
+    // payload allowlist instead of this harness freezing an obsolete file count.
+    for (const name of Object.keys({ ...RUNTIME.files, ...COMPAT.files })) assert.ok(manifest.files.some(item => item.path === 'runtime/' + name));
     assert.ok(manifest.files.every(item => !/\.gguf$|(?:^|\/)(?:tests|proof|node_modules|\.artifacts|\.git)(?:\/|$)/i.test(item.path)));
   });
   await check('all-published-payload-hashes-nested-paths-and-mime', async () => {
@@ -100,7 +102,7 @@ try {
       assert.equal(digest(bytes), item.sha256, item.path);
       files.push({ path: item.path, bytes: bytes.length, sha256: item.sha256, mime });
     }
-    for (const [name, identity] of Object.entries(RUNTIME.files)) {
+    for (const [name, identity] of Object.entries({ ...RUNTIME.files, ...COMPAT.files })) {
       assert.equal(files.find(item => item.path === 'runtime/' + name)?.sha256, identity.sha256);
     }
   });
@@ -123,6 +125,10 @@ try {
   if (!port) throw new Error('Owned Chrome did not expose its local debugging port.');
   browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
   context = browser.contexts()[0]; browserVersion = browser.version();
+  context.on('request', request => {
+    const target = new URL(request.url());
+    if (target.pathname.includes('/runtime/')) runtimeRequests.push(target.pathname);
+  });
   await context.route('**/*', route => {
     const target = new URL(route.request().url());
     if (target.origin === live.origin || ['blob:', 'data:'].includes(target.protocol)) return route.continue();
@@ -141,8 +147,9 @@ try {
     assert.equal(await page.evaluate(() => isSecureContext && location.protocol === 'https:'), true);
     assert.equal(await page.locator('#app').getAttribute('data-phase'), 'idle');
     assert.equal(await page.locator('#chat-stage').isVisible(), false); assert.deepEqual(externalRequests, []);
-    assert.match(await page.locator('.license').first().textContent(), /Memory64/);
-    assert.match(await page.locator('.license').first().textContent(), /OPFS/);
+    const requirements = (await page.locator('.license').allTextContents()).join(' ');
+    assert.match(requirements, /Memory64/); assert.match(requirements, /Memory32/);
+    assert.match(requirements, /OPFS/);
   });
   async function refusal(name, injection, label) {
     await check(name, async () => {
@@ -151,22 +158,25 @@ try {
         await probe.route(new URL('engine-worker.mjs', live).href, async route => {
           const res = await route.fetch(); await route.fulfill({ response: res, body: injection + '\n' + await res.text() });
         });
-        await probe.goto(live.href); await probe.locator('#download').click(); await settled(probe, 'error');
+        await probe.goto(live.href); await probe.locator('#download').click(); await settled(probe, 'unsupported');
         const text = await probe.locator('#error').textContent();
         assert.match(text, /This browser cannot run this pinned runtime:/); assert.match(text, label);
         assert.match(text, /No model was downloaded/); assert.deepEqual(externalRequests, []);
         assert.equal(await probe.locator('#chat-stage').isVisible(), false);
+        assert.equal(await probe.locator('#download').isVisible(), false);
+        assert.equal(await probe.locator('#local-file').isVisible(), false);
+        assert.equal(await probe.locator('#unsupported-hint').isVisible(), true);
         await until(() => workerClosed === workerCreated, 'Refusal must close the production Worker while its page remains open');
       } finally { await probe.close(); }
     });
   }
-  await refusal('injected-production-Memory64-refusal-before-weights', `
+  await refusal('injected-production-SIMD-permanent-refusal-before-weights', `
 const __pagesValidate = WebAssembly.validate.bind(WebAssembly);
 WebAssembly.validate = bytes => {
   const view = new Uint8Array(bytes.buffer ?? bytes, bytes.byteOffset ?? 0, bytes.byteLength);
-  if (view.length === 13 && view[8] === 5 && view[11] === 4) return false;
+  if (view.length < 64 && view.includes(253)) return false;
   return __pagesValidate(bytes);
-};`, /Memory64/);
+};`, /SIMD/);
   await refusal('injected-production-OPFS-refusal-before-weights', `
 Object.defineProperty(navigator.storage, 'getDirectory', { value: undefined, configurable: true });`, /Origin private file system/);
   await check('ordinary-native-file-input-and-exact-browser-file-size', async () => {
@@ -218,11 +228,49 @@ Object.defineProperty(navigator.storage, 'getDirectory', { value: undefined, con
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     assert.equal(await page.locator('#loading-stage').isVisible(), false);
     assert.ok(await page.evaluate(() => [...document.querySelectorAll('#scene *')].every(item => getComputedStyle(item).animationName === 'none')));
+    await page.locator('#unload').click(); await settled(page, 'cancelled');
+    await until(() => workerClosed === workerCreated, 'All observed runtime Workers closed');
+  });
+  await check('live-maintained-Memory32-fallback-and-real-chat-without-Memory64-or-JSPI', async () => {
+    const requestsBefore = runtimeRequests.length;
+    await page.route(new URL('engine-worker.mjs', live).href, async route => {
+      const res = await route.fetch();
+      const injection = `
+const __nativeMemory = WebAssembly.Memory;
+WebAssembly.Memory = new Proxy(__nativeMemory, { construct(target, args) {
+  if (args[0]?.address === 'i64') throw new TypeError('Memory64 absent: explicit test injection');
+  return Reflect.construct(target, args);
+}});
+Object.defineProperty(WebAssembly, 'Suspending', { value: undefined, configurable: true });
+Object.defineProperty(WebAssembly, 'promising', { value: undefined, configurable: true });`;
+      await route.fulfill({ response: res, body: injection + '\n' + await res.text() });
+    });
+    await page.reload();
+    await page.evaluate(() => document.getElementById('local-file').addEventListener('change', event => event.stopImmediatePropagation(), { capture: true, once: true }));
+    const inputSession = await context.newCDPSession(page);
+    try {
+      const { root: documentNode } = await inputSession.send('DOM.getDocument');
+      const { nodeId } = await inputSession.send('DOM.querySelector', { nodeId: documentNode.nodeId, selector: '#local-file' });
+      await inputSession.send('DOM.setFileInputFiles', { nodeId, files: [modelPath] }); nativeSelections++;
+    } finally { await inputSession.detach(); }
+    await page.evaluate(model => {
+      const input = document.getElementById('local-file');
+      window.__pagesRetainedModel = new File([input.files[0]], model.file, { type: 'application/octet-stream' });
+    }, MODEL);
+    await chooseRetainedFile(page); await settled(page);
+    assert.equal(await page.locator('#app').getAttribute('data-runtime-profile'), 'memory32-asyncify');
+    assert.match(await page.locator('#runtime-label').textContent(), /Memory32|compatibility/i);
+    await reply(page, 'What is two plus two? Answer briefly.');
+    const selected = runtimeRequests.slice(requestsBefore);
+    assert.ok(selected.some(path => path.endsWith('/runtime/compat/wllama.wasm')));
+    assert.ok(selected.some(path => path.endsWith('/runtime/compat/wllama.js')));
+    assert.equal(selected.some(path => path.endsWith('/runtime/wllama.wasm')), false);
+    assert.deepEqual(externalRequests, []); assert.deepEqual(pageErrors, []);
     await mkdir(output, { recursive: true });
     const path = 'live-mobile-chat.png'; await page.screenshot({ path: join(output, path), fullPage: true });
     const bytes = await readFile(join(output, path)); screenshots.push({ path, bytes: bytes.length, sha256: digest(bytes) });
     await page.locator('#unload').click(); await settled(page, 'cancelled');
-    await until(() => workerClosed === workerCreated, 'All observed runtime Workers closed');
+    await until(() => workerClosed === workerCreated, 'All observed fallback runtime Workers closed');
   });
 } catch (error) { failure = error; console.error(error.stack); }
 finally {
@@ -253,9 +301,9 @@ finally {
     model: { id: MODEL.id, file: MODEL.file, bytes: MODEL.bytes, sha256: MODEL.sha256, revision: MODEL.revision },
     modelSource: 'existing ordinary native file input via path-only Chrome DOM command; same bytes renamed in browser File API',
     externalModelDownloads: 0, harnessModelFileCopies: 0, nativeSelections,
-    runtime: { version: RUNTIME.version, files: RUNTIME.files }, browser: browserVersion, node: process.version,
-    capabilityRefusals: 'injected missing Memory64 and OPFS in otherwise actual published production Worker',
-    checks, files, exclusions, phases, externalRequests, pageErrors, screenshots,
+    runtime: { version: RUNTIME.version, files: RUNTIME.files, compat: COMPAT }, browser: browserVersion, node: process.version,
+    capabilityRefusals: 'injected missing SIMD and OPFS permanently refuse; injected Memory64 and JSPI absence selects and runs the actual published maintained Memory32 runtime',
+    checks, files, exclusions, phases, runtimeRequests, externalRequests, pageErrors, screenshots,
     workers: { created: workerCreated, closed: workerClosed }, cleanup, ms: Date.now() - started,
     limitations: ['Desktop Chrome with mobile viewport; physical iOS is untested.',
       'Native File path selection uses browser automation; physical picker and iPhone Files are unqualified.',

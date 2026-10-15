@@ -7,7 +7,7 @@ import { STATIC_MIME } from '../../modules/browser-rag-ts/scripts/static-server.
 const exampleDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryDirectory = resolve(exampleDirectory, '../..');
 const themeDirectory = join(repositoryDirectory, 'modules/browser-rag-ts/demo');
-const runtimeFiles = new Set(['index.js', 'wllama.wasm', 'LICENSE']);
+const runtimeFiles = new Set(['index.js', 'wllama.wasm', 'LICENSE', 'compat/wllama.js', 'compat/wllama.wasm']);
 
 // Keep the CLI origin stable for browser-local model cache; callers/tests can still use port zero.
 export function parseCliPort(args = process.argv.slice(2)) {

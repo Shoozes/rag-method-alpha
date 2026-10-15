@@ -51,6 +51,11 @@ export function createRuntimeAdapter() {
     fail(message = 'Fixture preparation failed', index = operations.length - 1) {
       operations[index].reject(new Error(message));
     },
+    unsupported(capabilities, index = operations.length - 1) {
+      operations[index].reject(Object.assign(new Error(capabilities.map(item => item.label).join(', ') + ' is unavailable. No model was downloaded.'), {
+        code: 'UNSUPPORTED_BROWSER', retryable: false, capabilities,
+      }));
+    },
     token(text, index = replies.length - 1) { replies[index].onToken(text); },
     answer(text, index = replies.length - 1) { replies[index].resolve(text); },
     signalState() { return operations.map(item => item.signal.aborted); },
@@ -61,7 +66,8 @@ export function createRuntimeAdapter() {
       const cached = fixture.mode === 'cached';
       fixture.calls.push({ kind: 'prepare', source, cached, file: file ? { name: file.name, size: file.size } : null });
       const promise = new Promise((resolve, reject) => operations.push({ resolve, reject, signal, onProgress, cached }));
-      fixture.progress(source === 'file' ? { phase: 'verifying', cached: false }
+      fixture.progress(fixture.mode === 'unsupported' ? { phase: 'checking', cached: false }
+        : source === 'file' ? { phase: 'verifying', cached: false }
         : cached ? { phase: 'checking', cached: true }
         : { phase: 'downloading', loaded: 76703152, total: 153406304, cached: false });
       return promise;
@@ -192,14 +198,19 @@ try {
     try {
       const draft = 'A fixture draft survives model preparation.';
       await page.locator('#draft').fill(draft);
+      assert.equal(await page.locator('#runtime-profile').textContent(), 'Automatic WASM runtime selection');
       await page.locator('#download').click();
       await phase(page, 'downloading');
+      await fixture(page, 'progress', { phase: 'downloading', loaded: 76703152, total: 153406304, runtimeProfile: 'memory64' });
+      assert.equal(await page.locator('#app').getAttribute('data-runtime-profile'), 'memory64');
+      assert.equal(await page.locator('#runtime-profile').textContent(), 'Memory64 CPU / WASM');
       assert.equal(await page.locator('#load-progress').getAttribute('value'), '0.5');
       assert.equal(await page.locator('#percent').textContent(), '50%');
       assert.equal(await page.locator('#send').isDisabled(), true);
       await noOverflow(page);
       await screenshot(page, 'desktop-loading-fixture.png');
       await ready(page);
+      assert.match(await page.locator('#runtime-label').textContent(), /Memory64 CPU \/ WASM/);
       assert.equal(await page.locator('#prompt').inputValue(), draft);
       assert.equal(await page.locator('#chat-heading').evaluate(node => node === document.activeElement), true);
       assert.equal(await page.locator('#scene').isVisible(), false);
@@ -214,9 +225,13 @@ try {
       await fixture(page, 'mode', 'cached');
       await page.locator('#download').click();
       await phase(page, 'checking');
+      await fixture(page, 'progress', { phase: 'checking', cached: true, runtimeProfile: 'memory32-asyncify' });
+      assert.equal(await page.locator('#app').getAttribute('data-runtime-profile'), 'memory32-asyncify');
+      assert.match(await page.locator('#runtime-profile').textContent(), /Memory32 compatibility \/ Asyncify \(may be slower\)/);
       assert.equal(await page.locator('#load-progress').getAttribute('value'), null);
       assert.match(await page.locator('#byte-status').textContent(), /cached bytes/);
       await ready(page, true);
+      assert.match(await page.locator('#runtime-label').textContent(), /Memory32 compatibility \/ Asyncify/);
       assert.match(await page.locator('#runtime-label').textContent(), /cached bytes/);
       assert.equal(await page.evaluate(() => window.__loaderFixture.progressEvents.some(event => event.phase === 'downloading')), false);
     } finally { await page.close(); }
@@ -234,6 +249,7 @@ try {
       await phase(page, 'error');
       assert.match(await page.locator('#error').textContent(), /<img src=x/);
       assert.equal(await page.locator('#error img').count(), 0);
+      assert.equal(await page.locator('#error').getAttribute('aria-describedby'), null, 'Transient errors do not announce unsupported guidance');
       assert.equal(await page.locator('#draft').inputValue(), draft);
       assert.equal(await page.locator('#chat-stage').isVisible(), false);
       assert.match(await page.locator('#download').textContent(), /Retry/);
@@ -266,6 +282,41 @@ try {
       await phase(page, 'downloading');
       await ready(page);
       assert.equal(await page.locator('#prompt').inputValue(), draft);
+    } finally { await page.close(); }
+  });
+
+  await check('permanent capability refusal preserves the draft and removes futile download, retry and File controls', async () => {
+    const page = await newPage({ mobile: true, reducedMotion: true });
+    try {
+      const draft = 'Keep this draft on an unsupported browser.';
+      await page.locator('#draft').fill(draft);
+      await fixture(page, 'mode', 'unsupported');
+      await page.locator('#download').click(); await phase(page, 'checking');
+      await fixture(page, 'unsupported', [{ id: 'opfs', label: 'Browser storage (OPFS)', detail: 'The API is unavailable.' }]);
+      await phase(page, 'unsupported');
+      assert.match(await page.locator('#error').textContent(), /Browser storage \(OPFS\).*No model was downloaded/);
+      assert.equal(await page.locator('#error').getAttribute('role'), 'alert');
+      assert.equal(await page.locator('#error').getAttribute('aria-describedby'), 'unsupported-hint');
+      assert.equal(await page.locator('#error').evaluate(node => node === document.activeElement), true);
+      assert.equal(await page.locator('#draft').inputValue(), draft);
+      assert.equal(await page.locator('#chat-stage').isVisible(), false);
+      assert.equal(await page.locator('#download').isVisible(), false); assert.equal(await page.locator('#download').isDisabled(), true);
+      assert.equal(await page.locator('.file-choice').isVisible(), false); assert.equal(await page.locator('#local-file').isDisabled(), true);
+      assert.equal(await page.locator('#cancel').isVisible(), false); assert.equal(await page.locator('#load-progress').isVisible(), false);
+      assert.match(await page.locator('#unsupported-hint').textContent(), /Retrying or choosing a local file cannot add it/);
+      assert.match(await page.locator('#unsupported-hint').textContent(), /Physical iPhone support is not yet verified/);
+      // Disabled controls are not the lifecycle boundary: even a dispatched File
+      // event must be refused without calling the adapter a second time.
+      await page.evaluate(() => {
+        document.getElementById('download').click();
+        const input = document.getElementById('local-file'), transfer = new DataTransfer();
+        transfer.items.add(new File(['fixture'], 'fixture-only.gguf'));
+        input.files = transfer.files; input.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      await settle(page); await phase(page, 'unsupported');
+      assert.equal(await page.evaluate(() => window.__loaderFixture.calls.length), 1);
+      assert.equal(await page.evaluate(() => window.__loaderFixture.progressEvents.some(event => event.phase === 'downloading')), false);
+      await noOverflow(page); await screenshot(page, 'unsupported-browser-fixture.png');
     } finally { await page.close(); }
   });
 
@@ -343,7 +394,7 @@ try {
   });
 
   await check('fixture boundary: no engine, runtime, model, external requests or page errors', async () => {
-    assert.equal(adapterReplacements, 6);
+    assert.equal(adapterReplacements, 7);
     assert.deepEqual(unexpectedRequests, []);
     assert.deepEqual(pageErrors, []);
     for (const identity of sourceIdentity) {

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { lstat, mkdir, readFile, readdir, realpath, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { MODEL, RUNTIME } from './model-contract.mjs';
+import { COMPAT, MODEL, RUNTIME } from './model-contract.mjs';
 
 const workspace = fileURLToPath(new URL('../../', import.meta.url));
 const example = fileURLToPath(new URL('./', import.meta.url));
@@ -14,9 +14,11 @@ const browserFiles = Object.freeze([
   'index.html', 'style.css', 'app.mjs', 'loader-controller.mjs', 'model-contract.mjs',
   'runtime-adapter.mjs', 'engine-worker.mjs', 'capabilities.mjs', 'bootstrap.mjs',
 ]);
-const runtimeFiles = Object.freeze(['index.js', 'wllama.wasm', 'LICENSE']);
+const runtimeIdentities = Object.freeze({ ...RUNTIME.files, ...COMPAT.files });
+const runtimeFiles = Object.freeze(Object.keys(runtimeIdentities));
 const payloadPaths = Object.freeze([...browserFiles, 'theme/aurel-gold.css',
   ...runtimeFiles.map(name => 'runtime/' + name), 'LICENSES/rag-method.txt', 'NOTICE.txt', 'README.txt'].sort());
+const priorPayloadPaths = payloadPaths.filter(name => !name.startsWith('runtime/compat/'));
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const portable = value => value.split(sep).join('/');
 const table = payload => [...payload].map(([path, bytes]) => ({ path, bytes: bytes.length, sha256: hash(bytes) })).sort((a, b) => a.path.localeCompare(b.path));
@@ -74,13 +76,14 @@ async function managedOutput(destination) {
     throw new Error('Refusing existing output without an intact managed site manifest.');
   }
   const { identitySha256, ...body } = previous;
+  const previousPaths = previous.files?.map(file => file.path).sort();
   if (previous.schema !== schema || previous.managedBy !== managedBy || identitySha256 !== identity(body)
       || previous.publicReleaseQualified !== false || !Array.isArray(previous.files)
-      || JSON.stringify(previous.files.map(file => file.path).sort()) !== JSON.stringify(payloadPaths)) {
+      || ![payloadPaths, priorPayloadPaths].some(paths => JSON.stringify(previousPaths) === JSON.stringify(paths))) {
     throw new Error('Refusing output with a foreign or changed managed manifest.');
   }
-  const permitted = new Set([...payloadPaths, manifestName]);
-  const permittedDirectories = new Set(['theme', 'runtime', 'LICENSES']);
+  const permitted = new Set([...previousPaths, manifestName]);
+  const permittedDirectories = new Set(['theme', 'runtime', 'runtime/compat', 'LICENSES']);
   const actual = [];
   async function visit(directory, prefix = '') {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -116,7 +119,7 @@ export async function stageStatic({ output = join(workspace, '.artifacts/model-c
   const payload = new Map(), source = new Map();
   for (const name of runtimeFiles) {
     const bytes = await ordinaryBytes(join(resolve(runtimeRoot), name), 'runtime/' + name, 16 * 1024 * 1024);
-    if (hash(bytes) !== RUNTIME.files[name].sha256) throw new Error('Pinned runtime SHA-256 mismatch: ' + name);
+    if (hash(bytes) !== runtimeIdentities[name].sha256) throw new Error('Pinned runtime SHA-256 mismatch: ' + name);
     payload.set('runtime/' + name, bytes);
   }
   for (const name of browserFiles) {
@@ -132,6 +135,9 @@ export async function stageStatic({ output = join(workspace, '.artifacts/model-c
     'RAG Method browser model chat notices', '',
     'First-party application and Aurel Gold theme: MIT. Complete text: LICENSES/rag-method.txt.',
     '@wllama/wllama ' + RUNTIME.version + ': MIT. Complete retained text: runtime/LICENSE.',
+    COMPAT.package + ' ' + COMPAT.version + ': MIT. Complete retained text: runtime/LICENSE.',
+    'Compatibility package upstream source: https://github.com/ngxson/wllama/tree/' + COMPAT.gitHead,
+    'The compatibility npm package omits a license file; runtime/LICENSE matches its exact upstream LICENCE.',
     'Pinned runtime files retain their verified upstream bytes.', '',
     'Model: ' + MODEL.id + ' / ' + MODEL.file,
     'Model revision: ' + MODEL.revision,
@@ -148,7 +154,9 @@ export async function stageStatic({ output = join(workspace, '.artifacts/model-c
     'Unknown files must return 404, never an HTML application fallback.',
     'No repository checkout, Node runtime, model file, credentials, or build tools are required by the site.',
     'Model loading requires a secure context. A local-file choice still verifies the pinned model bytes.',
-    'Canonical wllama 3.5.1 requires WebAssembly Memory64 and the OPFS API for both local File and remote loading.',
+    'The main wllama 3.5.1 runtime requires WebAssembly Memory64; the pinned maintained compatibility runtime uses Memory32 and Asyncify.',
+    'Missing Memory64 or JSPI selects the compatibility runtime automatically; the model identity stays unchanged.',
+    'Both runtime profiles require the OPFS API for local File and remote loading.',
     'Writable OPFS is required only for a new remote cache miss; an OPFS write failure does not itself block File or valid cached-byte loading.',
     'JSPI absence alone is not a loading gate.',
     'The model download, cache, and inference run only after an explicit browser action.',
@@ -164,6 +172,8 @@ export async function stageStatic({ output = join(workspace, '.artifacts/model-c
     model: { id: MODEL.id, file: MODEL.file, revision: MODEL.revision, bytes: MODEL.bytes,
       sha256: MODEL.sha256, url: MODEL.url, license: 'LFM Open License v1.0', licenseUrl: MODEL.license, weightsIncluded: false },
     runtime: { package: '@wllama/wllama', version: RUNTIME.version, license: 'MIT', licensePath: 'runtime/LICENSE' },
+    compatibilityRuntime: { package: COMPAT.package, version: COMPAT.version, gitHead: COMPAT.gitHead,
+      profile: 'Memory32/Asyncify', license: 'MIT', licensePath: 'runtime/LICENSE' },
     files: table(payload),
   };
   const manifest = { ...body, identitySha256: identity(body) };

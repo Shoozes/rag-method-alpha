@@ -6,7 +6,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { stageStatic } from '../examples/browser-model-chat/stage-static.mjs';
-import { MODEL, RUNTIME } from '../examples/browser-model-chat/model-contract.mjs';
+import { COMPAT, MODEL, RUNTIME } from '../examples/browser-model-chat/model-contract.mjs';
 import { listenStatic } from '../modules/browser-rag-ts/scripts/static-server.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -65,7 +65,7 @@ test('missing or wrong pinned runtime bytes fail before creating output', async 
 });
 
 test('one retained-runtime site has an exact hashed allowlist, notices, unreviewed identity and safe refresh', async t => {
-  // The intended delivery site is the sole ~8 MB output. No second runtime tree
+  // The intended delivery site is the sole delivery output. No second runtime tree
   // or model is created; failure cases above use only a few fixture bytes.
   const staged = await stageStatic();
   assert.equal(staged.output, site);
@@ -81,7 +81,7 @@ test('one retained-runtime site has an exact hashed allowlist, notices, unreview
   assert.equal(manifest.model.sha256, MODEL.sha256);
   assert.equal(manifest.model.licenseUrl, MODEL.license);
   const expected = [...browserFiles, 'theme/aurel-gold.css', 'runtime/index.js', 'runtime/wllama.wasm',
-    'runtime/LICENSE', 'LICENSES/rag-method.txt', 'NOTICE.txt', 'README.txt'].sort();
+    'runtime/LICENSE', 'runtime/compat/wllama.js', 'runtime/compat/wllama.wasm', 'LICENSES/rag-method.txt', 'NOTICE.txt', 'README.txt'].sort();
   assert.deepEqual(manifest.files.map(file => file.path).sort(), expected);
   for (const file of manifest.files) {
     const bytes = await readFile(join(site, file.path));
@@ -89,18 +89,22 @@ test('one retained-runtime site has an exact hashed allowlist, notices, unreview
     assert.equal(hash(bytes), file.sha256, file.path);
     assert.ok(!file.path.includes('..') && !file.path.startsWith('/'));
   }
-  for (const [name, contract] of Object.entries(RUNTIME.files)) {
+  for (const [name, contract] of Object.entries({ ...RUNTIME.files, ...COMPAT.files })) {
     assert.equal(hash(await readFile(join(site, 'runtime', name))), contract.sha256, 'retained runtime: ' + name);
   }
   assert.equal(hash(await readFile(join(site, 'theme/aurel-gold.css'))), hash(await readFile(join(root, 'modules/browser-rag-ts/demo/aurel-gold.css'))));
   assert.equal(hash(await readFile(join(site, 'LICENSES/rag-method.txt'))), hash(await readFile(join(root, 'LICENSE'))));
   const notices = await readFile(join(site, 'NOTICE.txt'), 'utf8');
   assert.match(notices, /@wllama\/wllama 3\.5\.1: MIT/);
+  assert.match(notices, /@wllama\/wllama-compat 3\.5\.1: MIT/);
+  assert.ok(notices.includes(COMPAT.gitHead));
   assert.match(notices, /LFM Open License v1\.0 \(distinct/);
   assert.ok(notices.includes(MODEL.license));
   assert.match(notices, /weights are not included/);
   const launch = await readFile(join(site, 'README.txt'), 'utf8');
-  assert.match(launch, /3\.5\.1 requires WebAssembly Memory64 and the OPFS API for both local File and remote loading/);
+  assert.match(launch, /main wllama 3\.5\.1 runtime requires WebAssembly Memory64/);
+  assert.match(launch, /compatibility runtime uses Memory32 and Asyncify/);
+  assert.match(launch, /Both runtime profiles require the OPFS API/);
   assert.match(launch, /Writable OPFS is required only for a new remote cache miss/);
   assert.match(launch, /JSPI absence alone is not a loading gate/);
   assert.doesNotMatch(JSON.stringify(manifest), /[A-Za-z]:\\|\/Users\/|\/home\/|file:\/\//);
@@ -150,7 +154,10 @@ test('hard-linked managed files and manifest are refused while linked read-only 
 
   const runtimeRoot = join(fixture, 'linked-runtime-input');
   await mkdir(runtimeRoot);
-  for (const name of Object.keys(RUNTIME.files)) await link(join(artifacts, 'runtime', name), join(runtimeRoot, name));
+  for (const name of Object.keys({ ...RUNTIME.files, ...COMPAT.files })) {
+    await mkdir(dirname(join(runtimeRoot, name)), { recursive: true });
+    await link(join(artifacts, 'runtime', name), join(runtimeRoot, name));
+  }
   assert.ok((await lstat(join(runtimeRoot, 'index.js'))).nlink > 1);
   assert.deepEqual((await stageStatic({ runtimeRoot })).manifest, originalManifest, 'read-only verified runtime inputs may be hard-linked');
 });
@@ -164,6 +171,7 @@ test('staged modules, Worker, theme and WASM serve with correct GET/HEAD MIME un
       ['', 'text/html; charset=utf-8'], ...browserFiles.filter(name => name.endsWith('.mjs')).map(name => [name, 'application/javascript; charset=utf-8']),
       ['style.css', 'text/css; charset=utf-8'], ['theme/aurel-gold.css', 'text/css; charset=utf-8'],
       ['runtime/index.js', 'application/javascript; charset=utf-8'], ['runtime/wllama.wasm', 'application/wasm'],
+      ['runtime/compat/wllama.js', 'application/javascript; charset=utf-8'], ['runtime/compat/wllama.wasm', 'application/wasm'],
       ['site-manifest.json', 'application/json; charset=utf-8'],
     ];
     for (const [asset, mime] of expected) {
@@ -183,7 +191,7 @@ test('staged modules, Worker, theme and WASM serve with correct GET/HEAD MIME un
     }
     for (const module of browserFiles.filter(name => name.endsWith('.mjs'))) {
       const text = await readFile(join(site, module), 'utf8');
-      for (const match of text.matchAll(/(?:from\s*|import\s*)['"]([^'"]+)['"]|new URL\(\s*['"]([^'"]+)['"]/g)) {
+      for (const match of text.matchAll(/(?:from\s*|import\s*)['"]([^'"]+)['"]|new URL\(\s*['"]([^'"]+)['"]\s*,/g)) {
         const target = match[1] || match[2];
         if (/^(?:https?:|data:|node:)/.test(target)) continue;
         const resolved = new URL(target, new URL(module, server.baseUrl));
@@ -192,7 +200,7 @@ test('staged modules, Worker, theme and WASM serve with correct GET/HEAD MIME un
       }
     }
     for (const missing of ['missing.mjs', 'missing.js', 'missing.wasm', 'serve.mjs', 'prepare-runtime.mjs', 'stage-static.mjs',
-      'tests/loader-controller.test.mjs', '.git/config', '.env', 'runtime/private.txt', MODEL.file, 'cache/model.gguf']) {
+      'tests/loader-controller.test.mjs', '.git/config', '.env', 'runtime/private.txt', 'runtime/compat/private.js', MODEL.file, 'cache/model.gguf']) {
       const response = await fetch(new URL(missing, server.baseUrl));
       assert.equal(response.status, 404, missing);
       assert.ok(!(response.headers.get('content-type') || '').startsWith('text/html'), missing + ' has no HTML fallback');

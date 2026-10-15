@@ -94,7 +94,7 @@ test('browser model preview serves only its bounded HTTP file surface', async (t
   const root = path.join(directory, 'public');
   const runtimeRoot = path.join(directory, 'runtime');
   const outside = path.join(directory, 'outside');
-  await Promise.all([root, runtimeRoot, outside, path.join(root, 'theme'), path.join(root, '.git')].map((entry) => mkdir(entry, { recursive: true })));
+  await Promise.all([root, runtimeRoot, path.join(runtimeRoot, 'compat'), outside, path.join(root, 'theme'), path.join(root, '.git')].map((entry) => mkdir(entry, { recursive: true })));
 
   const html = '<!doctype html><title>Fixture preview</title><p>PREVIEW-INDEX</p>';
   const moduleSource = 'export const fixtureModule = "real-mjs";\n';
@@ -115,6 +115,9 @@ test('browser model preview serves only its bounded HTTP file surface', async (t
     writeFile(path.join(runtimeRoot, 'index.js'), runtimeSource),
     writeFile(path.join(runtimeRoot, 'wllama.wasm'), wasm),
     writeFile(path.join(runtimeRoot, 'LICENSE'), license),
+    writeFile(path.join(runtimeRoot, 'compat', 'wllama.js'), runtimeSource),
+    writeFile(path.join(runtimeRoot, 'compat', 'wllama.wasm'), wasm),
+    writeFile(path.join(runtimeRoot, 'compat', 'private.js'), 'RUNTIME-EXTRA-MUST-NOT-APPEAR'),
     writeFile(path.join(runtimeRoot, 'extra.js'), 'RUNTIME-EXTRA-MUST-NOT-APPEAR'),
   ]);
 
@@ -157,7 +160,7 @@ test('browser model preview serves only its bounded HTTP file surface', async (t
     assert.deepEqual(response.body, await readFile(themePath));
   });
 
-  await t.test('allows exactly the three runtime artifacts and preserves WebAssembly MIME', async () => {
+  await t.test('allows exactly the five runtime artifacts and preserves WebAssembly MIME', async () => {
     const js = await request(server.url, '/runtime/index.js');
     assert.equal(js.status, 200);
     assertType(js, 'application/javascript;charset=utf-8');
@@ -169,7 +172,19 @@ test('browser model preview serves only its bounded HTTP file surface', async (t
     const notice = await request(server.url, '/runtime/LICENSE');
     assert.equal(notice.status, 200);
     assert.equal(notice.body.toString(), license);
-    for (const route of ['/runtime/extra.js', '/runtime/', '/runtime/index.js/extra', '/runtime/%65xtra.js']) {
+    for (const [route, expected, mime] of [
+      ['/runtime/compat/wllama.js', Buffer.from(runtimeSource), 'application/javascript;charset=utf-8'],
+      ['/runtime/compat/wllama.wasm', wasm, 'application/wasm'],
+    ]) {
+      for (const method of ['GET', 'HEAD']) {
+        const response = await request(server.url, route, method);
+        assert.equal(response.status, 200, method + ' ' + route);
+        assertType(response, mime);
+        assert.equal(Number(response.headers['content-length']), expected.length);
+        assert.deepEqual(response.body, method === 'GET' ? expected : Buffer.alloc(0));
+      }
+    }
+    for (const route of ['/runtime/extra.js', '/runtime/', '/runtime/index.js/extra', '/runtime/%65xtra.js', '/runtime/compat/', '/runtime/compat/private.js', '/runtime/compat/wllama.js/extra']) {
       const response = await request(server.url, route);
       assertBlocked(response, route);
       assert.ok(!response.body.includes(Buffer.from('RUNTIME-EXTRA-MUST-NOT-APPEAR')));

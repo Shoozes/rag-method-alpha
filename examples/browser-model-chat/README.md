@@ -3,8 +3,9 @@
 An optional, separate browser entry point for one pinned local model and a bounded chat. The existing Atlas entry point remains model-free. This example is served separately and is not included in the standard Vite/Atlas build artifact.
 
 Live static preview: **https://shoozes.github.io/rag-method-alpha/model-chat/**.
-Memory64 and OPFS requirements apply before either loading method. Physical
-iPhone support remains unqualified; use the [mobile checklist](./MOBILE.md).
+The runtime automatically selects a pinned Memory32 compatibility build when
+Memory64 or JSPI is unavailable. OPFS remains required. Physical iPhone support
+awaits a fresh device retest; use the [mobile checklist](./MOBILE.md).
 
 ## Run locally
 
@@ -14,13 +15,13 @@ Use Node.js 22.12 or later. From the repository root, prepare the pinned runtime
 node examples/browser-model-chat/prepare-runtime.mjs --fetch
 ```
 
-Or reuse the exact `@wllama/wllama` 3.5.1 npm archive:
+Or reuse the exact main and compatibility npm archives:
 
 ```sh
-node examples/browser-model-chat/prepare-runtime.mjs --archive "path/to/wllama-3.5.1.tgz"
+node examples/browser-model-chat/prepare-runtime.mjs --archive "path/to/wllama-3.5.1.tgz" --compat-archive "path/to/wllama-compat-3.5.1.tgz"
 ```
 
-Setup checks the archive's pinned SHA-512 and each selected file's SHA-256. It accepts an archive up to 8 MiB and extracts only `index.js`, `wllama.wasm`, and `LICENSE` into the ignored `.artifacts/model-chat/runtime/` directory. It runs no npm/package scripts or native build and downloads no model.
+Setup verifies pinned SHA-512 archives and selected SHA-256 files. The five runtime files are the main API, Memory64 WASM, MIT license, and Memory32 compatibility worker/WASM. Already verified profiles are retained; only missing profiles are fetched. Main and compatibility archives are bounded at 8 MiB and 16 MiB respectively and extraction is allowlisted. Setup runs no package scripts, installs or native builds, and downloads no model.
 
 ```sh
 node examples/browser-model-chat/serve.mjs
@@ -32,11 +33,11 @@ Open the printed `http://127.0.0.1:5187/` URL. Stop the server with Ctrl+C. Choo
 node examples/browser-model-chat/serve.mjs --port 5188
 ```
 
-Keep the same origin, including the port, to reuse that origin's browser model cache. `--port 0` selects an ephemeral port; the exported `startServer()` API also defaults to port 0 for tests. The preview binds only IPv4 loopback. It exposes this example, the existing Aurel Gold stylesheet, and three allowlisted runtime files; it does not expose a model directory or arbitrary host files.
+Keep the same origin, including the port, to reuse that origin's browser model cache. `--port 0` selects an ephemeral port; the exported `startServer()` API also defaults to port 0 for tests. The preview binds only IPv4 loopback. It exposes this example, the existing Aurel Gold stylesheet, and five allowlisted runtime files; it does not expose a model directory or arbitrary host files.
 
-In the page, explicitly download the model or choose the exact GGUF file from your device. Both paths verify byte length and SHA-256 before initialization. This pinned 3.5.1 build requires a secure context, Memory64, SIMD, exception handling, nested module Workers, Web Crypto and the OPFS API for **both** inputs. A local File avoids downloading weights and creating a new model-cache entry; it does not bypass missing Memory64 or OPFS API support. A new remote cache miss additionally requires writable OPFS sync access. A valid existing cache or File does not require that write probe. Supported loopback origins qualify as secure contexts locally.
+In the page, explicitly download the model or choose the exact GGUF File. Both paths verify byte length and SHA-256 before initialization. The API remains wllama 3.5.1 with the same model. Browsers lacking Memory64 or JSPI automatically use the pinned, self-hosted wllama-compat 3.5.1 Memory32/Asyncify build; other browsers use Memory64. The chosen profile is visible before weight loading and in chat. Both paths require a secure context, SIMD, exception handling, nested module Workers, Web Crypto and the OPFS API. A local File avoids downloading weights and creating a new model-cache entry, but cannot bypass a missing required browser feature. Only a new remote cache miss requires writable OPFS sync access. Valid cached bytes and Files skip that write probe.
 
-Before requesting weights, the Worker tests those features, verifies and compiles the exact pinned WASM, and starts a tiny module child Worker to check site policy. Refusal appears on the loading screen. Fully absent JSPI uses the bundled synchronous fallback, with additional memory pressure; incomplete JSPI entry points are rejected. These checks cannot guarantee enough memory for model initialization.
+Before requesting weights, the Worker tests browser capabilities, verifies and compiles the exact selected WASM, verifies compatibility worker glue when selected, and starts a tiny module child Worker to check policy. Full JSPI absence selects Asyncify; a partially broken JSPI interface is rejected. Permanent capability failures focus an explanation and remove futile Retry/File controls. Transient download/cache failures retain recovery. Memory32 compatibility may be slower, and neither profile guarantees enough device memory.
 
 ## Stage a static candidate
 
@@ -69,9 +70,10 @@ The executable contract is [model-contract.mjs](./model-contract.mjs).
 | Repository revision | `fa224d4cb60cffe61eb58726712ef255bb64d0b7` |
 | File size | `153406304` bytes (153.4 MB decimal) |
 | SHA-256 | `7bbd90384d3deffe4c646ec9643b212802d32d4ce417c90a1ec9282100650062` |
-| Browser runtime | `@wllama/wllama` 3.5.1, single-thread CPU/WASM |
+| Browser API / primary runtime | `@wllama/wllama` 3.5.1, single-thread CPU/WASM |
+| Compatibility build | `@wllama/wllama-compat` 3.5.1, Memory32 / Asyncify |
 
-The model has the [LFM Open License v1.0 at the pinned revision](https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF/blob/fa224d4cb60cffe61eb58726712ef255bb64d0b7/LICENSE); it is not covered by the runtime's MIT license. The wllama runtime is MIT licensed; setup retains its license as `/runtime/LICENSE`. Review both licenses before redistribution or deployment. Model and runtime files remain outside Git.
+The model has the [LFM Open License v1.0 at the pinned revision](https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF/blob/fa224d4cb60cffe61eb58726712ef255bb64d0b7/LICENSE); it is not covered by the runtime's MIT license. Both wllama packages are MIT licensed; `/runtime/LICENSE` contains the full shared upstream text. The compatibility package declares MIT but omits a license file, so its upstream text was verified at commit `912c18b75d4358c1405a64646b8dbe43a205943b`. Review both licenses before redistribution or deployment. Model weights remain outside Git and Pages. Prepared runtimes are ignored on the source branch; only verified allowlisted runtime bytes enter the Pages branch.
 
 ## Behavior and limits
 
@@ -92,16 +94,16 @@ The [Bonsai Space](https://huggingface.co/spaces/webml-community/ternary-bonsai-
 
 A separate comparison loaded the exact pinned 230M bytes with that retained Memory32 single-thread runtime and generated a reply in ordinary desktop Chrome. A second File API run passed with the OPFS directory API hidden before runtime construction. This is a labeled capability injection, not a native Files picker or iOS test. It establishes that the older donor can execute this model on the tested desktop; it does not change the product runtime or qualify the older build for distribution.
 
-Upstream also publishes [wllama-compat 3.5.1](https://registry.npmjs.org/@wllama%2fwllama-compat/3.5.1), whose [compat configuration](https://github.com/ngxson/wllama/blob/766d28e03eeac044fe055327d06b83d3f9b84544/compat/README.md) uses Memory32/Asyncify. That package has not been downloaded or executed here. Selecting it requires an exact-byte adapter and lifecycle qualification; the canonical example remains visibly gated on 3.5.1's current requirements.
+The maintained [wllama-compat 3.5.1 package](https://registry.npmjs.org/@wllama%2fwllama-compat/3.5.1) and [its configuration](https://github.com/ngxson/wllama/blob/766d28e03eeac044fe055327d06b83d3f9b84544/compat/README.md) provide Memory32/Asyncify. The exact pinned package was tested with the unchanged model in desktop Chrome while the Memory64 constructor was deliberately unavailable, and again with JSPI absent. Both runs initialized the real WASM and generated replies; File loading also worked when OPFS calls were blocked but the required API remained exposed. Production-path and published-page checks are separate from that focused comparison.
 
-The user previously reported iOS success over HTTPS and with device Files, and HTTP loading failures around 50 MB. Those are historical observations, not a universal limit or fresh device proof. This slice does not claim iOS support. A later device qualification must record the exact device/browser, model/license, loading and peak memory, cache reuse, cancellation, and recovery results without changing browser security settings.
+The latest real iPhone test of the earlier Memory64-only preview refused loading before weights: “Memory64 WebAssembly is unavailable.” Device/iOS version is pending. That observation prompted the maintained compatibility path; desktop feature injection does not establish iPhone success. Earlier user-reported HTTPS success and HTTP failures around 50 MB remain historical observations, not universal limits. A fresh device retest must record device/browser, exact model/license, memory, loading/cache, cancellation and recovery without changing browser security settings.
 
 ## Local verification
 
 Run the focused built-in Node tests from the repository root:
 
 ```sh
-node --test examples/browser-model-chat/tests/loader-controller.test.mjs examples/browser-model-chat/tests/runtime-adapter.test.mjs examples/browser-model-chat/tests/capabilities.test.mjs tests/server.test.mjs tests/model-chat-static.test.mjs
+node --test examples/browser-model-chat/tests/loader-controller.test.mjs examples/browser-model-chat/tests/runtime-adapter.test.mjs examples/browser-model-chat/tests/capabilities.test.mjs tests/server.test.mjs tests/model-chat-static.test.mjs tests/model-chat-prepare.test.mjs
 ```
 
 The server/static tests use real HTTP requests for nested-prefix GET/HEAD routes, executable module/WASM MIME types, missing routes, excluded files, traversal/dotfile rejection, link escape/refresher rejection, loopback binding and CLI port parsing. Capability tests cover missing features and tiny writable-cache cleanup. Controller/adapter tests use injected fixtures; they do not establish real-model inference or device support.
@@ -118,10 +120,16 @@ node tests/model-chat-browser.mjs
 node tests/model-chat-retained.mjs
 ```
 
-This journey streams that file once over owned loopback into a browser-held File, blocks external origins, checks injected Memory64/OPFS refusal before weights, cancellation/retry, two real initializations/replies and narrow reduced-motion layout. It does not copy or download a model. The separate donor comparison requires existing exact vendor inputs in `BROWSER_MODEL_MEMORY32_JS_FILE`, `BROWSER_MODEL_MEMORY32_WASM_FILE` and `BROWSER_MODEL_MEMORY32_LICENSE_FILE`:
+This journey streams that file once over owned loopback into a browser-held File, blocks external origins, checks injected SIMD/OPFS refusal before weights and actual Memory32 fallback when Memory64/JSPI are absent, cancellation/retry, two real initializations/replies and narrow reduced-motion layout. It does not copy or download a model. The separate donor comparison requires existing exact vendor inputs in `BROWSER_MODEL_MEMORY32_JS_FILE`, `BROWSER_MODEL_MEMORY32_WASM_FILE` and `BROWSER_MODEL_MEMORY32_LICENSE_FILE`:
 
 ```sh
 node tests/model-chat-memory32.mjs --existing-cache
+```
+
+The maintained compatibility probe uses the already prepared pinned assets and the same `BROWSER_MODEL_GGUF_FILE`:
+
+```sh
+node tests/model-chat-compat.mjs --existing-cache
 ```
 
 The original cold-remote journey is retained for a separately authorized new download:
@@ -132,11 +140,11 @@ node tests/model-chat-live.mjs --remote
 
 The journeys use an installed browser, do not install dependencies, and clean up their owned server/browser/profile. Actual model journeys launch ordinary headless Chrome and attach through CDP, without security-bypass flags. `BROWSER_RAG_CHROMIUM_PATH` selects its installed Chrome executable.
 
-Current acceptance on 2026-10-15: **53 Node/HTTP checks, 7 existing fixture UI checks, 9 focused mobile fixture checks and 11 live Pages checks** pass in Chrome 155.0.8059.79 on Windows, Node 26.5.0. Live checks verify all 17 public files, exact hashes/MIME/subpaths/404s, injected capability refusal before weights, native-File integrity and initialization, cancel/retry and actual generated replies. They use retained bytes, with no new model download. Mobile fixture checks include keyboard-size and landscape layout, touch targets, long text, anchored streaming and visible limit errors. The source-bound receipt records precise identities and evidence limits.
+The source-bound receipt records exact acceptance counts and identities. The focused suite covers capability selection, permanent refusal versus transient recovery, transport/lifecycle cancellation, bounded preparation, and static hashes/MIME/404s. UI fixtures cover mobile layout and unsupported states. The production retained-file journey separately executes both Memory64 and maintained Memory32/Asyncify, with the latter selected while Memory64 and JSPI are deliberately absent. The Pages journey repeats that behavior against the deployed HTTPS bytes. Feature injection remains a desktop simulation, not physical iPhone proof.
 
 Historical cold-remote/cache acceptance at commit `12478fb34c9c749fdc218f870d1d366f186af547` passed 7 real-model checks, including official remote transfer, integrity verification, generated replies and cache-only reuse with external requests blocked. That evidence is retained under its original commit identity; it is not represented as a rerun of the current source. A physical iOS device remains unqualified.
 
-The compact source-bound receipt is `.artifacts/proof/model-chat/receipt.json`. Essential images are `mobile-layout-fixture.png` (visibly labeled UI fixture at keyboard-size height) and `live-mobile-chat.png` (actual HTTPS model response). Runtime and delivery assets are ignored; temporary browser profiles were removed. The earlier vendor URL-base failure and its narrow fix remain in the historical record. No hosted CI, paid inference, API credentials, publication, or browser security changes were used.
+The compact source-bound receipt is `.artifacts/proof/model-chat/receipt.json`. Essential images are `mobile-layout-fixture.png` (visibly labeled UI fixture at keyboard-size height) and `live-mobile-chat.png` (actual HTTPS model response). Runtime and delivery assets are ignored; temporary browser profiles were removed. The earlier vendor URL-base failure and its narrow fix remain in the historical record. Browser verification runs locally against the published HTTPS site. GitHub runs its native Pages deployment only; no hosted verification suite, paid inference, API credentials or browser security bypass is used.
 
 ## Next bounded steps
 

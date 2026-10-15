@@ -9,7 +9,7 @@ function fixture(t) {
     constructor(url, options) { this.url = url; this.options = options; this.requests = []; this.terminations = 0; workers.push(this); active.add(this); }
     postMessage(message) { this.requests.push(structuredClone(message)); }
     terminate() { this.terminations++; active.delete(this); }
-    emit(id, type, value) { this.onmessage?.({ data: { id, type, value } }); }
+    emit(id, type, value, metadata = {}) { this.onmessage?.({ data: { id, type, value, ...metadata } }); }
     fail() { this.onerror?.({ message: 'Fixture worker crash' }); }
   }
   const adapter = createRuntimeAdapter({ WorkerClass: FixtureWorker });
@@ -78,4 +78,30 @@ test('pre-aborted input creates no worker; repeated disposal leaves no active wo
   const loading = adapter.prepare({ source: 'remote' }), stopped = assert.rejects(loading, aborted);
   await adapter.dispose(); await stopped; await adapter.dispose();
   assert.equal(workers.length, 1); assert.equal(workers[0].terminations, 1); assert.equal(active.size, 0);
+});
+
+test('explicit permanent capability refusal preserves safe metadata across Worker transport', async t => {
+  const { adapter, workers } = fixture(t);
+  const loading = adapter.prepare({ source: 'remote' }), worker = workers[0];
+  const capabilities = [{ id: 'opfs', label: 'Browser storage (OPFS)', detail: 'The API is unavailable.', ignored: 'not UI data' }, null, { label: 'invalid' }];
+  worker.emit(worker.requests[0].id, 'error', 'No model was downloaded. Browser storage is unavailable.', {
+    code: 'UNSUPPORTED_BROWSER', retryable: false, capabilities,
+  });
+  await assert.rejects(loading, failure => {
+    assert.equal(failure.code, 'UNSUPPORTED_BROWSER'); assert.equal(failure.retryable, false);
+    assert.match(failure.message, /No model was downloaded/);
+    assert.deepEqual(failure.capabilities, [{ id: 'opfs', label: 'Browser storage (OPFS)', detail: 'The API is unavailable.' }]);
+    capabilities[0].label = 'Mutated outside the adapter';
+    assert.equal(failure.capabilities[0].label, 'Browser storage (OPFS)');
+    return true;
+  });
+});
+
+test('unclassified errors and retryable capability failures do not acquire a permanent lock', async t => {
+  const { adapter, workers } = fixture(t);
+  for (const metadata of [{}, { code: 'UNSUPPORTED_BROWSER', retryable: true }, { retryable: false }]) {
+    const loading = adapter.prepare({ source: 'remote' }), worker = workers.at(-1);
+    worker.emit(worker.requests.at(-1).id, 'error', 'Fixture temporary failure', metadata);
+    await assert.rejects(loading, failure => failure.message === 'Fixture temporary failure' && failure.retryable !== false && failure.code !== 'UNSUPPORTED_BROWSER');
+  }
 });

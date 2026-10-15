@@ -8,9 +8,11 @@ This is a browser application; installing it as a native app is outside this sli
 
 1. Record the iPhone model, iOS version and browser/version. Open the HTTPS URL.
    Check portrait, landscape, larger text and pinch zoom; controls should stay usable.
-2. Read the model license and requirements, then start loading once. If Memory64
-   or OPFS is refused, retain the exact error. A local File cannot bypass those
-   requirements in this runtime. Refusal is not successful model support.
+2. Reload the page after the compatibility update, read the license, then start
+   loading once. Missing Memory64 or JSPI should select “Memory32 compatibility /
+   Asyncify” before weights. If another requirement is refused, retain the exact
+   error; Retry/File controls should not imply a workaround. Record device/iOS
+   details. Refusal is not successful model support.
 3. If supported, check measured download bytes, cancel, retry and initialization.
    Initialization has no percentage estimate. If the exact GGUF already exists in
    Files, try selecting it separately. Record tab reloads, storage failures and
@@ -21,6 +23,13 @@ This is a browser application; installing it as a native app is outside this sli
 5. Reload and check cache reuse, then interrupted-transfer/bad-cache recovery and
    background/foreground behavior. Conversation text is session-only. Record
    crashes, browser eviction and recovery; do not infer memory safety from file size.
+
+## Reported device failure
+
+The earlier Memory64-only preview refused on the user's iPhone before downloading
+weights: “Memory64 WebAssembly is unavailable.” iOS version remains pending. The
+maintained Memory32 path fixes that build requirement in desktop feature-injection
+tests; a fresh physical-device loading/chat test is still required.
 
 ## Evidence boundary
 
