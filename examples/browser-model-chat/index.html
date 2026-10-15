@@ -2,7 +2,7 @@
 <html lang="en" data-aurel-theme="gold">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="description" content="Load a small LiquidAI model and chat locally in your browser. An optional RAG Method composition.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E">
   <title>RAG Method · Local conversation</title>
@@ -26,7 +26,7 @@
           <ol class="stages" aria-label="Loading stages"><li data-step="downloading"><span>01</span>Fetch</li><li data-step="verifying"><span>02</span>Verify</li><li data-step="initializing"><span>03</span>Initialize</li></ol>
           <div class="load-actions"><button id="download" class="primary">Download &amp; open chat</button><button id="cancel" class="secondary" hidden>Cancel</button></div>
           <label class="file-choice" for="local-file">Already have the model? <span>Choose a local GGUF</span><input id="local-file" type="file" accept=".gguf"></label>
-          <p class="license">This build requires WebAssembly Memory64 and browser storage (OPFS) for both loading methods. A local File avoids a download and new model-cache writes. Requirements are checked before fetching weights; extra memory is needed for verification and initialization.</p>
+          <p class="license">This build requires WebAssembly Memory64 and browser storage (OPFS) for both loading methods. A local File avoids a download and new model-cache writes. Requirements are checked before fetching weights; extra memory is needed for verification and initialization. Physical iPhone support is not yet verified.</p>
           <p class="license">Downloading is subject to the <a id="model-license" href="https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF/blob/fa224d4cb60cffe61eb58726712ef255bb64d0b7/LICENSE" target="_blank" rel="noopener noreferrer">LFM Open License v1.0</a>. The browser retains a reusable cache when available.</p>
         </div>
       </div>
@@ -35,8 +35,8 @@
   </section>
   <section id="chat-stage" aria-labelledby="chat-heading" hidden>
     <div class="chat-header"><div><p class="eyebrow">02 / Converse</p><h1 id="chat-heading" tabindex="-1">Make room for <em>a thought.</em></h1><p id="runtime-label">LFM2.5-230M · on this device</p></div><button id="unload" class="secondary">Unload model</button></div>
-    <div id="messages" class="messages" role="log" aria-label="Conversation" aria-live="polite"><div id="chat-empty" class="chat-empty"><span aria-hidden="true">✧</span><p>A fresh conversation.</p><small>Try a short question. This small model can make mistakes.</small></div></div>
-    <form id="composer"><label for="prompt">Message</label><textarea id="prompt" maxlength="4000" rows="2" placeholder="Ask something…"></textarea><div class="composer-actions"><span>Session only · no saved history</span><button id="stop" class="secondary" type="button" hidden>Stop &amp; unload</button><button id="send" class="primary" type="submit">Send message <span aria-hidden="true">↗</span></button></div></form>
+    <div class="conversation">    <div id="messages" class="messages" role="log" aria-label="Conversation" aria-live="polite"><div id="chat-empty" class="chat-empty"><span aria-hidden="true">✧</span><p>A fresh conversation.</p><small>Try a short question. This small model can make mistakes.</small></div></div><button id="new-messages" class="secondary" type="button" aria-controls="messages" hidden>Latest messages</button></div>
+    <form id="composer"><p id="chat-error" class="error" role="alert" hidden></p><label for="prompt">Message</label><textarea id="prompt" maxlength="4000" rows="2" placeholder="Ask something…"></textarea><div class="composer-actions"><span>Session only · no saved history</span><button id="stop" class="secondary" type="button" hidden>Stop &amp; unload</button><button id="send" class="primary" type="submit">Send message <span aria-hidden="true">↗</span></button></div></form>
     <button id="clear" class="text-button">Clear conversation</button>
   </section>
   <footer><span>Optional browser model preview · Atlas remains model-free</span><a href="https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF" target="_blank" rel="noopener noreferrer">Model &amp; license ↗</a></footer>

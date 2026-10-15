@@ -2,6 +2,10 @@
 
 An optional, separate browser entry point for one pinned local model and a bounded chat. The existing Atlas entry point remains model-free. This example is served separately and is not included in the standard Vite/Atlas build artifact.
 
+Live static preview: **https://shoozes.github.io/rag-method-alpha/model-chat/**.
+Memory64 and OPFS requirements apply before either loading method. Physical
+iPhone support remains unqualified; use the [mobile checklist](./MOBILE.md).
+
 ## Run locally
 
 Use Node.js 22.12 or later. From the repository root, prepare the pinned runtime with one of these explicit commands:
@@ -45,6 +49,14 @@ node examples/browser-model-chat/stage-static.mjs
 The default output is `.artifacts/model-chat/site/`. `--output` selects another safe descendant of the checkout, and `--runtime-root` selects already prepared, exact-hash runtime inputs. The stager copies only an explicit browser asset allowlist plus licenses, notice and setup text. Its `site-manifest.json` records file sizes/hashes and source identity. It excludes models, caches, proof, tests, servers and preparer scripts. It refuses foreign directories, changed managed output, symlink escapes and hard-linked managed output before refreshing. This creates an **unreviewed local candidate**, not a release or deployment.
 
 Asset URLs are relative, including the stylesheet, bootstrap, runtime import and WASM. The exported directory can sit beneath a host prefix without a router rewrite. Serve actual missing files as 404, modules as JavaScript and WASM as `application/wasm`; an HTML fallback for missing assets is invalid. A future public host still needs HTTPS, its own policy/CORS checks and a license/release review. Hosting is not configured by this command.
+
+The public preview uses GitHub's native **Deploy from a branch** flow, with
+`gh-pages` at `/` and a root `.nojekyll`. Only the staged files are published
+under `model-chat/`; `main` and the Atlas owner branches are preserved. Updates
+must verify the manifest, replace only that subpath with its exact file table,
+preserve other publishing-tree content, and use an ordinary fast-forward push.
+The source lives on `workspace/model-loading-onboarding`. Deployment does not
+upgrade `publicReleaseQualified:false` into broader product release acceptance.
 
 ## Pinned identities and licenses
 
@@ -120,11 +132,11 @@ node tests/model-chat-live.mjs --remote
 
 The journeys use an installed browser, do not install dependencies, and clean up their owned server/browser/profile. Actual model journeys launch ordinary headless Chrome and attach through CDP, without security-bypass flags. `BROWSER_RAG_CHROMIUM_PATH` selects its installed Chrome executable.
 
-Current local acceptance on 2026-10-15 covers the focused Node/HTTP suite, 7 fixture UI checks, 9 retained-model staged-package checks and 2 explicit Memory32 comparison cases in Chrome 155.0.8059.79 on Windows, Node 26.5.0. The source-bound receipt records exact counts and hashes. The current browser checks made no external model download. Mobile proof is a 390 x 844 emulated viewport; the File API input is constructed from exact existing bytes, not a native picker selection.
+Current acceptance on 2026-10-15: **53 Node/HTTP checks, 7 existing fixture UI checks, 9 focused mobile fixture checks and 11 live Pages checks** pass in Chrome 155.0.8059.79 on Windows, Node 26.5.0. Live checks verify all 17 public files, exact hashes/MIME/subpaths/404s, injected capability refusal before weights, native-File integrity and initialization, cancel/retry and actual generated replies. They use retained bytes, with no new model download. Mobile fixture checks include keyboard-size and landscape layout, touch targets, long text, anchored streaming and visible limit errors. The source-bound receipt records precise identities and evidence limits.
 
 Historical cold-remote/cache acceptance at commit `12478fb34c9c749fdc218f870d1d366f186af547` passed 7 real-model checks, including official remote transfer, integrity verification, generated replies and cache-only reuse with external requests blocked. That evidence is retained under its original commit identity; it is not represented as a rerun of the current source. A physical iOS device remains unqualified.
 
-The compact source-bound receipt is `.artifacts/proof/model-chat/receipt.json`. Essential images are `desktop-loading-fixture.png` (visibly labeled mock UI) and `live-mobile-chat.png` (actual model response). Runtime and delivery assets are ignored; temporary browser profiles were removed. The earlier vendor URL-base failure and its narrow fix remain in the historical record. No hosted CI, paid inference, API credentials, publication, or browser security changes were used.
+The compact source-bound receipt is `.artifacts/proof/model-chat/receipt.json`. Essential images are `mobile-layout-fixture.png` (visibly labeled UI fixture at keyboard-size height) and `live-mobile-chat.png` (actual HTTPS model response). Runtime and delivery assets are ignored; temporary browser profiles were removed. The earlier vendor URL-base failure and its narrow fix remain in the historical record. No hosted CI, paid inference, API credentials, publication, or browser security changes were used.
 
 ## Next bounded steps
 
