@@ -4,11 +4,11 @@
   "publicReleaseQualified": false,
   "memoryPreview": true,
   "source": {
-    "head": "84c21e337d2657cbc2b97a3832511c310357ba36",
+    "head": "b44ab1230c1cdc7886b18db326e62c2eceb76c36",
     "dirty": false,
     "reviewStatus": "unreviewed",
     "fingerprintScope": "allowlisted browser sources, generated memory core, build source, theme, licenses and packager",
-    "fingerprintSha256": "57d987752525fcaf274c3d132401325abc80a23db520bb3a63acd16443aadd23",
+    "fingerprintSha256": "3b3ee2d651d6d92cb5a0305a6b13c1da41e19100de5e58d04dbfaf1cbe6b7ad9",
     "files": [
       {
         "path": ".artifacts/memory/rag-core.mjs",
@@ -37,8 +37,8 @@
       },
       {
         "path": "examples/browser-model-chat/index.html",
-        "bytes": 6915,
-        "sha256": "c51f7a788cdb405c46e0aad41b7146db61ae1195a2d2d97d614e589ca4c7429c"
+        "bytes": 6916,
+        "sha256": "04980eb889b97843e17025bce522e5e94e1f48188ad92d4e846b689ae67281d0"
       },
       {
         "path": "examples/browser-model-chat/licenses/LFM-Open-License-1.0.txt",
@@ -207,8 +207,8 @@
     },
     {
       "path": "index.html",
-      "bytes": 6915,
-      "sha256": "c51f7a788cdb405c46e0aad41b7146db61ae1195a2d2d97d614e589ca4c7429c"
+      "bytes": 6916,
+      "sha256": "04980eb889b97843e17025bce522e5e94e1f48188ad92d4e846b689ae67281d0"
     },
     {
       "path": "LICENSES/lfm-open-license-1.0.txt",
@@ -356,5 +356,5 @@
       "sha256": "4baf1abc8a47bb8eb7a41fdc1e924cf8ac80f4645f4524611a6d7ecb3712983e"
     }
   ],
-  "identitySha256": "c03f61648f8fee9c6fe1be837e35baa6a48bc624d55e2d3420602b755a596660"
+  "identitySha256": "3a8b883b67c44d5f2c80ea2b69d01dc9f8e42e12ebaa4f523710b857ff2f3550"
 }
