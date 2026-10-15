@@ -3,16 +3,16 @@
   "managedBy": "examples/browser-model-chat/stage-static.mjs",
   "publicReleaseQualified": false,
   "source": {
-    "head": "19eb2285931f620cb9517193c1cbdce116310335",
+    "head": "ddc504c0c741fbd2fa01e03f7a48197d045685c0",
     "dirty": false,
     "reviewStatus": "unreviewed",
     "fingerprintScope": "allowlisted browser sources, theme, first-party license and packager",
-    "fingerprintSha256": "22fdd156098cb4bdd5cd2a91b35c6b0c8e6dad54a967f305ee3eb809c1a3e9b2",
+    "fingerprintSha256": "7d69363c2170153785f9f02315ff881275cbe639a8060d5aed99c049cccc9759",
     "files": [
       {
         "path": "examples/browser-model-chat/app.mjs",
-        "bytes": 13480,
-        "sha256": "6195fd0ced54eb6efc1b69c392d4d176ab83982a9de81a7947601c5376bf8f92"
+        "bytes": 15714,
+        "sha256": "3043b02a36b16d314cba63b97656ba5b6c67fc28a1fe11ccd00a2a178902e3ed"
       },
       {
         "path": "examples/browser-model-chat/bootstrap.mjs",
@@ -31,8 +31,8 @@
       },
       {
         "path": "examples/browser-model-chat/index.html",
-        "bytes": 7771,
-        "sha256": "628f00fd201889cc1c6ca981d8bc2e22431d5cbabe4d216b076435f5f084a8d7"
+        "bytes": 6661,
+        "sha256": "fe48e2f9c763556da61e477b13bab9b3b68a598916314a29d73eeebf8f290e55"
       },
       {
         "path": "examples/browser-model-chat/loader-controller.mjs",
@@ -66,8 +66,8 @@
       },
       {
         "path": "examples/browser-model-chat/style.css",
-        "bytes": 15060,
-        "sha256": "bb97101db7d8fa93b945973bce2c45d0bbdd5f033b37e4b1069ed68afdc02d8d"
+        "bytes": 12147,
+        "sha256": "6fbadc1ba29a1672fc0195c19c78824420a1edb43c306c404bb15f52bc1192a0"
       },
       {
         "path": "examples/browser-model-chat/wasm-memory.mjs",
@@ -114,8 +114,8 @@
   "files": [
     {
       "path": "app.mjs",
-      "bytes": 13480,
-      "sha256": "6195fd0ced54eb6efc1b69c392d4d176ab83982a9de81a7947601c5376bf8f92"
+      "bytes": 15714,
+      "sha256": "3043b02a36b16d314cba63b97656ba5b6c67fc28a1fe11ccd00a2a178902e3ed"
     },
     {
       "path": "bootstrap.mjs",
@@ -134,8 +134,8 @@
     },
     {
       "path": "index.html",
-      "bytes": 7771,
-      "sha256": "628f00fd201889cc1c6ca981d8bc2e22431d5cbabe4d216b076435f5f084a8d7"
+      "bytes": 6661,
+      "sha256": "fe48e2f9c763556da61e477b13bab9b3b68a598916314a29d73eeebf8f290e55"
     },
     {
       "path": "LICENSES/rag-method.txt",
@@ -204,8 +204,8 @@
     },
     {
       "path": "style.css",
-      "bytes": 15060,
-      "sha256": "bb97101db7d8fa93b945973bce2c45d0bbdd5f033b37e4b1069ed68afdc02d8d"
+      "bytes": 12147,
+      "sha256": "6fbadc1ba29a1672fc0195c19c78824420a1edb43c306c404bb15f52bc1192a0"
     },
     {
       "path": "theme/aurel-gold.css",
@@ -218,5 +218,5 @@
       "sha256": "4baf1abc8a47bb8eb7a41fdc1e924cf8ac80f4645f4524611a6d7ecb3712983e"
     }
   ],
-  "identitySha256": "3820a25f9730bb279e17b6d6e1fc9a0ca64425fd9ec7b3126ed4fe8863caf400"
+  "identitySha256": "c07392f57248a642700442e20e2dfa3137cb44a7245e7947283ba3e17af221bc"
 }

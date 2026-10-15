@@ -3,48 +3,58 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-  <meta name="description" content="Load a small LiquidAI model and chat locally in your browser. An optional RAG Method composition.">
+  <meta name="description" content="A small model, running on your device.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E">
-  <title>RAG Method · Local conversation</title>
+  <title>RAG Method · Chat</title>
   <link rel="stylesheet" href="./theme/aurel-gold.css">
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
 <main id="app" data-phase="idle">
-  <header class="masthead"><a class="wordmark" href="https://github.com/Shoozes/rag-method-alpha">RAG Method<span>Local conversation / preview</span></a><div class="session"><i aria-hidden="true"></i><span id="session-status">Model not loaded</span></div></header>
+  <header class="masthead">
+    <a class="wordmark" href="https://github.com/Shoozes/rag-method-alpha">RAG Method</a>
+    <div class="header-actions"><span id="session-status" class="session" role="status">Not loaded</span>
+      <details id="chat-options" class="chat-options" hidden>
+        <summary aria-label="Chat options"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg><span class="sr-only">Chat options</span></summary>
+        <div class="options-panel"><p id="runtime-label">LFM2.5-230M · on this device</p><p>Session only. This small model can make mistakes.</p><a class="model-link" href="https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF" target="_blank" rel="noopener noreferrer">Model &amp; license</a><button id="clear" class="secondary" type="button">Clear conversation</button><button id="unload" class="secondary" type="button">Unload model</button></div>
+      </details>
+    </div>
+  </header>
   <section id="loading-stage" aria-labelledby="load-heading">
     <div class="hero">
-      <div class="introduction"><p class="eyebrow">01 / Arrive</p><h1 id="load-heading">A small model.<br>A private <em>conversation.</em></h1><p class="lede">Bring a little intelligence into this tab.<br>The model runs on your device. Your words stay here.</p><p class="reading-note">A basic chat, before the bigger workspace.<br>No account, API key, or graph setup.</p></div>
+      <div class="introduction"><h1 id="load-heading">A little room<br>to <em>think.</em></h1><p class="lede">A small model. On your device.</p></div>
       <div class="instrument">
-        <div id="scene" class="scene" aria-hidden="true"><div class="halo"></div><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="core"><span>LFM</span><small>230M</small></div><svg viewBox="0 0 300 300"><circle class="track" cx="150" cy="150" r="136"/><circle id="arc" class="arc" cx="150" cy="150" r="136"/></svg><span class="coordinate top">LIQUID FOUNDATION MODEL</span><span class="coordinate bottom">Q4_K_M · CPU / WASM</span></div>
+        <div id="scene" class="scene" aria-hidden="true"><div class="halo"></div><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="core"><span>LFM</span><small>230M</small></div><svg viewBox="0 0 300 300"><circle class="track" cx="150" cy="150" r="136"/><circle id="arc" class="arc" cx="150" cy="150" r="136"/></svg></div>
         <div class="load-panel">
-          <div class="model-label"><div><p class="eyebrow">LiquidAI / LFM2.5</p><h2>230M <span>Q4_K_M</span></h2></div><span class="size">153.4 MB</span></div>
-          <p id="runtime-profile" class="license" role="status" aria-live="polite">Automatic WASM runtime selection</p>
+          <div class="model-label"><h2>LFM2.5 <span>230M</span></h2><span class="size">153.4 MB</span></div>
           <p id="load-status" role="status" aria-live="polite">Ready when you are.</p>
-          <div id="init-status" class="init-status" hidden><p id="init-stage" role="status" aria-live="polite"></p><p id="init-timing"></p><p id="init-guidance" hidden>This step has been waiting for 30 seconds. Keep this tab in the foreground. The elapsed timer comes from the page; it does not prove the engine is responding. You can stop safely and retry the cached load. Waiting stops automatically after three minutes.</p></div>
+          <div id="init-status" class="init-status" hidden><p id="init-stage" role="status" aria-live="polite"></p><p id="init-timing"></p><p id="init-guidance" hidden>Still waiting. Keep this tab open, or stop and retry cached bytes. Waiting ends after three minutes.</p></div>
           <p id="error" class="error" role="alert" tabindex="-1" hidden></p>
-          <p id="recovery-hint" class="license" hidden>The initialization Worker has stopped. Your draft is preserved. Use Retry to check existing cached bytes first; a new download is only requested if reusable bytes are unavailable. Cached model bytes were not removed by stopping the Worker.</p>
-          <p id="unsupported-hint" class="license" hidden>A required browser feature is unavailable. Retrying or choosing a local file cannot add it. Your draft is preserved below. To continue now, open this page in desktop Chrome, where this demo has been tested. Physical iPhone support is not yet verified.</p>
+          <p id="recovery-hint" class="license" hidden>Cached bytes and your draft are preserved. Retry checks the cache first.</p>
+          <p id="unsupported-hint" class="license" hidden>A required browser feature is missing. Retry or a local file cannot add it. Your draft is preserved.</p>
           <progress id="load-progress" max="1" value="0" aria-label="Model loading progress"></progress>
-          <div class="progress-notes"><span id="byte-status">One pinned model · SHA-256 checked</span><span id="percent"></span></div>
-          <ol class="stages" aria-label="Loading stages"><li data-step="downloading"><span>01</span>Fetch</li><li data-step="verifying"><span>02</span>Verify</li><li data-step="initializing"><span>03</span>Initialize</li></ol>
-          <div class="load-actions"><button id="download" class="primary">Download &amp; open chat</button><button id="cancel" class="secondary" hidden>Cancel</button></div>
-          <details id="diagnostics" class="diagnostics" hidden><summary>Loading diagnostics</summary><p>No conversation text, model contents or account data are included. Share this report if loading stops.</p><textarea id="diagnostic-report" readonly rows="9" aria-label="Sanitized loading diagnostic report" spellcheck="false"></textarea><button id="copy-report" class="secondary" type="button">Copy report</button><span id="copy-status" role="status" aria-live="polite"></span></details>
-          <label class="file-choice" for="local-file">Already have the model? <span>Choose a local GGUF</span><input id="local-file" type="file" accept=".gguf"></label>
-          <p class="license">Self-hosted wllama 3.5.1 selects Memory32 compatibility when Memory64 or JSPI is unavailable. Both loading methods require the browser storage (OPFS) API; a new download also requires writable storage. A local File avoids a download and new model-cache writes. Requirements are checked before fetching weights; extra memory is needed for verification and initialization. Physical iPhone support is pending a new device test.</p>
-          <p class="license">Downloading is subject to the <a id="model-license" href="https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF/blob/fa224d4cb60cffe61eb58726712ef255bb64d0b7/LICENSE" target="_blank" rel="noopener noreferrer">LFM Open License v1.0</a>. The browser retains a reusable cache when available.</p>
+          <div class="progress-notes"><span id="byte-status">SHA-256 checked</span><span id="percent"></span></div>
+          <ol class="stages" aria-label="Loading stages"><li data-step="downloading">Fetch</li><li data-step="verifying">Verify</li><li data-step="initializing">Open</li></ol>
+          <div class="load-actions"><button id="download" class="primary">Open chat</button><button id="cancel" class="secondary" hidden>Cancel</button></div>
+          <label class="file-choice" for="local-file"><span>Choose a model file</span><input id="local-file" type="file" accept=".gguf"></label>
+          <details id="load-details" class="load-details"><summary>Model details</summary>
+            <p id="runtime-profile" class="license" role="status" aria-live="polite">Automatic WASM runtime selection</p>
+            <p class="license">LFM2.5-230M Q4_K_M. Self-hosted wllama 3.5.1. The selected runtime and verified bytes are used on this device. The browser storage (OPFS) API is required; downloads also need writable storage and additional working memory.</p>
+            <p class="license">Download once; cached bytes are verified on each visit. A local file avoids a new download. Initialization has no percentage estimate.</p>
+            <p class="license">Download subject to the <a id="model-license" href="https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF/blob/fa224d4cb60cffe61eb58726712ef255bb64d0b7/LICENSE" target="_blank" rel="noopener noreferrer">LFM Open License v1.0</a>.</p>
+            <label class="effects"><input id="effects" type="checkbox" checked> Ambient light</label>
+          </details>
+          <details id="diagnostics" class="diagnostics" hidden><summary>Loading report</summary><p>Model identity and loading stages only. No conversation text.</p><textarea id="diagnostic-report" readonly rows="9" aria-label="Sanitized loading diagnostic report" spellcheck="false"></textarea><button id="copy-report" class="secondary" type="button">Copy report</button><span id="copy-status" role="status" aria-live="polite"></span></details>
         </div>
       </div>
     </div>
-    <div class="understory"><label class="draft-label" for="draft"><span class="eyebrow">While it arrives</span><span>What would you like to ask?</span><textarea id="draft" maxlength="4000" rows="2" placeholder="Draft your first question…"></textarea></label><div class="local-note"><p>Download once. Initialize each visit.</p><span>Cached bytes are checked again before use. Initialization has no percentage estimate. Local-file loading does not add a browser download.</span><label class="effects"><input id="effects" type="checkbox" checked> Ambient light</label></div></div>
+    <div class="understory"><label class="draft-label" for="draft"><span>Start with a question</span><textarea id="draft" maxlength="4000" rows="2" placeholder="Write while it loads."></textarea></label></div>
   </section>
   <section id="chat-stage" aria-labelledby="chat-heading" hidden>
-    <div class="chat-header"><div><p class="eyebrow">02 / Converse</p><h1 id="chat-heading" tabindex="-1">Make room for <em>a thought.</em></h1><p id="runtime-label">LFM2.5-230M · on this device</p></div><button id="unload" class="secondary">Unload model</button></div>
-    <div class="conversation">    <div id="messages" class="messages" role="log" aria-label="Conversation" aria-live="polite"><div id="chat-empty" class="chat-empty"><span aria-hidden="true">✧</span><p>A fresh conversation.</p><small>Try a short question. This small model can make mistakes.</small></div></div><button id="new-messages" class="secondary" type="button" aria-controls="messages" hidden>Latest messages</button></div>
-    <form id="composer"><p id="chat-error" class="error" role="alert" hidden></p><label for="prompt">Message</label><textarea id="prompt" maxlength="4000" rows="2" placeholder="Ask something…"></textarea><div class="composer-actions"><span>Session only · no saved history</span><button id="stop" class="secondary" type="button" hidden>Stop &amp; unload</button><button id="send" class="primary" type="submit">Send message <span aria-hidden="true">↗</span></button></div></form>
-    <button id="clear" class="text-button">Clear conversation</button>
+    <h1 id="chat-heading" class="sr-only" tabindex="-1">Conversation</h1>
+    <div class="conversation"><div id="messages" class="messages" role="log" aria-label="Conversation" aria-live="polite"><div id="chat-empty" class="chat-empty"><p>What’s on your mind?</p></div></div><button id="new-messages" class="secondary" type="button" aria-controls="messages" hidden>Latest messages</button></div>
+    <form id="composer"><p id="chat-error" class="error" role="alert" hidden></p><label for="prompt" class="sr-only">Message</label><div class="composer-row"><textarea id="prompt" maxlength="4000" rows="1" placeholder="Message"></textarea><div class="composer-actions"><button id="stop" class="secondary" type="button" hidden>Stop</button><button id="send" class="primary" type="submit" aria-label="Send message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg><span class="sr-only">Send</span></button></div></div></form>
   </section>
-  <footer><span>Optional browser model preview · Atlas remains model-free</span><a href="https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF" target="_blank" rel="noopener noreferrer">Model &amp; license ↗</a></footer>
 </main>
 <script type="module" src="./bootstrap.mjs"></script>
 </body>
