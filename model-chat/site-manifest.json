@@ -3,11 +3,11 @@
   "managedBy": "examples/browser-model-chat/stage-static.mjs",
   "publicReleaseQualified": false,
   "source": {
-    "head": "88b0926c1cfcc1ae5522b133318cada8a115dc38",
+    "head": "19eb2285931f620cb9517193c1cbdce116310335",
     "dirty": false,
     "reviewStatus": "unreviewed",
     "fingerprintScope": "allowlisted browser sources, theme, first-party license and packager",
-    "fingerprintSha256": "32cb04f38b5c6aafcb18ee77757c12ebb19884091fff3e32907aef13bdf1e9e4",
+    "fingerprintSha256": "22fdd156098cb4bdd5cd2a91b35c6b0c8e6dad54a967f305ee3eb809c1a3e9b2",
     "files": [
       {
         "path": "examples/browser-model-chat/app.mjs",
@@ -26,8 +26,8 @@
       },
       {
         "path": "examples/browser-model-chat/engine-worker.mjs",
-        "bytes": 13726,
-        "sha256": "ee24bc0bb2fe387a70f2153810f997064137102a200eacc9af2341f38b73b2d4"
+        "bytes": 14483,
+        "sha256": "d1f461d137703153ac31630686d351a748209dea8583a74d28ebad91bbaec6c5"
       },
       {
         "path": "examples/browser-model-chat/index.html",
@@ -55,14 +55,24 @@
         "sha256": "6e6913c362e58ce4fe90cc134d745631affe40dfff0511736bfe742f4446013a"
       },
       {
+        "path": "examples/browser-model-chat/runtime-profile.mjs",
+        "bytes": 1946,
+        "sha256": "11b260c2d1f8107808127f5a0a2b22f149c4fde6d7da217c3079e19ef1a423f5"
+      },
+      {
         "path": "examples/browser-model-chat/stage-static.mjs",
-        "bytes": 13772,
-        "sha256": "d6f4190b25c39cd20a3f159eda337a8dc529c9ecaaba40bc55c46930a6e2287e"
+        "bytes": 13967,
+        "sha256": "842fee9eef96c148b094c417e932509c539708390261b0918c98d650358aee56"
       },
       {
         "path": "examples/browser-model-chat/style.css",
         "bytes": 15060,
         "sha256": "bb97101db7d8fa93b945973bce2c45d0bbdd5f033b37e4b1069ed68afdc02d8d"
+      },
+      {
+        "path": "examples/browser-model-chat/wasm-memory.mjs",
+        "bytes": 3361,
+        "sha256": "4baf1abc8a47bb8eb7a41fdc1e924cf8ac80f4645f4524611a6d7ecb3712983e"
       },
       {
         "path": "LICENSE",
@@ -119,8 +129,8 @@
     },
     {
       "path": "engine-worker.mjs",
-      "bytes": 13726,
-      "sha256": "ee24bc0bb2fe387a70f2153810f997064137102a200eacc9af2341f38b73b2d4"
+      "bytes": 14483,
+      "sha256": "d1f461d137703153ac31630686d351a748209dea8583a74d28ebad91bbaec6c5"
     },
     {
       "path": "index.html",
@@ -163,6 +173,11 @@
       "sha256": "6e6913c362e58ce4fe90cc134d745631affe40dfff0511736bfe742f4446013a"
     },
     {
+      "path": "runtime-profile.mjs",
+      "bytes": 1946,
+      "sha256": "11b260c2d1f8107808127f5a0a2b22f149c4fde6d7da217c3079e19ef1a423f5"
+    },
+    {
       "path": "runtime/compat/wllama.js",
       "bytes": 166823,
       "sha256": "011e11f2c2a4a94d1764a4f45993e01ae5c48f72d78d59464972b26606afd6ac"
@@ -196,7 +211,12 @@
       "path": "theme/aurel-gold.css",
       "bytes": 1736,
       "sha256": "9d00bbe275e9025d40a0d14b6e4e6fa1e98af072bb215d83a5c335d65b657ad5"
+    },
+    {
+      "path": "wasm-memory.mjs",
+      "bytes": 3361,
+      "sha256": "4baf1abc8a47bb8eb7a41fdc1e924cf8ac80f4645f4524611a6d7ecb3712983e"
     }
   ],
-  "identitySha256": "f4608788c59332ece007968466faee1dc48878b9fe409537a75ffbd3d4ab7bcb"
+  "identitySha256": "3820a25f9730bb279e17b6d6e1fc9a0ca64425fd9ec7b3126ed4fe8863caf400"
 }

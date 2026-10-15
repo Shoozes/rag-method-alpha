@@ -2,6 +2,8 @@ import { Wllama } from './runtime/index.js';
 import { MODEL, RUNTIME, COMPAT } from './model-contract.mjs';
 import { inspectCapabilities } from './capabilities.mjs';
 import { formatRuntimeError, formatRuntimeAbort, installRuntimeAbortGuard } from './runtime-errors.mjs';
+import { inspectWasmMemories } from './wasm-memory.mjs';
+import { runtimeResources, bindRuntimeResources } from './runtime-profile.mjs';
 
 // Pinned wllama 3.5.1 resolves asset URLs through document.baseURI, even
 // for absolute URLs. It otherwise runs in this dedicated Worker. Supply only
@@ -86,6 +88,10 @@ async function pinnedRuntimeFile(name, identity, javascript = false) {
 async function validateRuntime(compat) {
   const name = compat ? 'compat/wllama.wasm' : 'wllama.wasm';
   const bytes = await pinnedRuntimeFile(name, (compat ? COMPAT : RUNTIME).files[name]);
+  const memory = inspectWasmMemories(bytes);
+  if (!memory.memories.length || memory.requiresMemory64 !== !compat) {
+    throw Object.assign(new Error('The pinned WASM memory declarations differ from the selected runtime profile. No model was downloaded.'), { code: 'ENGINE_BOUNDARY_ERROR' });
+  }
   try { await WebAssembly.compile(bytes); }
   catch {
     throw Object.assign(new Error('This browser cannot compile the pinned WASM runtime. No model was downloaded.'), {
@@ -138,6 +144,7 @@ async function prepare({ source, file }, progress) {
   const runtimeProfile = compat ? 'memory32-asyncify' : 'memory64';
   progress({ phase: 'checking', runtimeProfile });
   const workerCode = await validateRuntime(compat);
+  const resources = runtimeResources(runtimeProfile, workerCode, import.meta.url);
   const events = [];
   let started;
   let initializing = false;
@@ -149,7 +156,7 @@ async function prepare({ source, file }, progress) {
   };
   // Native output is consumed only by this allowlist; no raw logs, model
   // metadata or prompt text are posted to the page or diagnostic report.
-  engine = new Wllama({ default: new URL('./runtime/wllama.wasm', import.meta.url).href }, { logger: engineLogger(milestone), suppressNativeLog: false, allowOffline: true });
+  engine = new Wllama({ default: resources.wasmPath }, { logger: engineLogger(milestone), suppressNativeLog: false, allowOffline: true });
   installRuntimeAbortGuard(engine, identity => {
     nativeAbortFailure = Object.assign(new Error(formatRuntimeAbort(identity)), { code: 'ENGINE_NATIVE_ABORT', retryable: true });
     rejectOperation?.(nativeAbortFailure);
@@ -157,6 +164,10 @@ async function prepare({ source, file }, progress) {
   // Keep the exact model and API. Missing Memory64/JSPI selects the maintained,
   // self-hosted Memory32/Asyncify build; never use the vendor's default CDN.
   engine.setCompat(compat ? { wasm: new URL('./runtime/compat/wllama.wasm', import.meta.url).href, worker: { code: workerCode } } : null, 'firefox_safari');
+  // setCompat only configures a candidate. The vendor's constructor-only
+  // predicate can disagree with the binary probe on WebKit and silently pick
+  // Memory64. Bind the verified WASM/glue pair to this owned instance instead.
+  bindRuntimeResources(engine, resources);
   progress({ phase: 'checking' });
   let blobs, model, cached = false;
   if (source === 'file') {
