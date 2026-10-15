@@ -4,12 +4,27 @@
   "publicReleaseQualified": false,
   "memoryPreview": true,
   "source": {
-    "head": "b44ab1230c1cdc7886b18db326e62c2eceb76c36",
+    "head": "43739f0d6bd93932a0da3b32f057672a6df40d3a",
     "dirty": false,
     "reviewStatus": "unreviewed",
     "fingerprintScope": "allowlisted browser sources, generated memory core, build source, theme, licenses and packager",
-    "fingerprintSha256": "3b3ee2d651d6d92cb5a0305a6b13c1da41e19100de5e58d04dbfaf1cbe6b7ad9",
+    "fingerprintSha256": "2705194319202d16f6940694ad7ae3438efe0f7dace905d535a6c202b0211ee0",
     "files": [
+      {
+        "path": ".artifacts/memory/graph-renderer.mjs",
+        "bytes": 1315350,
+        "sha256": "c85fda05a2a6ac5596dc41f5f197064eb3063932eaf574ae93f5f7141d179edd"
+      },
+      {
+        "path": ".artifacts/memory/LICENSES/forcegraph-tsl.txt",
+        "bytes": 1064,
+        "sha256": "1a897e0ee6f1fc65889976eadb848acefac9db7f9c97274a6c490f52390cd474"
+      },
+      {
+        "path": ".artifacts/memory/LICENSES/three.txt",
+        "bytes": 1081,
+        "sha256": "8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc"
+      },
       {
         "path": ".artifacts/memory/rag-core.mjs",
         "bytes": 128489,
@@ -61,6 +76,11 @@
         "sha256": "655804b7f3db11e73b7742dbb40abc14304002328402b777f1efda7d9113a288"
       },
       {
+        "path": "examples/browser-model-chat/memory/build-graph.mjs",
+        "bytes": 8237,
+        "sha256": "761c9f183846a0c3be6485c48d67f0d06d1c6ef9123bed3e000b74fbbb848560"
+      },
+      {
         "path": "examples/browser-model-chat/memory/citations.mjs",
         "bytes": 12598,
         "sha256": "a51f2de1202bffa5e36a52a86fe30ad937278e4867366898e2ff646b48e9f953"
@@ -77,13 +97,13 @@
       },
       {
         "path": "examples/browser-model-chat/memory/panel.css",
-        "bytes": 4489,
-        "sha256": "84c1ecbb8a201ead8dfd6cfcbff695f69a96e2e7b471064ae14bea1c849b6d04"
+        "bytes": 9242,
+        "sha256": "c1b45e039b8f4045d1ee2e586dc52ea890de27428f7656e985415d460d49c284"
       },
       {
         "path": "examples/browser-model-chat/memory/panel.mjs",
-        "bytes": 17521,
-        "sha256": "bede1c496ffce02a908547ee73ea5801f54290a4b57c3d633d8fc414ce4b8fc2"
+        "bytes": 22953,
+        "sha256": "3be12e28c201c2d4711042dc8ad1efa1454625ffaf91d4ec2181a3425e41a511"
       },
       {
         "path": "examples/browser-model-chat/memory/rag-adapter.mjs",
@@ -132,8 +152,8 @@
       },
       {
         "path": "examples/browser-model-chat/stage-static.mjs",
-        "bytes": 18246,
-        "sha256": "7a7e6a35fb1cf8f39d041a5965f4ea83c16e66da76396ec07ae879669802adbf"
+        "bytes": 20947,
+        "sha256": "16c7a750d26581499f42ef919673b82ecbfd29dab01dbd567f13c815e1cab804"
       },
       {
         "path": "examples/browser-model-chat/style.css",
@@ -154,6 +174,41 @@
         "path": "modules/browser-rag-ts/demo/aurel-gold.css",
         "bytes": 1736,
         "sha256": "9d00bbe275e9025d40a0d14b6e4e6fa1e98af072bb215d83a5c335d65b657ad5"
+      },
+      {
+        "path": "modules/browser-rag-ts/package-lock.json",
+        "bytes": 40297,
+        "sha256": "18236f5b4f65a14cbcded47b0f8ed3259581eb29e445ffa0921b4440fdad4414"
+      },
+      {
+        "path": "modules/browser-rag-ts/src/application/graphPalette.ts",
+        "bytes": 2293,
+        "sha256": "b27abc279cce07af04e54d70a02e47605dbeb9dd8aaf119bbdec66ad8499e0d8"
+      },
+      {
+        "path": "modules/browser-rag-ts/src/application/graphRenderer.ts",
+        "bytes": 19553,
+        "sha256": "2ea13219df467488ec977d4559eb77b48825de691eb27bf3f71a8a97ba9c31e0"
+      },
+      {
+        "path": "modules/browser-rag-ts/src/application/layoutGraph.ts",
+        "bytes": 7164,
+        "sha256": "22e0f826dd592d474ecec6a2e5d9bd390a238015db56fe8984bc1b2393c2ce74"
+      },
+      {
+        "path": "modules/browser-rag-ts/src/presentation/nodeSpawnMotion.js",
+        "bytes": 7740,
+        "sha256": "2739f72710489b81bbc98f87618da05de2261c74bd90a0276f01600580f4f1d1"
+      },
+      {
+        "path": "modules/browser-rag-ts/vendor/graph-package.json",
+        "bytes": 602,
+        "sha256": "a85184f116a9e1107ee555840b5cc6b8bbd8633d49202ddbbffa64464deeed4c"
+      },
+      {
+        "path": "modules/browser-rag-ts/vendor/ours-forcegraph-tsl-0.3.0-alpha.1.tgz",
+        "bytes": 313331,
+        "sha256": "ff8fdd7167bf30dc0ab392c8054564bc83eb255c0f260b5a0a362f4b8fb9ebb8"
       }
     ]
   },
@@ -169,6 +224,18 @@
     "licensePath": "LICENSES/lfm-open-license-1.0.txt",
     "licenseSha256": "30adf9d6478191fb87f2424f63ba0728598335aaf99cd2848ef17e8e545fe94b",
     "weightsIncluded": false
+  },
+  "graph": {
+    "package": "@ours/forcegraph-tsl",
+    "version": "0.3.0-alpha.1",
+    "threeVersion": "0.185.0",
+    "bundlePath": "memory/graph-renderer.mjs",
+    "bundleSha256": "c85fda05a2a6ac5596dc41f5f197064eb3063932eaf574ae93f5f7141d179edd",
+    "layoutBackend": "local",
+    "licenses": {
+      "LICENSES/forcegraph-tsl.txt": "1a897e0ee6f1fc65889976eadb848acefac9db7f9c97274a6c490f52390cd474",
+      "LICENSES/three.txt": "8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc"
+    }
   },
   "runtime": {
     "package": "@wllama/wllama",
@@ -211,6 +278,11 @@
       "sha256": "04980eb889b97843e17025bce522e5e94e1f48188ad92d4e846b689ae67281d0"
     },
     {
+      "path": "LICENSES/forcegraph-tsl.txt",
+      "bytes": 1064,
+      "sha256": "1a897e0ee6f1fc65889976eadb848acefac9db7f9c97274a6c490f52390cd474"
+    },
+    {
       "path": "LICENSES/lfm-open-license-1.0.txt",
       "bytes": 10574,
       "sha256": "30adf9d6478191fb87f2424f63ba0728598335aaf99cd2848ef17e8e545fe94b"
@@ -219,6 +291,11 @@
       "path": "LICENSES/rag-method.txt",
       "bytes": 1064,
       "sha256": "1a897e0ee6f1fc65889976eadb848acefac9db7f9c97274a6c490f52390cd474"
+    },
+    {
+      "path": "LICENSES/three.txt",
+      "bytes": 1081,
+      "sha256": "8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc"
     },
     {
       "path": "loader-controller.mjs",
@@ -246,14 +323,19 @@
       "sha256": "201d9cf92c7e8c0bb1f0b0d6a3ab60c787531f99c202125938e0dcc0d2a775f3"
     },
     {
+      "path": "memory/graph-renderer.mjs",
+      "bytes": 1315350,
+      "sha256": "c85fda05a2a6ac5596dc41f5f197064eb3063932eaf574ae93f5f7141d179edd"
+    },
+    {
       "path": "memory/panel.css",
-      "bytes": 4489,
-      "sha256": "84c1ecbb8a201ead8dfd6cfcbff695f69a96e2e7b471064ae14bea1c849b6d04"
+      "bytes": 9242,
+      "sha256": "c1b45e039b8f4045d1ee2e586dc52ea890de27428f7656e985415d460d49c284"
     },
     {
       "path": "memory/panel.mjs",
-      "bytes": 17521,
-      "sha256": "bede1c496ffce02a908547ee73ea5801f54290a4b57c3d633d8fc414ce4b8fc2"
+      "bytes": 22953,
+      "sha256": "3be12e28c201c2d4711042dc8ad1efa1454625ffaf91d4ec2181a3425e41a511"
     },
     {
       "path": "memory/rag-adapter.mjs",
@@ -292,13 +374,13 @@
     },
     {
       "path": "NOTICE.txt",
-      "bytes": 1376,
-      "sha256": "e8e064660a56d6eddf65fbfbc74039a24a9beb01012a8c8535004197fdf9cad8"
+      "bytes": 1664,
+      "sha256": "446ea2055d8b326b7e4626df576496b1cc1d986b2123bfc8b19f1b9885b77df9"
     },
     {
       "path": "README.txt",
-      "bytes": 2276,
-      "sha256": "a3ba8860b560aac3033fbc6b3353f0eedcc6c3700226153928440af1b046d384"
+      "bytes": 2549,
+      "sha256": "311c5080d8fbc948c000dbffb7e6f3bbc7f6eca392489db324b25de75f403191"
     },
     {
       "path": "runtime-adapter.mjs",
@@ -356,5 +438,5 @@
       "sha256": "4baf1abc8a47bb8eb7a41fdc1e924cf8ac80f4645f4524611a6d7ecb3712983e"
     }
   ],
-  "identitySha256": "3a8b883b67c44d5f2c80ea2b69d01dc9f8e42e12ebaa4f523710b857ff2f3550"
+  "identitySha256": "bfc96a2c760a64c385784f0be5bcb8ef1dde009ab3ec13d2da2e9564c4eb27bb"
 }

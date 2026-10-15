@@ -12,6 +12,9 @@ Model revision: fa224d4cb60cffe61eb58726712ef255bb64d0b7
 Model license: LFM Open License v1.0 (distinct from the application/runtime MIT licenses).
 https://huggingface.co/LiquidAI/LFM2.5-230M-GGUF/blob/fa224d4cb60cffe61eb58726712ef255bb64d0b7/LICENSE
 Complete pinned model license: LICENSES/lfm-open-license-1.0.txt.
+@ours/forcegraph-tsl 0.3.0-alpha.1: MIT. Complete retained text: LICENSES/forcegraph-tsl.txt.
+Three.js 0.185.0: MIT. Complete retained text: LICENSES/three.txt.
+The graph bundle reuses the existing admitted TSL renderer and local layout; no graph worker or remote dependency is required.
 Model weights are not included in this static payload. Download is an explicit browser action.
 The model license applies to model use and redistribution; inspect its pinned terms before deployment.
 

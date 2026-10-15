@@ -12,7 +12,9 @@ Both runtime profiles require the OPFS API for local File and remote loading.
 Writable OPFS is required only for a new remote cache miss; an OPFS write failure does not itself block File or valid cached-byte loading.
 JSPI absence alone is not a loading gate.
 The model download, cache, and inference run only after an explicit browser action.
-Open ?memory=1 for this one-chat memory preview; add &graph=0 to omit the optional read-only SVG event graph.
+Open ?memory=1 for this one-chat memory preview; add &graph=0 for its searchable HTML memory list without the optional TSL graph.
+The pinned TSL renderer uses Three WebGPU with a WebGL2 backend fallback; unavailable graphics retain accessible memory controls.
+Graph startup or device loss is not a guarantee of mobile GPU support. No new iOS qualification follows from this package.
 Older context is selected automatically as source-linked exact passages; no special markup is required.
 Automatic passage selection is lossy extractive context, not general semantic summarization or verified fact admission.
 Explicit Save stores selected exact user words separately for keyword retrieval; Forget does not erase the transcript.
