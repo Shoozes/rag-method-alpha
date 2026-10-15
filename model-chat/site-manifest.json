@@ -3,7 +3,7 @@
   "managedBy": "examples/browser-model-chat/stage-static.mjs",
   "publicReleaseQualified": false,
   "source": {
-    "head": "ddc504c0c741fbd2fa01e03f7a48197d045685c0",
+    "head": "3ad5d33ecd142fde14f86ab4e4cc165a988ea781",
     "dirty": false,
     "reviewStatus": "unreviewed",
     "fingerprintScope": "allowlisted browser sources, theme, first-party license and packager",
@@ -218,5 +218,5 @@
       "sha256": "4baf1abc8a47bb8eb7a41fdc1e924cf8ac80f4645f4524611a6d7ecb3712983e"
     }
   ],
-  "identitySha256": "c07392f57248a642700442e20e2dfa3137cb44a7245e7947283ba3e17af221bc"
+  "identitySha256": "7a2b489f0ec58220b1385bb24c2542d7e2527012ccfac689ed1e0c0a3dbf23f9"
 }
