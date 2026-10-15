@@ -73,10 +73,13 @@ export function createRuntimeAdapter() {
     }
     terminate() { this.terminations++; }
   }
-  const transport = createOwnedTransport({ WorkerClass: FixtureWaitWorker, initWaitMs: 1600 });
+  let transport;
   return {
     prepare({ source, file, signal, onProgress }) {
-      if (fixture.mode === 'init-wait') return transport.prepare({ source, file, signal, onProgress });
+      if (fixture.mode === 'init-wait' || fixture.mode === 'init-copy') {
+        transport ||= createOwnedTransport({ WorkerClass: FixtureWaitWorker, initWaitMs: fixture.mode === 'init-copy' ? 10_000 : 1600 });
+        return transport.prepare({ source, file, signal, onProgress });
+      }
       const cached = fixture.mode === 'cached';
       fixture.calls.push({ kind: 'prepare', source, cached, file: file ? { name: file.name, size: file.size } : null });
       const promise = new Promise((resolve, reject) => operations.push({ resolve, reject, signal, onProgress, cached }));
@@ -90,7 +93,7 @@ export function createRuntimeAdapter() {
       fixture.calls.push({ kind: 'reply', messages: structuredClone(messages) });
       return new Promise((resolve, reject) => replies.push({ resolve, reject, signal, onToken }));
     },
-    async dispose() { fixture.disposals += 1; await transport.dispose(); },
+    async dispose() { fixture.disposals += 1; await transport?.dispose(); },
   };
 }
 `;
@@ -462,8 +465,30 @@ try {
     } finally { await page.close(); }
   });
 
+  await check('manual diagnostic-copy selection survives a real page timer tick and refreshes on blur', async () => {
+    const page = await newPage({ mobile: true, reducedMotion: true });
+    try {
+      await fixture(page, 'mode', 'init-copy'); await page.locator('#download').click(); await phase(page, 'initializing');
+      await page.locator('#diagnostics').evaluate(node => { node.open = true; });
+      await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('Fixture denied'); } } }));
+      await page.locator('#copy-report').click(); assert.match(await page.locator('#copy-status').textContent(), /Select and copy/);
+      const held = await page.locator('#diagnostic-report').evaluate(node => ({ value: node.value, start: node.selectionStart, end: node.selectionEnd }));
+      const originalSeconds = JSON.parse(held.value).initializationElapsedSeconds;
+      assert.equal(held.start, 0); assert.equal(held.end, held.value.length);
+      await page.waitForFunction(seconds => Number.parseInt(document.getElementById('init-timing').textContent, 10) > seconds, originalSeconds);
+      assert.deepEqual(await page.locator('#diagnostic-report').evaluate(node => ({ value: node.value, start: node.selectionStart, end: node.selectionEnd })), held);
+      assert.equal(await page.locator('#diagnostic-report').evaluate(node => node === document.activeElement), true);
+      await page.locator('#diagnostic-report').evaluate(node => node.blur());
+      const refreshed = JSON.parse(await page.locator('#diagnostic-report').inputValue());
+      assert.ok(refreshed.initializationElapsedSeconds > originalSeconds, 'Blur refreshes the held snapshot to the latest report');
+      await page.locator('#cancel').click(); await phase(page, 'cancelled');
+      assert.equal(await page.evaluate(() => window.__loaderFixture.waitWorkers[0].terminations), 1);
+      await noOverflow(page);
+    } finally { await page.close(); }
+  });
+
   await check('fixture boundary: no engine, runtime, model, external requests or page errors', async () => {
-    assert.equal(adapterReplacements, 8);
+    assert.equal(adapterReplacements, 9);
     assert.deepEqual(unexpectedRequests, []);
     assert.deepEqual(pageErrors, []);
     for (const identity of sourceIdentity) {
