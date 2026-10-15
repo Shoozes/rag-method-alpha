@@ -17,7 +17,7 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions }
     cancelled: 'Stopped. You can try again or choose a local file.', error: 'The model could not finish. You can retry below.',
     unsupported: 'This browser cannot run this runtime.',
   };
-  let previousPhase = '', messages = [], pendingMessage;
+  let previousPhase = '', messages = [], pendingMessage, latestReport = '';
   const log = $('messages');
   let followTail = true, viewportFrame;
   function scrollLatest(force = false) {
@@ -78,7 +78,7 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions }
     const initRecovery = state.phase === 'error' && (hasInit || state.errorCode === 'INIT_WAIT_LIMIT');
     $('recovery-hint').hidden = !initRecovery;
     $('diagnostics').hidden = state.phase === 'idle' || inChat;
-    $('diagnostic-report').value = JSON.stringify({ kind: 'rag-model-chat-loading', runtimeVersion: RUNTIME.version,
+    latestReport = JSON.stringify({ kind: 'rag-model-chat-loading', runtimeVersion: RUNTIME.version,
       model: { file: MODEL.file, revision: MODEL.revision, bytes: MODEL.bytes, sha256: MODEL.sha256 },
       runtimeProfile: state.runtimeProfile, phase: state.phase, source: state.source, cachedBytesReported: state.cached,
       lastConfirmedStage: state.initStage, stageDetail: reportText(state.initDetail),
@@ -86,6 +86,7 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions }
       initializationElapsedSeconds: Math.floor(state.initElapsedMs / 1000), secondsSinceEngineStage: Math.floor(state.lastProgressAgeMs / 1000),
       errorCode: state.errorCode, errorDetail: reportText(state.error), browser: reportText(navigator.userAgent), pageVisible: !document.hidden,
     }, null, 2);
+    if (document.activeElement !== $('diagnostic-report')) $('diagnostic-report').value = latestReport;
     $('send').disabled = state.phase !== 'ready';
     $('stop').hidden = state.phase !== 'generating';
     $('unload').disabled = state.phase === 'generating';
@@ -145,12 +146,16 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions }
     $('local-file').value = '';
   });
   $('cancel').addEventListener('click', () => controller.cancel());
+  $('diagnostic-report').addEventListener('blur', () => { $('diagnostic-report').value = latestReport; });
   $('copy-report').addEventListener('click', async () => {
+    const snapshot = latestReport;
+    $('diagnostic-report').value = snapshot;
     try {
       if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
-      await navigator.clipboard.writeText($('diagnostic-report').value);
+      await navigator.clipboard.writeText(snapshot);
       $('copy-status').textContent = 'Report copied.';
     } catch {
+      $('diagnostic-report').value = latestReport;
       $('diagnostic-report').focus(); $('diagnostic-report').select();
       $('copy-status').textContent = 'Select and copy the report above.';
     }

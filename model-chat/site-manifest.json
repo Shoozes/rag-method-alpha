@@ -3,16 +3,16 @@
   "managedBy": "examples/browser-model-chat/stage-static.mjs",
   "publicReleaseQualified": false,
   "source": {
-    "head": "200673a4dd5858d74b1de5eef79d8e3b78d7535b",
+    "head": "9cef2964178d74f5d09f8aeb024ed662f3246d19",
     "dirty": false,
     "reviewStatus": "unreviewed",
     "fingerprintScope": "allowlisted browser sources, theme, first-party license and packager",
-    "fingerprintSha256": "dd0038e58e63586a8be506b1a7c0cfa7a41ffb0aaa2b80c9d80153bb82666be5",
+    "fingerprintSha256": "f39b6975c7d525db5ed1130f1ebe4b28f2f8e937ef512a73a54bbdb26b638a26",
     "files": [
       {
         "path": "examples/browser-model-chat/app.mjs",
-        "bytes": 13192,
-        "sha256": "1a01ff6989efe99712dadb934adfd9004f6aeaa5971e9282e189df9099ecddd9"
+        "bytes": 13517,
+        "sha256": "c72d67e85de7d4473f6b82821b6b1ea6a456b7760cb6610a5a01b7b3c81b14ce"
       },
       {
         "path": "examples/browser-model-chat/bootstrap.mjs",
@@ -99,8 +99,8 @@
   "files": [
     {
       "path": "app.mjs",
-      "bytes": 13192,
-      "sha256": "1a01ff6989efe99712dadb934adfd9004f6aeaa5971e9282e189df9099ecddd9"
+      "bytes": 13517,
+      "sha256": "c72d67e85de7d4473f6b82821b6b1ea6a456b7760cb6610a5a01b7b3c81b14ce"
     },
     {
       "path": "bootstrap.mjs",
@@ -188,5 +188,5 @@
       "sha256": "9d00bbe275e9025d40a0d14b6e4e6fa1e98af072bb215d83a5c335d65b657ad5"
     }
   ],
-  "identitySha256": "8ddce822848ad61fca986e42da3ba124d2d456c6f2b46141fee30e98ce156e7d"
+  "identitySha256": "165d93b8031ef839e7601b5b8c0f0462af7c494641b76077f49dbbb7bdf9470d"
 }
