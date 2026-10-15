@@ -263,3 +263,52 @@ test('failed disposal must be retried successfully before another model can prep
   assert.equal(adapter.loads.length, 2); adapter.loads[1].resolve(prepared); await retry;
   assert.equal(controller.getState().phase, 'ready');
 });
+
+test('initialization uses an independent page clock and keeps the last actual stage without claiming progress', async () => {
+  const adapter = fixtureAdapter(); let now = 0, timer, removed = 0;
+  const controller = createLoaderController(adapter, () => {}, { now: () => now,
+    setIntervalFn(run, delay) { assert.equal(delay, 1000); timer = run; return 0; }, clearIntervalFn(id) { assert.equal(id, 0); removed++; timer = null; },
+  });
+  const loading = controller.load({ source: 'remote' }), operation = adapter.loads[0];
+  now = 300_000; operation.onProgress({ phase: 'initializing', stage: 'runtime-start', detail: 'Starting runtime', cached: true });
+  now += 31_000; timer();
+  let state = controller.getState(); assert.equal(state.initElapsedMs, 31_000); assert.equal(state.lastProgressAgeMs, 31_000);
+  assert.equal(state.initStage, 'runtime-start'); assert.equal(state.progress, null); assert.equal(state.cached, true);
+  operation.onProgress({ phase: 'initializing', stage: 'context-create', detail: 'Creating context' });
+  now += 5000; timer(); state = controller.getState();
+  assert.equal(state.initElapsedMs, 36_000); assert.equal(state.lastProgressAgeMs, 5000); assert.equal(state.initStage, 'context-create');
+  operation.onProgress({ phase: 'downloading', loaded: 1, total: 1 }); assert.equal(controller.getState().phase, 'initializing');
+  state.initEvents[0].stage = 'mutated'; assert.equal(controller.getState().initEvents[0].stage, 'runtime-start');
+  operation.reject(Object.assign(new Error('The waiting limit was reached, not an engine failure.'), { code: 'INIT_WAIT_LIMIT' }));
+  await assert.rejects(loading, code('INIT_WAIT_LIMIT')); state = controller.getState();
+  assert.equal(state.phase, 'error'); assert.equal(state.cached, true); assert.equal(state.initStage, 'context-create'); assert.equal(state.retryable, true);
+  assert.equal(removed, 1); assert.equal(timer, null);
+  await loadReady(controller, adapter, { ...prepared, cached: true }); assert.equal(controller.getState().initStage, null);
+  operation.onProgress({ phase: 'initializing', stage: 'warmup' }); assert.equal(controller.getState().initStage, null);
+});
+
+test('structured engine errors retain confirmed bounded diagnostics and remain recoverable', async () => {
+  const adapter = fixtureAdapter(), controller = createLoaderController(adapter);
+  const loading = controller.load({ source: 'remote' });
+  adapter.loads[0].reject(Object.assign(new Error('Fixture nested Worker exception'), { code: 'ENGINE_WORKER_ERROR', diagnostics: {
+    stage: 'model-load', detail: 'Loading model tensors', events: [{ stage: 'runtime-start', detail: 'Runtime started', atMs: 1 }, { stage: 'arbitrary', detail: 'ignore this', atMs: 2 }],
+  } }));
+  await assert.rejects(loading, code('ENGINE_WORKER_ERROR')); const state = controller.getState();
+  assert.equal(state.initStage, 'model-load'); assert.equal(state.initDetail, 'Loading model tensors');
+  assert.equal(state.initEvents.length, 1); assert.equal(state.initEvents[0].stage, 'runtime-start');
+  assert.equal(state.retryable, true); assert.equal(adapter.disposals, 1); await loadReady(controller, adapter);
+});
+
+test('completed initialization timing freezes and cannot be mistaken for later generation failure', async () => {
+  const adapter = fixtureAdapter(); let now = 0;
+  const controller = createLoaderController(adapter, () => {}, { now: () => now, setIntervalFn() { return 0; }, clearIntervalFn() {} });
+  const loading = controller.load({ source: 'remote' });
+  adapter.loads[0].onProgress({ phase: 'initializing', stage: 'model-load', detail: 'Loading tensors' });
+  now = 2000; adapter.loads[0].resolve(prepared); await loading;
+  assert.equal(controller.getState().initElapsedMs, 2000);
+  now = 300_000; const sending = controller.send(messages);
+  adapter.replies[0].reject(new Error('Fixture generation failure'));
+  await assert.rejects(sending, code('REPLY_FAILED'));
+  assert.equal(controller.getState().initStage, null); assert.equal(controller.getState().initElapsedMs, 0);
+  assert.deepEqual(controller.getState().initEvents, []);
+});

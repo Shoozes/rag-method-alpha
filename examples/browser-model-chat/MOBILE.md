@@ -14,7 +14,14 @@ This is a browser application; installing it as a native app is outside this sli
    error; Retry/File controls should not imply a workaround. Record device/iOS
    details. Refusal is not successful model support.
 3. If supported, check measured download bytes, cancel, retry and initialization.
-   Initialization has no percentage estimate. If the exact GGUF already exists in
+   Initialization has no percentage estimate. Read the last confirmed stage and
+   elapsed time. At 30 seconds, guidance appears; at 180 seconds the owned Worker
+   stops with `INIT_WAIT_LIMIT`, preserving complete cached bytes. This is a wait
+   limit, not proof of an invalid model. Use Copy report if initialization stalls
+   or fails; it excludes prompts and raw logs. Cancel is available while waiting.
+   A retry checks the existing complete cache before any model transfer. Do not
+   clear browser storage or redownload to diagnose an unexplained stall.
+   If the exact GGUF already exists in
    Files, try selecting it separately. Record tab reloads, storage failures and
    unexpected network transfers rather than treating them as platform limits.
 4. Send a short question. Open the keyboard, type a long draft and rotate. The
@@ -27,9 +34,12 @@ This is a browser application; installing it as a native app is outside this sli
 ## Reported device failure
 
 The earlier Memory64-only preview refused on the user's iPhone before downloading
-weights: “Memory64 WebAssembly is unavailable.” iOS version remains pending. The
-maintained Memory32 path fixes that build requirement in desktop feature-injection
-tests; a fresh physical-device loading/chat test is still required.
+weights: "Memory64 WebAssembly is unavailable." The next Safari screenshot showed
+Memory32 compatibility / Asyncify selected and Initialize still pending after the
+user reported a few minutes. There was no visible error or internal stage. Device
+and iOS version remain pending. The cause has not been established. Fresh and warm
+OPFS-cache paths pass real Memory32 initialization/chat on desktop Chrome; a fresh
+physical-device test with the new bounded stage report is still required.
 
 ## Evidence boundary
 
@@ -45,6 +55,14 @@ secondary text. Local-file selection has a 44px target. Input text remains 16px.
 hashes/MIME/404s, refusal before weights, and real initialization/chat using an
 existing exact native File. Configure `BROWSER_MODEL_GGUF_FILE` as documented;
 this test downloads no model and does not alter browser security settings.
+
+`node tests/model-chat-init.mjs` uses the same retained-model environment to test
+the production cold OPFS and cache-only Memory32 paths in a disposable profile.
+Only the canonical model URL's transport is redirected to an owned loopback
+stream of existing exact bytes. It also injects a labeled child startup fault to
+verify a structured error and cache-preserving recovery. No external model bytes
+are downloaded, no existing browser cache is inspected, and vendor files remain
+unchanged. This desktop probe does not identify the physical Safari failure.
 
 Desktop Chrome checks use real browser interaction, resized viewports, long text,
 scroll/focus checks and reduced motion. A resized desktop viewport can approximate

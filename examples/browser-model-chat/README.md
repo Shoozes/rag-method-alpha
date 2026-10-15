@@ -77,7 +77,8 @@ The model has the [LFM Open License v1.0 at the pinned revision](https://hugging
 
 ## Behavior and limits
 
-- Download progress uses measured bytes. Integrity checking is a separate phase. Native initialization has no percentage estimate; the page does not invent one.
+- Download progress uses measured bytes. Integrity checking is a separate phase. Initialization shows elapsed time and the last confirmed runtime stage, without a percentage estimate. Time since a stage update measures silence, not Worker health. After 30 seconds the page explains recovery; after 180 seconds the main thread stops its owned Worker with `INIT_WAIT_LIMIT`. This waiting limit is not a model validation result.
+- Runtime stage messages come from an allowlist of actual pinned-runtime callbacks. Child Worker errors and outer Worker/message errors retain a bounded error code and stage. The on-page Copy report includes model/runtime identity, timing, sanitized error detail and browser identification; it excludes conversation text, raw logs and model contents. Cancel, a waiting limit and runtime failure preserve complete cached model bytes for a fresh cache-first attempt.
 - Cancel, stop, unload, and page teardown terminate the owned model worker. Loading can be retried with a fresh worker; cancelling a reply unloads the model too.
 - Chat is session-only. Reloading clears the transcript and draft; cached model bytes may persist in the browser. Clearing the conversation does not erase the model cache.
 - The send gate bounds accepted history to six completed turns and checks a 6,000-character history/input budget. Individual input is limited to 4,000 characters, generated replies to 160 tokens, and model context to 2,048 tokens. An interrupted attempt remains visible but is excluded from subsequent accepted history.
@@ -96,7 +97,7 @@ A separate comparison loaded the exact pinned 230M bytes with that retained Memo
 
 The maintained [wllama-compat 3.5.1 package](https://registry.npmjs.org/@wllama%2fwllama-compat/3.5.1) and [its configuration](https://github.com/ngxson/wllama/blob/766d28e03eeac044fe055327d06b83d3f9b84544/compat/README.md) provide Memory32/Asyncify. The exact pinned package was tested with the unchanged model in desktop Chrome while the Memory64 constructor was deliberately unavailable, and again with JSPI absent. Both runs initialized the real WASM and generated replies; File loading also worked when OPFS calls were blocked but the required API remained exposed. Production-path and published-page checks are separate from that focused comparison.
 
-The latest real iPhone test of the earlier Memory64-only preview refused loading before weights: “Memory64 WebAssembly is unavailable.” Device/iOS version is pending. That observation prompted the maintained compatibility path; desktop feature injection does not establish iPhone success. Earlier user-reported HTTPS success and HTTP failures around 50 MB remain historical observations, not universal limits. A fresh device retest must record device/browser, exact model/license, memory, loading/cache, cancellation and recovery without changing browser security settings.
+The first real iPhone test of the earlier Memory64-only preview refused loading before weights: "Memory64 WebAssembly is unavailable." A subsequent Safari screenshot showed the maintained Memory32/Asyncify profile selected and initialization still waiting after the user reported several minutes. It showed no runtime error or internal substage. Device/iOS version and the cause remain unknown; this is not successful iPhone support. The added diagnostics and waiting limit make the next attempt bounded and inspectable. Desktop tests exercise fresh download into OPFS, cache reopening, SHA verification and real Memory32 initialization/chat; they do not reproduce that device stall. Earlier user-reported HTTPS success and HTTP failures around 50 MB remain historical observations, not universal limits. A fresh device retest must record device/browser, exact model/license, memory, loading/cache, cancellation and recovery without changing browser security settings.
 
 ## Local verification
 
@@ -132,6 +133,15 @@ The maintained compatibility probe uses the already prepared pinned assets and t
 node tests/model-chat-compat.mjs --existing-cache
 ```
 
+The focused initialization probe uses that same retained GGUF and Playwright
+setup, redirects only model transport to owned loopback, and tests fresh OPFS
+loading, cache-only loading, a labeled child startup fault and fresh-Worker
+recovery without requesting external weights:
+
+```sh
+node tests/model-chat-init.mjs
+```
+
 The original cold-remote journey is retained for a separately authorized new download:
 
 ```sh
@@ -144,7 +154,7 @@ The source-bound receipt records exact acceptance counts and identities. The foc
 
 Historical cold-remote/cache acceptance at commit `12478fb34c9c749fdc218f870d1d366f186af547` passed 7 real-model checks, including official remote transfer, integrity verification, generated replies and cache-only reuse with external requests blocked. That evidence is retained under its original commit identity; it is not represented as a rerun of the current source. A physical iOS device remains unqualified.
 
-The compact source-bound receipt is `.artifacts/proof/model-chat/receipt.json`. Essential images are `mobile-layout-fixture.png` (visibly labeled UI fixture at keyboard-size height) and `live-mobile-chat.png` (actual HTTPS model response). Runtime and delivery assets are ignored; temporary browser profiles were removed. The earlier vendor URL-base failure and its narrow fix remain in the historical record. Browser verification runs locally against the published HTTPS site. GitHub runs its native Pages deployment only; no hosted verification suite, paid inference, API credentials or browser security bypass is used.
+The compact source-bound receipt is `.artifacts/proof/model-chat/receipt.json`. It names the essential labeled fixture image and `live-mobile-chat.png` (actual HTTPS model response). Runtime and delivery assets are ignored; temporary browser profiles were removed. The earlier vendor URL-base failure and its narrow fix remain in the historical record. Browser verification runs locally against the published HTTPS site. GitHub runs its native Pages deployment only; no hosted verification suite, paid inference, API credentials or browser security bypass is used.
 
 ## Next bounded steps
 

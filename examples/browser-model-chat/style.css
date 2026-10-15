@@ -5,6 +5,7 @@
 
 /* Keep the existing reading layout on desktop; use the available keyboard space
    for a contained conversation on phones and short landscape viewports. */
+.init-status{border-left:1px solid var(--line);padding-left:12px;margin:12px 0;color:var(--muted);font:12px/1.6 ui-monospace,monospace;overflow-wrap:anywhere}.init-status p{margin:6px 0}.init-status #init-guidance{font:12px/1.7 Manrope,"Segoe UI",sans-serif;color:var(--subtle)}.diagnostics{margin-top:16px;font-size:12px;line-height:1.7;color:var(--muted)}.diagnostics summary{cursor:pointer;min-height:44px;display:list-item;padding-block:10px}.diagnostics textarea{font:11px/1.5 ui-monospace,monospace;min-height:180px;white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 0}.diagnostics #copy-status{display:block;margin-top:8px}
 .conversation{position:relative;max-width:850px;width:100%;margin-inline:auto}
 #new-messages{position:absolute;right:8px;bottom:8px;min-height:46px;box-shadow:0 2px 12px #0008}
 .file-choice{display:flex;flex-wrap:wrap;align-items:center;gap:0 4px;min-height:44px;max-width:100%;padding-block:9px}

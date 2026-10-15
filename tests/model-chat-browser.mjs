@@ -24,6 +24,7 @@ const fixtureLabel = 'Mock adapter UI checks; no model or runtime execution';
 const sourcePaths = [
   'examples/browser-model-chat/index.html', 'examples/browser-model-chat/app.mjs',
   'examples/browser-model-chat/loader-controller.mjs', 'examples/browser-model-chat/style.css',
+  'examples/browser-model-chat/runtime-adapter.mjs',
   'examples/browser-model-chat/serve.mjs', 'tests/model-chat-browser.mjs',
 ];
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -35,11 +36,12 @@ const started = Date.now();
 // This is the only fulfilled production module. No Worker or real adapter runs.
 // Deliberately retain old promises/callbacks after dispose to test late results.
 const fixtureModule = String.raw`
+import { createRuntimeAdapter as createOwnedTransport } from './runtime-adapter.mjs?fixture-owned-transport';
 export function createRuntimeAdapter() {
   const operations = [], replies = [];
   const fixture = window.__loaderFixture = {
     label: 'MOCK UI FIXTURE — no model/runtime execution', mode: 'cold',
-    calls: [], progressEvents: [], disposals: 0,
+    calls: [], progressEvents: [], disposals: 0, waitWorkers: [],
     progress(event, index = operations.length - 1) {
       const operation = operations[index];
       fixture.progressEvents.push({ ...event });
@@ -61,8 +63,20 @@ export function createRuntimeAdapter() {
     signalState() { return operations.map(item => item.signal.aborted); },
     replySignalState() { return replies.map(item => item.signal.aborted); },
   };
+  class FixtureWaitWorker {
+    constructor() { this.requests = []; this.terminations = 0; fixture.waitWorkers.push(this); }
+    postMessage(request) {
+      this.requests.push(request);
+      queueMicrotask(() => this.onmessage?.({ data: { id: request.id, type: 'progress', value: {
+        phase: 'initializing', stage: 'context-create', detail: 'Fixture context creation has not completed', cached: true, runtimeProfile: 'memory32-asyncify',
+      } } }));
+    }
+    terminate() { this.terminations++; }
+  }
+  const transport = createOwnedTransport({ WorkerClass: FixtureWaitWorker, initWaitMs: 1600 });
   return {
     prepare({ source, file, signal, onProgress }) {
+      if (fixture.mode === 'init-wait') return transport.prepare({ source, file, signal, onProgress });
       const cached = fixture.mode === 'cached';
       fixture.calls.push({ kind: 'prepare', source, cached, file: file ? { name: file.name, size: file.size } : null });
       const promise = new Promise((resolve, reject) => operations.push({ resolve, reject, signal, onProgress, cached }));
@@ -76,7 +90,7 @@ export function createRuntimeAdapter() {
       fixture.calls.push({ kind: 'reply', messages: structuredClone(messages) });
       return new Promise((resolve, reject) => replies.push({ resolve, reject, signal, onToken }));
     },
-    async dispose() { fixture.disposals += 1; },
+    async dispose() { fixture.disposals += 1; await transport.dispose(); },
   };
 }
 `;
@@ -156,8 +170,13 @@ async function screenshot(page, name) {
   finally { await page.locator('#browser-fixture-badge').evaluate(node => node.remove()); }
   screenshots.push({ path: '.artifacts/proof/model-chat/' + name, evidence: 'fixture', sha256: digest(await readFile(target)) });
 }
-async function newPage({ mobile = false, reducedMotion = false } = {}) {
+async function newPage({ mobile = false, reducedMotion = false, pageClock = false } = {}) {
   const page = await context.newPage();
+  if (pageClock) await page.addInitScript(() => {
+    const actualNow = Date.now;
+    window.__fixtureClockOffset = 0;
+    Date.now = () => actualNow() + window.__fixtureClockOffset;
+  });
   await page.setViewportSize(mobile ? { width: 390, height: 844 } : { width: 1440, height: 1000 });
   if (reducedMotion) await page.emulateMedia({ reducedMotion: 'reduce' });
   page.on('pageerror', error => pageErrors.push(error.message));
@@ -168,7 +187,8 @@ async function newPage({ mobile = false, reducedMotion = false } = {}) {
       unexpectedRequests.push({ origin: url.origin === new URL(preview.url).origin ? 'loopback' : 'external', path: url.pathname });
     }
   });
-  await page.route('**/runtime-adapter.mjs', async route => {
+  await page.route('**/runtime-adapter.mjs*', async route => {
+    if (new URL(route.request().url()).search === '?fixture-owned-transport') { await route.continue(); return; }
     adapterReplacements += 1;
     await route.fulfill({ status: 200, contentType: 'text/javascript; charset=utf-8', body: fixtureModule });
   });
@@ -393,8 +413,57 @@ try {
     } finally { await page.close(); }
   });
 
+  await check('owned transport initialization wait shows actual stage and elapsed time, stops safely and retains cache-first recovery', async () => {
+    const page = await newPage({ mobile: true, reducedMotion: true, pageClock: true });
+    try {
+      await page.locator('#draft').fill('Private fixture draft must never enter diagnostics.');
+      await fixture(page, 'mode', 'init-wait'); await page.locator('#download').click(); await phase(page, 'initializing');
+      assert.match(await page.locator('#init-stage').textContent(), /Creating the conversation context.*Fixture context creation/);
+      assert.match(await page.locator('#cancel').textContent(), /Stop initialization/);
+      await page.waitForFunction(() => document.getElementById('init-timing').textContent.startsWith('1s elapsed'));
+      assert.equal(await page.locator('#load-progress').getAttribute('value'), null);
+      assert.equal(await page.locator('#init-guidance').isVisible(), false);
+      // Test-only page clock, not runtime liveness or actual 31-second device latency.
+      await page.evaluate(() => {
+        window.__fixtureClockOffset = 30_000;
+        const worker = window.__loaderFixture.waitWorkers[0];
+        worker.onmessage({ data: { id: worker.requests[0].id, type: 'progress', value: { phase: 'initializing', stage: 'context-create', detail: 'Fixture context creation has not completed' } } });
+      });
+      assert.equal(await page.locator('#init-guidance').isVisible(), true);
+      assert.match(await page.locator('#init-guidance').textContent(), /does not prove the engine is responding/);
+      await phase(page, 'error'); assert.match(await page.locator('#error').textContent(), /waiting limit, not proof.*Cached bytes were not removed/);
+      assert.match(await page.locator('#load-status').textContent(), /waiting limit reached/);
+      assert.equal(await page.locator('#draft').inputValue(), 'Private fixture draft must never enter diagnostics.');
+      assert.match(await page.locator('#recovery-hint').textContent(), /Retry to check existing cached bytes first/);
+      assert.equal(await page.evaluate(() => window.__loaderFixture.waitWorkers[0].terminations), 1);
+      const report = JSON.parse(await page.locator('#diagnostic-report').inputValue());
+      assert.equal(report.errorCode, 'INIT_WAIT_LIMIT'); assert.equal(report.lastConfirmedStage, 'context-create');
+      assert.equal(report.model.file, 'LFM2.5-230M-Q4_K_M.gguf'); assert.equal(report.model.bytes, 153406304);
+      assert.equal(report.model.sha256, '7bbd90384d3deffe4c646ec9643b212802d32d4ce417c90a1ec9282100650062');
+      assert.match(report.errorDetail, /waiting limit, not proof/);
+      assert.equal(report.cachedBytesReported, true); assert.ok(report.initializationElapsedSeconds >= 1);
+      assert.equal(JSON.stringify(report).includes('Private fixture draft'), false);
+      await page.locator('#diagnostics').evaluate(node => { node.open = true; });
+      await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('Fixture denied'); } } }));
+      await page.locator('#copy-report').click(); assert.match(await page.locator('#copy-status').textContent(), /Select and copy/);
+      assert.equal(await page.locator('#diagnostic-report').evaluate(node => node === document.activeElement && node.selectionEnd > node.selectionStart), true);
+      await noOverflow(page); await screenshot(page, 'initialization-wait-fixture.png');
+      // A terminated lifetime cannot overwrite the actionable failure.
+      await page.evaluate(() => { const worker = window.__loaderFixture.waitWorkers[0]; worker.onmessage({ data: { id: worker.requests[0].id, type: 'progress', value: { phase: 'initializing', stage: 'ready' } } }); });
+      await phase(page, 'error'); assert.match(await page.locator('#init-stage').textContent(), /Creating the conversation context/);
+      await fixture(page, 'mode', 'cached'); await page.locator('#download').click(); await ready(page, true);
+      assert.equal(await page.locator('#prompt').inputValue(), 'Private fixture draft must never enter diagnostics.');
+      await page.locator('#unload').click(); await phase(page, 'cancelled');
+      await fixture(page, 'mode', 'init-wait'); await page.locator('#download').click(); await phase(page, 'initializing');
+      await page.locator('#cancel').click(); await phase(page, 'cancelled');
+      assert.equal(await page.evaluate(() => window.__loaderFixture.waitWorkers[1].terminations), 1);
+      assert.equal(await page.locator('#draft').inputValue(), 'Private fixture draft must never enter diagnostics.');
+      await noOverflow(page);
+    } finally { await page.close(); }
+  });
+
   await check('fixture boundary: no engine, runtime, model, external requests or page errors', async () => {
-    assert.equal(adapterReplacements, 7);
+    assert.equal(adapterReplacements, 8);
     assert.deepEqual(unexpectedRequests, []);
     assert.deepEqual(pageErrors, []);
     for (const identity of sourceIdentity) {

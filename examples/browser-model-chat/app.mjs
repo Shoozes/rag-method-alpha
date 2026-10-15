@@ -1,12 +1,14 @@
 import { createLoaderController } from './loader-controller.mjs';
 import { createRuntimeAdapter } from './runtime-adapter.mjs';
-import { MODEL } from './model-contract.mjs';
+import { MODEL, RUNTIME } from './model-contract.mjs';
 
-export function mountApp(adapter = createRuntimeAdapter()) {
+export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions } = {}) {
   const $ = id => document.getElementById(id);
   const app = $('app');
   const busyPhases = new Set(['checking', 'downloading', 'verifying', 'initializing']);
   const profiles = { memory64: 'Memory64 CPU / WASM', 'memory32-asyncify': 'Memory32 compatibility / Asyncify (may be slower)' };
+  const stages = { 'runtime-start': 'Starting the WASM runtime', 'model-read': 'Reading verified model bytes',
+    'model-load': 'Loading model tensors', 'context-create': 'Creating the conversation context', warmup: 'Warming up the model', ready: 'Initialization completed' };
   const labels = {
     idle: 'Ready when you are.', checking: 'Checking this browser and its cache…',
     downloading: 'Bringing the model to your device…', verifying: 'Checking the model’s SHA-256…',
@@ -43,7 +45,8 @@ export function mountApp(adapter = createRuntimeAdapter()) {
   window.visualViewport?.addEventListener('resize', fitViewport);
   window.visualViewport?.addEventListener('scroll', fitViewport, { passive: true });
   fitViewport();
-  const controller = createLoaderController(adapter, render);
+  const controller = createLoaderController(adapter, render, controllerOptions);
+  const reportText = value => typeof value === 'string' ? value.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/https?:\/\/\S+|[A-Za-z]:[\\/]\S+|\/(?:Users|home)\/\S+/g, '[location omitted]').slice(0, 240) : null;
   function render(state) {
     const busy = busyPhases.has(state.phase);
     const unsupported = state.phase === 'unsupported';
@@ -66,6 +69,23 @@ export function mountApp(adapter = createRuntimeAdapter()) {
     document.querySelector('.progress-notes').hidden = unsupported;
     document.querySelector('.stages').hidden = unsupported;
     $('cancel').hidden = !busy;
+    $('cancel').textContent = state.phase === 'initializing' ? 'Stop initialization' : 'Cancel';
+    const hasInit = state.initStage !== null || state.phase === 'initializing';
+    $('init-status').hidden = !hasInit || inChat;
+    $('init-stage').textContent = `Last confirmed stage: ${stages[state.initStage] || 'Opening the model'}${state.initDetail ? ' — ' + state.initDetail : ''}`;
+    $('init-timing').textContent = `${Math.floor(state.initElapsedMs / 1000)}s elapsed · ${Math.floor(state.lastProgressAgeMs / 1000)}s since the last engine stage update. No percentage estimate.`;
+    $('init-guidance').hidden = state.phase !== 'initializing' || state.initElapsedMs < 30_000;
+    const initRecovery = state.phase === 'error' && (hasInit || state.errorCode === 'INIT_WAIT_LIMIT');
+    $('recovery-hint').hidden = !initRecovery;
+    $('diagnostics').hidden = state.phase === 'idle' || inChat;
+    $('diagnostic-report').value = JSON.stringify({ kind: 'rag-model-chat-loading', runtimeVersion: RUNTIME.version,
+      model: { file: MODEL.file, revision: MODEL.revision, bytes: MODEL.bytes, sha256: MODEL.sha256 },
+      runtimeProfile: state.runtimeProfile, phase: state.phase, source: state.source, cachedBytesReported: state.cached,
+      lastConfirmedStage: state.initStage, stageDetail: reportText(state.initDetail),
+      stageEvents: state.initEvents.map(({ stage, detail, atMs }) => ({ stage, detail: reportText(detail), atMs })),
+      initializationElapsedSeconds: Math.floor(state.initElapsedMs / 1000), secondsSinceEngineStage: Math.floor(state.lastProgressAgeMs / 1000),
+      errorCode: state.errorCode, errorDetail: reportText(state.error), browser: reportText(navigator.userAgent), pageVisible: !document.hidden,
+    }, null, 2);
     $('send').disabled = state.phase !== 'ready';
     $('stop').hidden = state.phase !== 'generating';
     $('unload').disabled = state.phase === 'generating';
@@ -74,9 +94,9 @@ export function mountApp(adapter = createRuntimeAdapter()) {
     $('error').hidden = !state.error;
     $('error').textContent = state.error || '';
     if (state.phase !== previousPhase) {
-      $('load-status').textContent = labels[state.phase] || state.phase;
+      $('load-status').textContent = state.errorCode === 'INIT_WAIT_LIMIT' ? 'Initialization waiting limit reached. Cached bytes can be retried.' : labels[state.phase] || state.phase;
       $('session-status').textContent = inChat ? (state.phase === 'generating' ? 'Writing locally' : 'Ready · CPU / WASM') : busy ? 'Preparing model' : unsupported ? 'Browser unsupported' : 'Model not loaded';
-      if (unsupported) $('error').focus();
+      if (unsupported || initRecovery) $('error').focus();
     }
     if (state.determinate) {
       $('load-progress').value = state.progress;
@@ -125,6 +145,16 @@ export function mountApp(adapter = createRuntimeAdapter()) {
     $('local-file').value = '';
   });
   $('cancel').addEventListener('click', () => controller.cancel());
+  $('copy-report').addEventListener('click', async () => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText($('diagnostic-report').value);
+      $('copy-status').textContent = 'Report copied.';
+    } catch {
+      $('diagnostic-report').focus(); $('diagnostic-report').select();
+      $('copy-status').textContent = 'Select and copy the report above.';
+    }
+  });
   $('effects').addEventListener('change', () => app.classList.toggle('quiet', !$('effects').checked));
   const visibility = () => app.classList.toggle('is-hidden', document.hidden);
   document.addEventListener('visibilitychange', visibility); visibility();
