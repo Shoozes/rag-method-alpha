@@ -153,7 +153,7 @@ export async function stageStatic({ output = join(workspace, '.artifacts/model-c
     'JSPI absence alone is not a loading gate.',
     'The model download, cache, and inference run only after an explicit browser action.',
     'Read NOTICE.txt, LICENSES/rag-method.txt, runtime/LICENSE, and the pinned model license.',
-    'This package is unpublished working source, not public-release or iOS qualification.', '',
+    'This package is a static preview, not full product-release or iOS qualification.', '',
   ].join('\n')));
   const sourceFiles = table(source);
   const body = {
