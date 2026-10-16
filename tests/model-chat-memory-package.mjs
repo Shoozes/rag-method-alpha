@@ -19,7 +19,7 @@ if (!playwright) throw new Error('Set BROWSER_MODEL_PLAYWRIGHT_MODULE (or PLAYWR
 const prefix = '/portable/preview/';
 const memoryAssets = ['workspace', 'store', 'events', 'context', 'structured-context', 'automatic-context', 'automatic-memory',
   'conversation-index', 'scoped-pockets', 'starter-facts', 'rag-adapter',
-  'restore-events', 'citations', 'panel', 'rag-core', 'graph-renderer'].map(name => `memory/${name}.mjs`).concat('memory/panel.css');
+  'restore-events', 'citations', 'panel', 'navigation', 'rag-core', 'graph-renderer'].map(name => `memory/${name}.mjs`).concat('memory/panel.css');
 const payloadPaths = ['index.html', 'style.css', 'app.mjs', 'loader-controller.mjs', 'model-contract.mjs',
   'runtime-adapter.mjs', 'engine-worker.mjs', 'runtime-errors.mjs', 'wasm-memory.mjs', 'runtime-profile.mjs',
   'capabilities.mjs', 'bootstrap.mjs', 'theme/aurel-gold.css', 'runtime/index.js', 'runtime/wllama.wasm',
@@ -27,7 +27,7 @@ const payloadPaths = ['index.html', 'style.css', 'app.mjs', 'loader-controller.m
   'LICENSES/lfm-open-license-1.0.txt', 'LICENSES/forcegraph-tsl.txt', 'LICENSES/three.txt', 'NOTICE.txt', 'README.txt', ...memoryAssets].sort();
 const expectedFiles = [...payloadPaths, 'site-manifest.json'].sort();
 const pinned = {
-  'memory/graph-renderer.mjs': 'c85fda05a2a6ac5596dc41f5f197064eb3063932eaf574ae93f5f7141d179edd',
+  'memory/graph-renderer.mjs': 'f0218f4a62109c67708a73d0068b6afb73d7857aa563b31c3a1363b9bf0cba6f',
   'LICENSES/forcegraph-tsl.txt': '1a897e0ee6f1fc65889976eadb848acefac9db7f9c97274a6c490f52390cd474',
   'LICENSES/three.txt': '8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc',
   'LICENSES/lfm-open-license-1.0.txt': '30adf9d6478191fb87f2424f63ba0728598335aaf99cd2848ef17e8e545fe94b',
@@ -119,11 +119,11 @@ try {
       boundary: { actualNativeCalls: previous.boundary?.actualNativeCalls, runtimeWorkersCreated: previous.boundary?.runtimeWorkersCreated,
         externalRequestCount: previous.boundary?.externalRequests?.length, pageErrorCount: previous.boundary?.pageErrors?.length } });
   }
-  await check('exact 41-file payload, complete license pins, source and manifest identities', async () => {
+  await check('exact 42-file payload, complete license pins, source and manifest identities', async () => {
     assert.ok(inside(resolve(root, '.artifacts/model-chat'), packageRoot), 'package stays in its explicitly owned artifact parent');
     assert.equal(await realpath(packageRoot), packageRoot, 'package root has no linked ancestor');
     assert.deepEqual(await filesBelow(packageRoot), expectedFiles);
-    assert.equal(payloadPaths.length, 41); assert.equal(expectedFiles.length, 42);
+    assert.equal(payloadPaths.length, 42); assert.equal(expectedFiles.length, 43);
     const manifestBytes = await readFile(join(packageRoot, 'site-manifest.json'));
     assert.equal(digest(manifestBytes), expectedManifest, 'expected reviewed manifest bytes');
     manifest = JSON.parse(manifestBytes);
@@ -164,7 +164,7 @@ try {
     const readme = await readFile(join(packageRoot, 'README.txt'), 'utf8');
     assert.match(readme, /no special markup is required/); assert.match(readme, /lossy extractive context, not general semantic summarization/);
     assert.match(readme, /not full product-release or iOS qualification/);
-    observations.push({ packagePath: portable(relative(root, packageRoot)), filesIncludingManifest: 42,
+    observations.push({ packagePath: portable(relative(root, packageRoot)), filesIncludingManifest: 43,
       manifestSha256: digest(manifestBytes), manifestIdentitySha256: identitySha256, sourceHead: manifest.source.head,
       sourceDirtyAtStage: manifest.source.dirty, sourceFingerprintSha256: manifest.source.fingerprintSha256,
       packageBytes: packageIdentity.reduce((sum, file) => sum + file.bytes, 0) + manifestBytes.length });

@@ -23,13 +23,14 @@ const browserFiles = ['index.html', 'style.css', 'app.mjs', 'loader-controller.m
 const helperFiles = ['runtime-errors.mjs', 'wasm-memory.mjs', 'runtime-profile.mjs'];
 const memoryFiles = ['memory/workspace.mjs', 'memory/store.mjs', 'memory/events.mjs', 'memory/context.mjs',
   'memory/structured-context.mjs', 'memory/automatic-context.mjs', 'memory/rag-adapter.mjs', 'memory/restore-events.mjs',
-  'memory/citations.mjs', 'memory/panel.mjs', 'memory/panel.css', 'memory/rag-core.mjs', 'memory/graph-renderer.mjs',
+  'memory/citations.mjs', 'memory/panel.mjs', 'memory/panel.css', 'memory/navigation.mjs', 'memory/rag-core.mjs', 'memory/graph-renderer.mjs',
   'memory/automatic-memory.mjs', 'memory/conversation-index.mjs', 'memory/scoped-pockets.mjs', 'memory/starter-facts.mjs'];
 const automaticAdded = ['memory/automatic-memory.mjs', 'memory/conversation-index.mjs', 'memory/scoped-pockets.mjs', 'memory/starter-facts.mjs'];
+const navigationAdded = ['memory/navigation.mjs'];
 const modelLicensePath = 'LICENSES/lfm-open-license-1.0.txt';
 const graphAdded = ['memory/graph-renderer.mjs', 'LICENSES/forcegraph-tsl.txt', 'LICENSES/three.txt'];
 const previewAdded = [...memoryFiles, modelLicensePath, ...graphAdded.filter(name => name.startsWith('LICENSES/'))];
-const graphPins = { 'memory/graph-renderer.mjs': 'c85fda05a2a6ac5596dc41f5f197064eb3063932eaf574ae93f5f7141d179edd',
+const graphPins = { 'memory/graph-renderer.mjs': 'f0218f4a62109c67708a73d0068b6afb73d7857aa563b31c3a1363b9bf0cba6f',
   'LICENSES/forcegraph-tsl.txt': '1a897e0ee6f1fc65889976eadb848acefac9db7f9c97274a6c490f52390cd474',
   'LICENSES/three.txt': '8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc' };
 const modelLicenseSha256 = '30adf9d6478191fb87f2424f63ba0728598335aaf99cd2848ef17e8e545fe94b';
@@ -98,7 +99,7 @@ test('missing or wrong pinned runtime bytes fail before creating output', async 
   assert.equal(await exists(output), false);
 });
 
-test('explicit preview export has exactly 41 hashed payload files plus manifest, complete licenses and safe refresh', async t => {
+test('explicit preview export has exactly 42 hashed payload files plus manifest, complete licenses and safe refresh', async t => {
   // The intended delivery site is the sole delivery output. No second runtime tree
   // or model is created; failure cases above use only a few fixture bytes.
   const staged = await stageStatic();
@@ -121,7 +122,7 @@ test('explicit preview export has exactly 41 hashed payload files plus manifest,
     'runtime/LICENSE', 'runtime/compat/wllama.js', 'runtime/compat/wllama.wasm', 'LICENSES/rag-method.txt', 'NOTICE.txt', 'README.txt',
     ...previewAdded].sort();
   assert.deepEqual(manifest.files.map(file => file.path).sort(), expected);
-  assert.equal(manifest.files.length, 41);
+  assert.equal(manifest.files.length, 42);
   const actual = [];
   async function visit(directory, prefix = '') {
     for (const item of await readdir(directory, { withFileTypes: true })) {
@@ -131,7 +132,7 @@ test('explicit preview export has exactly 41 hashed payload files plus manifest,
   }
   await visit(site);
   assert.deepEqual(actual.sort(), [...expected, 'site-manifest.json'].sort());
-  assert.equal(actual.length, 42, 'no additional files, source, models or private products');
+  assert.equal(actual.length, 43, 'no additional files, source, models or private products');
   for (const file of manifest.files) {
     const bytes = await readFile(join(site, file.path));
     assert.equal(bytes.length, file.bytes, file.path);
@@ -198,7 +199,7 @@ test('explicit preview export has exactly 41 hashed payload files plus manifest,
   assert.equal(await readFile(join(foreign, '.env'), 'utf8'), 'PRIVATE-FIXTURE-KEEP');
 });
 
-test('the sole managed site migrates exact old 35-file, 21-file and prior payloads; partial memory sets are refused', async () => {
+test('the sole managed site migrates the exact 41-file automatic preview and older payloads; partial memory sets are refused', async () => {
   const manifestBytes = await readFile(join(site, 'site-manifest.json'));
   const manifest = JSON.parse(manifestBytes);
   const retained = new Map();
@@ -207,8 +208,9 @@ test('the sole managed site migrates exact old 35-file, 21-file and prior payloa
   }
   try {
     for (const absent of [
-      automaticAdded,
-      [...automaticAdded, ...graphAdded],
+      navigationAdded,
+      [...navigationAdded, ...automaticAdded],
+      [...navigationAdded, ...automaticAdded, ...graphAdded],
       previewAdded,
       [...previewAdded, 'wasm-memory.mjs', 'runtime-profile.mjs'],
       [...previewAdded, ...helperFiles],
@@ -219,6 +221,7 @@ test('the sole managed site migrates exact old 35-file, 21-file and prior payloa
       previous.source.files = previous.source.files.filter(file => !absent.some(name => file.path === 'examples/browser-model-chat/' + name));
       previous.source.fingerprintSha256 = hash(JSON.stringify(previous.source.files));
       const previousManifest = { ...previous, identitySha256: hash(JSON.stringify(previous)) };
+      if (absent === navigationAdded) assert.equal(previous.files.length, 41, 'exact previous automatic preview path table');
       for (const name of absent) await rm(join(site, name));
       await writeFile(join(site, 'site-manifest.json'), JSON.stringify(previousManifest));
       const refreshed = await stageStatic();

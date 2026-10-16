@@ -1,3 +1,11 @@
+import { mountMemoryNavigation } from './navigation.mjs';
+
+export const MEMORY_SCOPE_COLORS = Object.freeze({ conversation: '#bce4ff', persona: '#d3a5ed', global: '#e8c991' });
+export function memoryScopeColor(scope) {
+  const color = Object.hasOwn(MEMORY_SCOPE_COLORS, scope) ? MEMORY_SCOPE_COLORS[scope] : undefined;
+  return color === undefined ? undefined : Number.parseInt(color.slice(1), 16);
+}
+
 /** Real saved memories and their cited user messages; bounded view, no admission. */
 export function projectMemoryMap({ active, turns, graphData, preferredRecordIds = [], limit = 6 }) {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > 6) throw RangeError('Memory map admits at most six current records.');
@@ -45,9 +53,11 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   const button = control('Memory', 'memory-open'); button.classList.add('memory-open');
   button.setAttribute('aria-haspopup', 'dialog'); button.setAttribute('aria-controls', 'memory-dialog'); options.before(button);
   const dialog = el('dialog', undefined, { id: 'memory-dialog', class: 'memory-dialog', 'aria-labelledby': 'memory-title' });
+  for (const [scope, color] of Object.entries(MEMORY_SCOPE_COLORS)) dialog.style.setProperty('--memory-scope-' + scope, color);
   const header = el('header', undefined, { class: 'memory-panel-header' });
-  const back = control('Back', 'memory-back'), close = control('Close', 'memory-close'); back.hidden = true;
-  const title = el('h2', 'Memory', { id: 'memory-title' }); header.append(back, title, close);
+  const back = control('Back', 'memory-back'), fit = control('Fit', 'memory-fit'), close = control('Close', 'memory-close'); back.hidden = true; fit.hidden = true;
+  fit.setAttribute('aria-label', 'Fit memory graph');
+  const title = el('h2', 'Memory', { id: 'memory-title' }); header.append(back, title, fit, close);
   const body = el('div', undefined, { class: 'memory-panel-body' });
   const searchForm = el('form', undefined, { id: 'memory-recall-form', class: 'memory-search-form' });
   const query = el('input', undefined, { id: 'memory-query', type: 'search', maxlength: '1024', placeholder: automaticMemory ? 'Search memory' : 'Search saved words', 'aria-label': automaticMemory ? 'Search memory' : 'Search saved words', enterkeyhint: 'search' });
@@ -58,7 +68,7 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   const recall = control('Search', 'memory-recall'); recall.type = 'submit'; searchForm.append(pocket, query, clear, recall);
   const map = el('div', undefined, { class: 'memory-map' });
   const picture = el('div', undefined, { id: 'memory-graph', class: 'memory-graph', 'aria-label': automaticMemory ? 'Memory from your active pockets' : 'Saved memories and their sources' });
-  const canvas = el('canvas', undefined, { class: 'memory-canvas', 'aria-hidden': 'true' }); canvas.hidden = true;
+  const canvas = el('canvas', undefined, { class: 'memory-canvas', 'aria-hidden': 'true', draggable: 'false' }); canvas.hidden = true;
   const empty = el('p', 'No saved memories yet.', { class: 'memory-empty' }); picture.append(canvas, empty); map.append(picture);
   const detail = el('section', undefined, { id: 'memory-detail', class: 'memory-detail', 'aria-labelledby': 'memory-detail-title' }); detail.hidden = true;
   const detailTitle = el('h3', 'Saved words', { id: 'memory-detail-title', tabindex: '-1' });
@@ -80,8 +90,13 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   const add = control('Save from chat', 'memory-add'); add.classList.add('memory-add');
   const savedWords = control('Saved words', 'memory-saved-words'); savedWords.hidden = true;
   const footer = el('div', undefined, { class: 'memory-footer' }); footer.append(add, savedWords);
+  const legend = el('div', undefined, { class: 'memory-scope-legend', role: 'list', 'aria-label': 'Memory scopes' }); legend.hidden = !automaticMemory;
+  for (const [scope] of Object.entries(MEMORY_SCOPE_COLORS)) {
+    const label = el('span', scope[0].toUpperCase() + scope.slice(1), { role: 'listitem' });
+    label.style.setProperty('--memory-node-color', 'var(--memory-scope-' + scope + ')'); legend.append(label);
+  }
   const status = el('p', '', { id: 'memory-status', role: 'status', 'aria-live': 'polite' });
-  body.append(searchForm, map, editor, status, footer); dialog.append(header, body); doc.body.append(dialog);
+  body.append(searchForm, legend, map, editor, status, footer); dialog.append(header, body); doc.body.append(dialog);
 
   let disposed = false, busy = false, hits = null, sequence = 0, selected = null, editRecord = null, skipFocusReturn = false;
   let renderer = null, rendererModule = null, rendererPromise = null, rendererGeneration = 0, topology = '', currentMap = { nodes: [], links: [] };
@@ -94,17 +109,21 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   const selectedSource = () => userTurns().find(turn => turn.id === source.value);
   const selectedRecord = () => selected?.kind === 'record' ? active().find(item => item.id === selected.recordId) : null;
   const isAutomaticView = () => Boolean(automaticMemory && !legacyView);
+  const navigation = mountMemoryNavigation({ surface: picture,
+    getRenderer: () => dialog.open && editor.hidden && detail.hidden && picture.dataset.renderer === 'tsl' ? renderer : null });
   const autoSnapshot = () => automaticMemory.snapshot({ preferredNodeIds: hits?.map(hit => hit.nodeId) ?? [], limit: 12 });
   const setStatus = (value, error = false) => { status.textContent = value; status.classList.toggle('memory-error', error); status.setAttribute('role', error ? 'alert' : 'status'); status.hidden = !value; };
   const errorText = error => typeof error?.message === 'string' ? error.message.slice(0, 180) : 'The memory operation could not finish.';
   function buttons() {
     const authored = selectedSource(), valid = Boolean(authored && text.value.length && text.value.length <= 4000 && authored.content.includes(text.value));
     save.disabled = busy || !valid; correct.disabled = busy || !valid || !editRecord;
-    for (const node of [source, text, query, recall, clear, add, edit, forget, remember, savedWords, pocket, cancel, back]) node.disabled = busy;
+    for (const node of [source, text, query, recall, clear, add, edit, forget, remember, savedWords, pocket, cancel, back, fit]) node.disabled = busy;
     recall.disabled = busy || !query.value.trim(); clear.hidden = !query.value;
     add.hidden = !editor.hidden || selected !== null || userTurns().length === 0;
     savedWords.hidden = !automaticMemory || legacyView || !editor.hidden || selected !== null || active().length === 0;
     pocket.hidden = !isAutomaticView();
+    legend.hidden = !isAutomaticView() || !editor.hidden;
+    fit.hidden = !renderer || !detail.hidden || !editor.hidden;
     searchForm.classList.toggle('has-pockets', isAutomaticView());
   }
   function sourceLinks(ids) {
@@ -120,6 +139,7 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
       .filter(id => currentMap.nodes.some(node => node.id === id));
   }
   function showDetail(node, focus = false) {
+    navigation.cancel();
     selected = node; editor.hidden = true; map.hidden = false; searchForm.hidden = false; detail.hidden = !node;
     back.hidden = !node && !legacyView; title.textContent = legacyView ? 'Saved words' : 'Memory'; editRecord = null;
     detailProvenance.hidden = !node || !isAutomaticView(); remember.hidden = true;
@@ -164,9 +184,11 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
     }
   }
   function stopRenderer() {
+    navigation.cancel(); fit.hidden = true;
     ++rendererGeneration; renderer?.dispose(); renderer = null; rendererPromise = null; topology = ''; canvas.hidden = true;
   }
   function fallback(reason = '') {
+    navigation.cancel(); fit.hidden = true;
     renderer?.dispose(); renderer = null; topology = ''; canvas.hidden = true;
     picture.dataset.renderer = 'list'; picture.classList.add('is-fallback');
     for (const node of nodeButtons.values()) node.hidden = false;
@@ -180,6 +202,7 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
     canvas.dataset.memoryPacking = compact ? 'compact' : 'force';
     const key = JSON.stringify({ nodes: currentMap.nodes, links: currentMap.links, packing: canvas.dataset.memoryPacking, columns });
     if (topology !== key) {
+      navigation.cancel();
       const data = { view: 'evidence', nodes: currentMap.nodes.map(node => ({ ...node, kind: node.kind === 'source' || node.kind === 'global' ? 'source' : 'chunk',
         record_id: node.recordId ?? null, source_id: node.turnId ?? node.sourceTurnId ?? node.recordId ?? node.id, path: 'memory/' + (node.recordId ?? node.sourceTurnId ?? node.id) })),
         links: currentMap.links, total_nodes: currentMap.nodes.length, total_links: currentMap.links.length, omitted_nodes: 0, omitted_links: 0 };
@@ -219,10 +242,11 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
       canvas.hidden = false;
       const value = await module.createTslRagGraphRenderer({ canvas, backend, onNodeActivate: id => {
         const node = currentMap.nodes.find(node => node.id === id); if (node) showDetail(node, true);
-      }, onTerminalFailure: () => fallback('device unavailable') });
+      }, nodeColor: id => memoryScopeColor(currentMap.nodes.find(node => node.id === id)?.scope), preserveNodeColors: true,
+      onTerminalFailure: () => fallback('device unavailable') });
       if (generation !== rendererGeneration || disposed || !dialog.open) { value.dispose(); return; }
       renderer = value; rendererModule = module; renderer.setMotionEnabled(!motionPreference.matches);
-      picture.dataset.renderer = 'tsl'; picture.dataset.backend = renderer.backend; picture.classList.remove('is-fallback'); drawRenderer();
+      picture.dataset.renderer = 'tsl'; picture.dataset.backend = renderer.backend; picture.classList.remove('is-fallback'); drawRenderer(); buttons();
     })().catch(() => { if (generation === rendererGeneration && !disposed) fallback('initialization failed'); })
       .finally(() => { if (generation === rendererGeneration) rendererPromise = null; });
   }
@@ -241,7 +265,7 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
     for (const node of currentMap.nodes) {
       let target = nodeButtons.get(node.id);
       if (!target) {
-        target = control('', ''); target.removeAttribute('id'); target.className = 'memory-map-node';
+        target = control('', ''); target.removeAttribute('id'); target.className = 'memory-map-node'; target.draggable = false;
         target.append(el('span', '', { class: 'memory-node-label', 'aria-hidden': 'true' }));
         target.dataset.memoryNode = node.id; target.dataset.memoryKind = node.kind;
         listen(target, 'click', () => { const current = currentMap.nodes.find(item => item.id === node.id); if (current) showDetail(current, true); });
@@ -252,6 +276,8 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
       target.setAttribute('aria-label', provenance + node.label);
       if (isAutomaticView()) { target.dataset.memoryScope = node.scope; target.dataset.memoryRole = node.role; }
       else { delete target.dataset.memoryScope; delete target.dataset.memoryRole; }
+      if (memoryScopeColor(node.scope) !== undefined) target.style.setProperty('--memory-node-color', MEMORY_SCOPE_COLORS[node.scope]);
+      else target.style.removeProperty('--memory-node-color');
       target.dataset.matched = String(matches.has(node.id)); target.setAttribute('aria-pressed', String(selected?.id === node.id));
     }
     picture.classList.toggle('has-query', hits !== null); empty.hidden = currentMap.nodes.length > 0;
@@ -273,6 +299,7 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
     if (returnFocus) (nodeButtons.get(from) ?? query).focus({ preventScroll: true });
   }
   function beginEdit(record = null, sourceId) {
+    navigation.cancel();
     editRecord = record ? { id: record.id, version: record.version } : null;
     stopRenderer(); editor.hidden = false; map.hidden = true; searchForm.hidden = true; detail.hidden = true; back.hidden = false;
     title.textContent = record ? 'Edit memory' : 'Save from chat'; source.replaceChildren(el('option', 'Choose a message', { value: '' }));
@@ -299,7 +326,7 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   listen(add, 'click', () => beginEdit()); listen(edit, 'click', () => { const item = selectedRecord(); if (item) beginEdit(item); });
   listen(cancel, 'click', () => graphView()); listen(back, 'click', () => { if (legacyView && !selected && editor.hidden) { legacyView = false; hits = null; query.value = ''; } graphView(); });
   listen(savedWords, 'click', () => { legacyView = true; hits = null; query.value = ''; setStatus(''); graphView(); });
-  listen(pocket, 'change', () => { const requested = pocket.value; void write(() => automaticMemory.setScope(requested), '', true); });
+  listen(pocket, 'change', () => { navigation.cancel(); const requested = pocket.value; void write(() => automaticMemory.setScope(requested), '', true); });
   listen(remember, 'click', () => {
     const node = selected;
     if (!isAutomaticView() || node?.kind !== 'message' || node.role !== 'user' || !node.turnId) return;
@@ -330,6 +357,10 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
     finally { busy = false; if (!disposed) { refresh(); query.focus({ preventScroll: true }); } }
   });
   listen(canvas, 'rag-camera-frame', overlayPositions);
+  listen(fit, 'click', () => navigation.fit());
+  for (const type of ['dragstart', 'selectstart', 'contextmenu']) listen(picture, type, event => {
+    if (picture.dataset.renderer === 'tsl') event.preventDefault();
+  });
   listen(motionPreference, 'change', () => renderer?.setMotionEnabled(!motionPreference.matches));
   const viewport = () => { dialog.style.setProperty('--memory-viewport-height', (window.visualViewport?.height ?? window.innerHeight) + 'px'); drawRenderer(); renderer?.refreshViewport(); };
   if (window.visualViewport) listen(window.visualViewport, 'resize', viewport); listen(window, 'resize', viewport); viewport();
@@ -348,7 +379,7 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   const observer = new MutationObserver(refresh); observer.observe(options, { attributes: true, attributeFilter: ['hidden'] });
   const unsubscribe = events.subscribe(refresh), unsubscribeAutomatic = automaticMemory?.subscribe?.(refresh); refresh();
   return Object.freeze({ button, dialog, refresh, dispose() {
-    if (disposed) return; disposed = true; stopRenderer(); observer.disconnect(); unsubscribe(); unsubscribeAutomatic?.(); listeners.abort();
+    if (disposed) return; disposed = true; stopRenderer(); navigation.dispose(); observer.disconnect(); unsubscribe(); unsubscribeAutomatic?.(); listeners.abort();
     if (dialog.open) dialog.close(); dialog.remove(); button.remove(); stylesheet?.remove();
   } });
 }

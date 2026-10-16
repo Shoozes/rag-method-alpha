@@ -120,11 +120,13 @@ node examples/browser-model-chat/stage-static.mjs --memory-preview --output .art
 
 The builder verifies prepared package bytes and emits one self-contained
 `.artifacts/memory/graph-renderer.mjs`, plus complete graph/Three MIT texts.
-The explicit memory export contains **41 payload files plus its manifest**.
+The explicit memory export contains **42 payload files plus its manifest**.
 Automatic memory adds `memory/automatic-memory.mjs`, `memory/conversation-index.mjs`,
 `memory/scoped-pockets.mjs` and `memory/starter-facts.mjs`. The existing graph
 bundle and `LICENSES/forcegraph-tsl.txt` / `LICENSES/three.txt` remain included. Preserve those full notices
 alongside the first-party/runtime MIT texts and separate LFM model license.
+`memory/navigation.mjs` adapts contained pan/pinch input to that same renderer;
+it does not introduce another graph runtime.
 Prepared dependencies and build scripts are source/setup inputs, not browser files.
 These commands reuse prepared inputs; they do not constitute a fresh-host install proof.
 
@@ -301,7 +303,7 @@ The source-bound receipt records exact acceptance counts and identities. The foc
 
 Historical cold-remote/cache acceptance at commit `12478fb34c9c749fdc218f870d1d366f186af547` passed 7 real-model checks, including official remote transfer, integrity verification, generated replies and cache-only reuse with external requests blocked. That evidence is retained under its original commit identity; it is not represented as a rerun of the current source. A physical iOS device remains unqualified.
 
-The compact source-bound receipt is `.artifacts/proof/model-chat/receipt.json`. It names only the essential current captures, including the desktop landing and `live-mobile-chat.png` (actual HTTPS model response). Runtime and delivery assets are ignored; temporary browser profiles were removed. The earlier vendor URL-base failure and its narrow fix remain in the historical record. Browser verification runs locally against the published HTTPS site. GitHub runs its native Pages deployment only; no hosted verification suite, paid inference, API credentials or browser security bypass is used.
+The retained runtime/lifecycle receipt is `.artifacts/proof/model-chat/receipt.json`, under its original source identities. It includes the desktop landing and `live-mobile-chat.png` (historical actual HTTPS model response). The later mobile-navigation publication appends bounded live results to its existing local mobile receipt; `tests/model-chat-memory-mobile.mjs --live` requires explicit reviewed source/manifest/graph pins and that proof owner. Its provider/token-meter fixture is visibly labeled and makes no model calls. Runtime and delivery assets are ignored; temporary browser profiles are removed. The earlier vendor URL-base failure and its narrow fix remain in the historical record. Browser verification runs locally against the published HTTPS site. GitHub runs its native Pages deployment only; no hosted verification suite, paid inference, API credentials or browser security bypass is used.
 
 ## Next bounded steps
 

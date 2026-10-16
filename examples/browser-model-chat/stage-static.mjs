@@ -18,7 +18,7 @@ const browserFiles = Object.freeze([
 const memoryFiles = Object.freeze([
   'memory/workspace.mjs', 'memory/store.mjs', 'memory/events.mjs', 'memory/context.mjs',
   'memory/structured-context.mjs', 'memory/automatic-context.mjs', 'memory/rag-adapter.mjs',
-  'memory/restore-events.mjs', 'memory/citations.mjs', 'memory/panel.mjs', 'memory/panel.css',
+  'memory/restore-events.mjs', 'memory/citations.mjs', 'memory/panel.mjs', 'memory/panel.css', 'memory/navigation.mjs',
   'memory/rag-core.mjs', 'memory/graph-renderer.mjs',
   'memory/automatic-memory.mjs', 'memory/conversation-index.mjs',
   'memory/scoped-pockets.mjs', 'memory/starter-facts.mjs',
@@ -26,7 +26,7 @@ const memoryFiles = Object.freeze([
 const automaticMemoryFiles = new Set(['memory/automatic-memory.mjs', 'memory/conversation-index.mjs',
   'memory/scoped-pockets.mjs', 'memory/starter-facts.mjs']);
 const memoryCoreSha256 = 'c282ebb3965c4a25b48fb66082ce18c72184449f2123633a901ffceb9939ace6';
-const graphRendererSha256 = 'c85fda05a2a6ac5596dc41f5f197064eb3063932eaf574ae93f5f7141d179edd';
+const graphRendererSha256 = 'f0218f4a62109c67708a73d0068b6afb73d7857aa563b31c3a1363b9bf0cba6f';
 const graphLicenses = Object.freeze({
   'LICENSES/forcegraph-tsl.txt': '1a897e0ee6f1fc65889976eadb848acefac9db7f9c97274a6c490f52390cd474',
   'LICENSES/three.txt': '8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc',
@@ -41,8 +41,10 @@ const payloadPaths = Object.freeze([...browserFiles, 'theme/aurel-gold.css',
 const preMemoryPayloadPaths = payloadPaths.filter(name => !['wasm-memory.mjs', 'runtime-profile.mjs'].includes(name));
 const priorPayloadPaths = preMemoryPayloadPaths.filter(name => name !== 'runtime-errors.mjs');
 const legacyPayloadPaths = priorPayloadPaths.filter(name => !name.startsWith('runtime/compat/'));
-const previousMemoryPayloadPaths = Object.freeze([...payloadPaths, ...memoryFiles.filter(name => name !== 'memory/graph-renderer.mjs' && !automaticMemoryFiles.has(name)), modelLicensePath].sort());
-const previousGraphMemoryPayloadPaths = Object.freeze([...payloadPaths, ...memoryFiles.filter(name => !automaticMemoryFiles.has(name)), modelLicensePath, ...Object.keys(graphLicenses)].sort());
+const previousMemoryFiles = memoryFiles.filter(name => name !== 'memory/navigation.mjs');
+const previousMemoryPayloadPaths = Object.freeze([...payloadPaths, ...previousMemoryFiles.filter(name => name !== 'memory/graph-renderer.mjs' && !automaticMemoryFiles.has(name)), modelLicensePath].sort());
+const previousGraphMemoryPayloadPaths = Object.freeze([...payloadPaths, ...previousMemoryFiles.filter(name => !automaticMemoryFiles.has(name)), modelLicensePath, ...Object.keys(graphLicenses)].sort());
+const previousAutomaticMemoryPayloadPaths = Object.freeze([...payloadPaths, ...previousMemoryFiles, modelLicensePath, ...Object.keys(graphLicenses)].sort());
 const memoryPayloadPaths = Object.freeze([...payloadPaths, ...memoryFiles, modelLicensePath, ...Object.keys(graphLicenses)].sort());
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const portable = value => value.split(sep).join('/');
@@ -104,7 +106,7 @@ async function managedOutput(destination, memoryPreview) {
   const previousPaths = previous.files?.map(file => file.path).sort();
   if (previous.schema !== schema || previous.managedBy !== managedBy || identitySha256 !== identity(body)
       || previous.publicReleaseQualified !== false || !Array.isArray(previous.files)
-      || ![...(memoryPreview ? [memoryPayloadPaths, previousGraphMemoryPayloadPaths, previousMemoryPayloadPaths] : []), payloadPaths, preMemoryPayloadPaths, priorPayloadPaths, legacyPayloadPaths]
+      || ![...(memoryPreview ? [memoryPayloadPaths, previousAutomaticMemoryPayloadPaths, previousGraphMemoryPayloadPaths, previousMemoryPayloadPaths] : []), payloadPaths, preMemoryPayloadPaths, priorPayloadPaths, legacyPayloadPaths]
         .some(paths => JSON.stringify(previousPaths) === JSON.stringify(paths))) {
     throw new Error('Refusing output with a foreign or changed managed manifest.');
   }

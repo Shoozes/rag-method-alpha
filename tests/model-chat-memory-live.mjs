@@ -23,13 +23,13 @@ const fixtureScopes = new Map([
 const cleanup = { browserContextClosed: false, ownedTemporaryProfileRemoved: false };
 const memoryFiles = ['workspace', 'store', 'events', 'context', 'structured-context', 'automatic-context', 'automatic-memory',
   'conversation-index', 'scoped-pockets', 'starter-facts', 'rag-adapter',
-  'restore-events', 'citations', 'panel', 'rag-core', 'graph-renderer'].map(name => `memory/${name}.mjs`).concat('memory/panel.css');
+  'restore-events', 'citations', 'panel', 'navigation', 'rag-core', 'graph-renderer'].map(name => `memory/${name}.mjs`).concat('memory/panel.css');
 const payloadPaths = ['index.html', 'style.css', 'app.mjs', 'loader-controller.mjs', 'model-contract.mjs',
   'runtime-adapter.mjs', 'engine-worker.mjs', 'runtime-errors.mjs', 'wasm-memory.mjs', 'runtime-profile.mjs',
   'capabilities.mjs', 'bootstrap.mjs', 'theme/aurel-gold.css', 'runtime/index.js', 'runtime/wllama.wasm',
   'runtime/LICENSE', 'runtime/compat/wllama.js', 'runtime/compat/wllama.wasm', 'LICENSES/rag-method.txt',
   'LICENSES/lfm-open-license-1.0.txt', 'LICENSES/forcegraph-tsl.txt', 'LICENSES/three.txt', 'NOTICE.txt', 'README.txt', ...memoryFiles].sort();
-const graphPins = { 'memory/graph-renderer.mjs': 'c85fda05a2a6ac5596dc41f5f197064eb3063932eaf574ae93f5f7141d179edd',
+const graphPins = { 'memory/graph-renderer.mjs': 'f0218f4a62109c67708a73d0068b6afb73d7857aa563b31c3a1363b9bf0cba6f',
   'LICENSES/forcegraph-tsl.txt': '1a897e0ee6f1fc65889976eadb848acefac9db7f9c97274a6c490f52390cd474',
   'LICENSES/three.txt': '8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc' };
 const expectedPaths = [...payloadPaths, 'site-manifest.json'].sort();
@@ -48,7 +48,7 @@ async function check(name, run) {
   catch (error) { checks.push({ name, status: 'fail', durationMs: Date.now() - at, message: error.message, ...evidence }); throw error; }
 }
 async function request(path, method = 'GET', limit = 128 * 1024) {
-  // 42 GET/HEAD pairs + initial/final manifest + finite private-route probes.
+  // 43 GET/HEAD pairs + initial/final manifest + finite private-route probes.
   if (++httpRequests > 112) throw new Error('Finite 112-request HTTP proof budget exceeded.');
   const target = new URL(path, base);
   assert.equal(target.origin, base.origin); assert.ok(target.pathname.startsWith(base.pathname));
@@ -106,7 +106,7 @@ try {
   const chrome = required('MODEL_CHAT_BROWSER');
   base = new URL(process.env.BROWSER_MEMORY_PREVIEW_URL || 'https://shoozes.github.io/rag-method-alpha/model-chat/');
   assert.equal(base.href, 'https://shoozes.github.io/rag-method-alpha/model-chat/', 'explicitly reviewed experimental Pages destination');
-  await check('reviewed HTTPS manifest binds the exact public source and 41-file payload', async () => {
+  await check('reviewed HTTPS manifest binds the exact public source and 42-file payload', async () => {
     const { response, bytes } = await request('site-manifest.json');
     assert.equal(response.status, 200); assert.ok(correctMime('site-manifest.json', response.headers.get('content-type')?.split(';')[0]));
     manifestSha256 = digest(bytes); assert.equal(manifestSha256, expectedManifest);
@@ -118,15 +118,15 @@ try {
     assert.equal(manifest.source.head, expectedHead); assert.equal(manifest.source.dirty, false);
     assert.equal(manifest.source.fingerprintSha256, digest(JSON.stringify(manifest.source.files)));
     assert.equal(manifest.source.fingerprintSha256, expectedFingerprint);
-    assert.deepEqual(manifest.files.map(file => file.path).sort(), payloadPaths); assert.equal(manifest.files.length, 41);
-    assert.equal(expectedPaths.length, 42); assert.equal(manifest.graph.bundleSha256, graphPins['memory/graph-renderer.mjs']);
+    assert.deepEqual(manifest.files.map(file => file.path).sort(), payloadPaths); assert.equal(manifest.files.length, 42);
+    assert.equal(expectedPaths.length, 43); assert.equal(manifest.graph.bundleSha256, graphPins['memory/graph-renderer.mjs']);
     assert.equal(manifest.graph.layoutBackend, 'local');
     for (const [path, hash] of Object.entries(graphPins)) assert.equal(manifest.files.find(file => file.path === path)?.sha256, hash, path);
     assert.equal(manifest.model.licensePath, 'LICENSES/lfm-open-license-1.0.txt');
     assert.equal(manifest.model.licenseSha256, '30adf9d6478191fb87f2424f63ba0728598335aaf99cd2848ef17e8e545fe94b');
     assert.equal(manifest.files.find(file => file.path === manifest.model.licensePath)?.sha256, manifest.model.licenseSha256);
   });
-  await check('all 42 HTTPS files match reviewed GET bytes and GET/HEAD MIME', async () => {
+  await check('all 43 HTTPS files match reviewed GET bytes and GET/HEAD MIME', async () => {
     for (let offset = 0; offset < expectedPaths.length; offset += 4) {
       const settled = await Promise.allSettled(expectedPaths.slice(offset, offset + 4).map(async path => {
         const expected = path === 'site-manifest.json' ? { sha256: expectedManifest, bytes: 128 * 1024 } : manifest.files.find(file => file.path === path);
@@ -333,7 +333,7 @@ finally {
     startedAt: new Date(started).toISOString(), durationMs: Date.now() - started, node: process.version, browser: browserVersion,
     url: base?.href, verifierSha256: digest(await readFile(fileURLToPath(import.meta.url))),
     manifest: manifest && { sha256: manifestSha256, identitySha256: manifest.identitySha256, sourceHead: manifest.source.head,
-      sourceFingerprintSha256: manifest.source.fingerprintSha256, filesIncludingManifest: 42 },
+      sourceFingerprintSha256: manifest.source.fingerprintSha256, filesIncludingManifest: 43 },
     checks, assets: assets.sort((left, right) => left.path.localeCompare(right.path)), privatePaths, observations, screenshot,
     boundary: { fixture: checks.some(check => check.fixture), fixtureCases: checks.filter(check => check.fixture).map(({ name, fixtureScope }) => ({ name, fixtureScope })),
       productionBootstrapReplaced: false, providerCalls: 0, actualNativeCalls: 0, modelDownloads: 0,

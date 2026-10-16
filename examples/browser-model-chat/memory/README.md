@@ -32,6 +32,21 @@ autonomous agent. TulpaWeaver's current-companion allow-list informed the scope
 boundary; Conversation is this preview's adaptation, not an identical donor
 pocket. No private donor code was copied.
 
+Drag the graph background or a node to pan, pinch or wheel to zoom, and use
+**Fit** to recover the view. A tap or keyboard activation opens the real source;
+dragging does not select it. Only the graph captures navigation gestures.
+Details and the graph-disabled list retain native scrolling and selection;
+page zoom is left unrestricted outside the graph. Reduced motion disables graph
+animation. Conversation is light blue, Persona soft purple and Global gold,
+with scope labels and base colors retained during search/selection. The existing
+metallic lighting makes pale-blue points appear close to white. Colors do not
+change memory ownership, access or compaction policy.
+
+Desktop Chrome touch-emulation checks cover pan, pinch, Fit, capture transfer,
+cancellation, keyboard/source actions and the real list fallback. Native page
+pinch remained unqualified even on a plain-page automation control; physical
+touch selection and named iPhone/browser behavior still need device testing.
+
 A later question uses the existing local keyword RAG core to select up to three
 prior user/public-source excerpts, at most 360 codepoints each. The native prompt
 meter and 160-token reply reserve decide fit; the latest question stays whole.

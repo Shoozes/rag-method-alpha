@@ -27,6 +27,8 @@ export interface RagGraphRenderer {
   replaySpawn():void;
   stopMotion():void;
   fit(): void;
+  getCameraPose(): CameraPose | null;
+  setCameraPose(pose: CameraPose): void;
   setInteractionState(selectedNodeId: string | null, hitNodeIds: readonly string[]): void;
   diagnostics(): RagGraphRendererDiagnostics;
   clear(): void;
@@ -40,6 +42,8 @@ export interface RagGraphRendererDiagnostics {
   readonly hit_targets: readonly RagGraphHitTarget[];
   readonly node_targets: readonly RagGraphNodeTarget[];
   readonly viewport: RagGraphViewportDiagnostics;
+  readonly camera_pose: CameraPose | null;
+  readonly node_colors: readonly { readonly node_id: string; readonly base_color: number }[];
 }
 
 export interface RagGraphRuntimeDiagnostics {
@@ -76,6 +80,8 @@ export interface RagGraphViewportDiagnostics {
 export interface CreateRagGraphRendererOptions {
   readonly canvas: HTMLCanvasElement;
   readonly backend?: RagRendererBackend;
+  readonly nodeColor?: (nodeId: string) => number | undefined;
+  readonly preserveNodeColors?: boolean;
   readonly onNodeActivate: (nodeId: string) => void;
   readonly onTerminalFailure: (message: string) => void;
 }
@@ -86,6 +92,19 @@ function nodeRadius(node: { readonly data?: RenderNodeData }): number {
 
 function nodeColor(node: { readonly data?: RenderNodeData }): number {
   return node.data ? graphFamilyColorNumber(node.data.path) : graphColorNumber("chunk");
+}
+
+function copyCameraPose(pose: CameraPose): CameraPose {
+  const copy = {
+    position: { x: pose?.position?.x, y: pose?.position?.y, z: pose?.position?.z },
+    target: { x: pose?.target?.x, y: pose?.target?.y, z: pose?.target?.z },
+  };
+  const coordinates = [...Object.values(copy.position), ...Object.values(copy.target)];
+  const distance = Math.hypot(copy.position.x - copy.target.x, copy.position.y - copy.target.y, copy.position.z - copy.target.z);
+  if (coordinates.some(value => !Number.isFinite(value)) || distance < 0.1 || distance > 100_000) {
+    throw new Error("Camera pose requires finite coordinates and a distance from 0.1 to 100000.");
+  }
+  return copy;
 }
 
 function frameVisibleGraph(
@@ -111,6 +130,16 @@ function frameVisibleGraph(
 }
 
 export async function createTslRagGraphRenderer(options: CreateRagGraphRendererOptions): Promise<RagGraphRenderer> {
+  const baseColors = new Map<string, number>();
+  const resolvedNodeColor = (node: { readonly id: string | number; readonly data?: RenderNodeData }): number => {
+    const id = String(node.id), supplied = options.nodeColor?.(id);
+    if (supplied !== undefined && (!Number.isInteger(supplied) || supplied < 0 || supplied > 0xffffff)) {
+      throw new Error("Graph node color must be an RGB integer from 0 to 0xffffff.");
+    }
+    const color = supplied ?? nodeColor(node);
+    baseColors.set(id, color);
+    return color;
+  };
   let graph: ForceGraph<RenderNodeData, { readonly kind: string }> | null = await createForceGraph3D<RenderNodeData, { readonly kind: string }>({
     platform: createThreePlatform({ THREE, TSL }),
     host: { mode: "managed", canvas: options.canvas },
@@ -124,7 +153,7 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
         metalness: 0.88,
         roughness: 0.2,
         emissive: 0.62,
-        selectionEffect: { enabled: true, bubbleScale: 2.1, intensity: 0.9, color: graphColorNumber("selected"), breathAmount: 0 },
+        selectionEffect: { enabled: true, bubbleScale: 2.1, intensity: 0.9, color: options.preserveNodeColors ? 0xffffff : graphColorNumber("selected"), breathAmount: 0 },
       },
       linkFlow: {
         enabled: false,
@@ -139,7 +168,7 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
       cameraPose: { position: { x: 0, y: 0, z: 120 }, target: { x: 0, y: 0, z: 0 } },
     },
     layout: { backend: "local", autoStart: false, dimensions: 2, seed: 20260919 },
-    nodes: { radius: nodeRadius, color: nodeColor },
+    nodes: { radius: nodeRadius, color: resolvedNodeColor },
     links: {
       width: (link) => link.data?.kind === "reference" ? 1.6 : 1.05,
       color: (link) => link.data?.kind === "reference" ? graphColorNumber("reference") : graphColorNumber("link"),
@@ -147,8 +176,8 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
     },
     interaction: { hover: true, dragNodes: false, selection: "single", navigation: true },
     stateTheme: {
-      selected: { color: graphColorNumber("selected"), colorMix: 0.98, scale: 1.42 },
-      focused: { color: graphColorNumber("hit"), colorMix: 0.82, scale: 1.2 },
+      selected: { color: graphColorNumber("selected"), colorMix: options.preserveNodeColors ? 0 : 0.98, scale: 1.42 },
+      focused: { color: graphColorNumber("hit"), colorMix: options.preserveNodeColors ? 0 : 0.82, scale: 1.2 },
     },
   });
 
@@ -194,6 +223,20 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
     const width = options.canvas.clientWidth;
     const height = options.canvas.clientHeight;
     return width > 0 && height > 0 ? { width, height } : null;
+  };
+
+  const currentCameraPose = (): CameraPose | null => {
+    const pose = graph?.getCameraPose();
+    return pose ? { position: { ...pose.position }, target: { ...pose.target } } : null;
+  };
+
+  const updateNodeScale = (height: number): void => {
+    if (!graph) return;
+    const pose = graph.getCameraPose();
+    if (!pose) return;
+    const distance = Math.hypot(pose.position.x - pose.target.x, pose.position.y - pose.target.y, pose.position.z - pose.target.z);
+    unitsPerPixel = 2 * distance * Math.tan(25 * Math.PI / 180) / height;
+    graph.setNodeStyle({ radius: styledRadius, color: resolvedNodeColor });
   };
 
   const projectedTargets = (nodeIds: Iterable<string>): readonly RagGraphNodeTarget[] => {
@@ -258,6 +301,9 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
     options.canvas.dataset.hitTargets = JSON.stringify(hitTargets());
     options.canvas.dataset.nodeTargets = JSON.stringify(nodeTargets);
     options.canvas.dataset.viewport = JSON.stringify(viewportDiagnostics());
+    options.canvas.dataset.cameraPose = JSON.stringify(currentCameraPose());
+    options.canvas.dataset.nodeColors = JSON.stringify(visibleNodeIds.flatMap(id => baseColors.has(id)
+      ? [{ node_id: id, base_color: baseColors.get(id)! }] : []));
     options.canvas.dispatchEvent(new Event("rag-camera-frame"));
     options.canvas.dataset.rendererDiagnostics = JSON.stringify(runtimeDiagnostics());
   };
@@ -278,13 +324,8 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
     }
     lastViewport = measured;
     if (sizeChanged || framePending || !userAdjusted) {
-      const pose = graph.getCameraPose();
-      if (pose) {
-        const distance = Math.hypot(pose.position.x - pose.target.x, pose.position.y - pose.target.y, pose.position.z - pose.target.z);
-        unitsPerPixel = 2 * distance * Math.tan(25 * Math.PI / 180) / measured.height;
-        // Keep overview nodes legible on narrow viewports; zoom still behaves naturally.
-        graph.setNodeStyle({ radius: styledRadius, color: nodeColor });
-      }
+      // Keep overview nodes legible on narrow viewports; zoom still behaves naturally.
+      updateNodeScale(measured.height);
     }
     viewportUpdateCount += 1;
     viewportLifecycle = "ready";
@@ -357,6 +398,8 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
         links: positioned.links.map((link) => ({ id: link.id, source: link.source, target: link.target, data: { kind: link.kind } })),
       });
       visibleNodeIds = positioned.nodes.map((node) => node.id);
+      const currentIds = new Set(visibleNodeIds);
+      for (const id of baseColors.keys()) if (!currentIds.has(id)) baseColors.delete(id);
       options.canvas.dataset.motionEnabled=String(motionEnabled);
       hasGraphData = true;
       framePending = !userAdjusted;
@@ -379,6 +422,19 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
       framePending = true;
       updateViewport();
     },
+    getCameraPose: currentCameraPose,
+    setCameraPose(pose: CameraPose): void {
+      const next = copyCameraPose(pose);
+      if (!graph) return;
+      stopCamera();
+      userAdjusted = true;
+      framePending = false;
+      graph.setCameraPose(next);
+      const measured = viewport();
+      if (measured) updateNodeScale(measured.height);
+      graph.render();
+      publishDiagnostics();
+    },
     setInteractionState(nextSelectedNodeId: string | null, nextHitNodeIds: readonly string[]): void {
       if (graph) graph.setNodeFlagsMany(hitNodeIds, 0, NodeFlags.Focused);
       const previousSelection=selectedNodeId;
@@ -397,6 +453,9 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
         hit_targets: Object.freeze(hitTargets()),
         node_targets: Object.freeze([...projectedTargets(visibleNodeIds)]),
         viewport: viewportDiagnostics(),
+        camera_pose: currentCameraPose(),
+        node_colors: Object.freeze(visibleNodeIds.flatMap(id => baseColors.has(id)
+          ? [Object.freeze({ node_id: id, base_color: baseColors.get(id)! })] : [])),
       });
     },
     clear(): void {
@@ -405,6 +464,7 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
       selectedNodeId = null;
       hitNodeIds.clear();
       visibleNodeIds = [];
+      baseColors.clear();
       hasGraphData = false;
       framePending = false;
       userAdjusted = false;
@@ -427,6 +487,7 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
       offError();
       graph.dispose();
       graph = null;
+      baseColors.clear();
       selectedNodeId = null;
       hitNodeIds.clear();
       visibleNodeIds = [];

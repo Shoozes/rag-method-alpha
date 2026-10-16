@@ -17,7 +17,7 @@ const profilePrefix = 'rag-automatic-pockets-';
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const failureSummary = value => String(value||'').replace(/\u001b\[[0-9;]*m/g,'').split('\n').slice(0,9).filter(line=>!line.trim().startsWith('at ')).join('\n');
 const memoryFiles = ['workspace','store','events','context','structured-context','automatic-context','rag-adapter',
-  'restore-events','citations','panel','rag-core','graph-renderer','automatic-memory','conversation-index','scoped-pockets','starter-facts']
+  'restore-events','citations','panel','navigation','rag-core','graph-renderer','automatic-memory','conversation-index','scoped-pockets','starter-facts']
   .map(name=>'memory/'+name+'.mjs').concat('memory/panel.css');
 const payloadPaths = ['index.html','style.css','app.mjs','loader-controller.mjs','model-contract.mjs','runtime-adapter.mjs',
   'engine-worker.mjs','runtime-errors.mjs','wasm-memory.mjs','runtime-profile.mjs','capabilities.mjs','bootstrap.mjs',
@@ -99,10 +99,10 @@ async function verifyManifest(expectedSha,expectedHead,expectedFingerprint) {
   assert.equal(manifest.schema,'rag-model-chat-static/v1');assert.equal(manifest.memoryPreview,true);assert.equal(manifest.publicReleaseQualified,false);
   assert.equal(manifest.model.weightsIncluded,false);assert.equal(manifest.source.head,expectedHead);assert.equal(manifest.source.dirty,false);
   assert.equal(manifest.source.fingerprintSha256,expectedFingerprint);assert.equal(expectedFingerprint,digest(JSON.stringify(manifest.source.files)));
-  assert.deepEqual(manifest.files.map(file=>file.path).sort(),payloadPaths);assert.equal(payloadPaths.length,41);
+  assert.deepEqual(manifest.files.map(file=>file.path).sort(),payloadPaths);assert.equal(payloadPaths.length,42);
   for(const file of manifest.files){assert.match(file.sha256,/^[a-f0-9]{64}$/);assert.ok(Number.isSafeInteger(file.bytes)&&file.bytes>0);}
   for(const [path,hash] of Object.entries({'memory/rag-core.mjs':'c282ebb3965c4a25b48fb66082ce18c72184449f2123633a901ffceb9939ace6',
-    'memory/graph-renderer.mjs':'c85fda05a2a6ac5596dc41f5f197064eb3063932eaf574ae93f5f7141d179edd',
+    'memory/graph-renderer.mjs':'f0218f4a62109c67708a73d0068b6afb73d7857aa563b31c3a1363b9bf0cba6f',
     'LICENSES/lfm-open-license-1.0.txt':'30adf9d6478191fb87f2424f63ba0728598335aaf99cd2848ef17e8e545fe94b'}))assert.equal(manifest.files.find(file=>file.path===path)?.sha256,hash,path);
   sourceIdentity={head:expectedHead,fingerprintSha256:expectedFingerprint,manifestSha256,identitySha256};
   // Exercise this standalone nested server separately from any repo server.
@@ -115,7 +115,7 @@ async function verifyManifest(expectedSha,expectedHead,expectedFingerprint) {
   for(const path of ['memory/PRIVATE_LOCAL_ONLY','memory/serve-local.mjs','.git/config','.env','tests/model-chat-automatic-pockets-browser.mjs','node_modules/playwright/index.mjs']){
     const result=await request(path,'HEAD',0);assert.equal(result.response.status,404,path);assert.equal(result.bytes.length,0);
   }
-  preflight={status:'pass',manifestSha256,sourceHead:expectedHead,sourceFingerprint:expectedFingerprint,payloadFiles:41,totalFiles:42,nestedPrefix:base.pathname,privateProbes:6,bootstrapAndOriginalAdapterVerified:true};
+  preflight={status:'pass',manifestSha256,sourceHead:expectedHead,sourceFingerprint:expectedFingerprint,payloadFiles:42,totalFiles:43,nestedPrefix:base.pathname,privateProbes:6,bootstrapAndOriginalAdapterVerified:true};
 }
 
 async function check(name, run) {
