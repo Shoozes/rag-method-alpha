@@ -16,8 +16,15 @@ Open ?memory=1 for this one-chat memory preview; add &graph=0 for its searchable
 The pinned TSL renderer uses Three WebGPU with a WebGL2 backend fallback; unavailable graphics retain accessible memory controls.
 Graph startup or device loss is not a guarantee of mobile GPU support. No new iOS qualification follows from this package.
 Older context is selected automatically as source-linked exact passages; no special markup is required.
+Each accepted message creates a canonical Conversation node. Generated-assistant text remains labeled and is excluded from retrieved user evidence.
+The pocket filter changes real retrieval: Global public Space starters, explicit Persona user excerpts, current Conversation, or All pockets.
+Scope bindings include actor, persona and conversation identities; visual selection grants no permissions.
+Space starters cite https://science.nasa.gov/earth/facts/, https://science.nasa.gov/moon/facts/ and https://science.nasa.gov/mars/moons/.
+Search highlights actual matches. Last-used nodes light only after dispatch. No automatic fact promotion or agent orchestration is included.
 Automatic passage selection is lossy extractive context, not general semantic summarization or verified fact admission.
 Explicit Save stores selected exact user words separately for keyword retrieval; Forget does not erase the transcript.
+Remember for persona retains exact user-source proof. Forget/version exclusions persist when saving succeeds; quota failures report session-only state.
+The index refuses more than 512 turns or 512 KiB; Persona memory is bounded to 32 excerpts and 256 KiB including proof/history.
 Historical answer links describe Sources sent at the time, not answer truth, current record eligibility or authenticated execution.
 Known 230M model limits include failed unrelated-question abstention and answer-format adherence.
 After correction, a native test used Thursday instead of Tuesday but omitted the codename and city in a multi-field answer; answer completeness is not guaranteed.

@@ -48,6 +48,8 @@ async function hash(text) {
 export function createConversationStore({ conversationId = 'local-chat', actorId = 'local-user' } = {}) {
   identity(conversationId); identity(actorId);
   let turns = [];
+  const observers = new Set();
+  const notify = () => { for (const observer of [...observers]) { try { observer(); } catch { /* Views cannot roll back canonical turns. */ } } };
   const snapshot = () => immutable({ schema: conversationSchema, conversationId, actorId, version: turns.length, turns });
   return Object.freeze({
     append({ role, content: text } = {}) {
@@ -55,9 +57,14 @@ export function createConversationStore({ conversationId = 'local-chat', actorId
       content(text);
       const turn = { id: id('t-', turns.length + 1), role, content: text, actorId, conversationId };
       turns.push(turn);
+      notify();
       return immutable(turn);
     },
     snapshot,
+    subscribe(observer) {
+      if (typeof observer !== 'function') fail('Conversation observer required.');
+      observers.add(observer); return () => observers.delete(observer);
+    },
     exportState: () => JSON.stringify(snapshot()),
     importState(serialized) {
       const state = parsed(serialized);
@@ -72,6 +79,7 @@ export function createConversationStore({ conversationId = 'local-chat', actorId
       });
       if (incoming.length < turns.length || turns.some((turn, index) => !same(turn, incoming[index]))) fail('Original transcript turns cannot be removed or changed.');
       turns = incoming;
+      notify();
       return snapshot();
     },
   });

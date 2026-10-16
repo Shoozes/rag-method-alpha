@@ -4,11 +4,11 @@
   "publicReleaseQualified": false,
   "memoryPreview": true,
   "source": {
-    "head": "43739f0d6bd93932a0da3b32f057672a6df40d3a",
+    "head": "10aea4dcfb31385988ae605fe5a113553ba39708",
     "dirty": false,
     "reviewStatus": "unreviewed",
     "fingerprintScope": "allowlisted browser sources, generated memory core, build source, theme, licenses and packager",
-    "fingerprintSha256": "2705194319202d16f6940694ad7ae3438efe0f7dace905d535a6c202b0211ee0",
+    "fingerprintSha256": "19d02aa8f23175452fcb543656f5233c1e6e86b6abef49485c139a383d30797e",
     "files": [
       {
         "path": ".artifacts/memory/graph-renderer.mjs",
@@ -32,8 +32,8 @@
       },
       {
         "path": "examples/browser-model-chat/app.mjs",
-        "bytes": 18030,
-        "sha256": "532aebb9087bf61091bd2d5003ebd36098865399c22fcda6a6ed4e9f4c81bdc3"
+        "bytes": 18292,
+        "sha256": "8c2dda70dc59ed7cc8f59d7852c1f263ebb0acd648cbc28c4022a64a11b332cd"
       },
       {
         "path": "examples/browser-model-chat/bootstrap.mjs",
@@ -71,6 +71,11 @@
         "sha256": "09a82a7dd813344b0a9e49b8657358214314a639a7ff0c41f0f333d3b452872d"
       },
       {
+        "path": "examples/browser-model-chat/memory/automatic-memory.mjs",
+        "bytes": 10550,
+        "sha256": "17fb2621931178e8e464c815df5552c8bebc364e441c020edef90d8a595a17db"
+      },
+      {
         "path": "examples/browser-model-chat/memory/build-core.mjs",
         "bytes": 3921,
         "sha256": "655804b7f3db11e73b7742dbb40abc14304002328402b777f1efda7d9113a288"
@@ -87,8 +92,13 @@
       },
       {
         "path": "examples/browser-model-chat/memory/context.mjs",
-        "bytes": 9434,
-        "sha256": "c144a6cd5f19d1a1f9dad828754f037183c91ecdf5e8d02635353873dcdbb598"
+        "bytes": 11532,
+        "sha256": "dfa8f047c4e83077a5ebc60c026f3d46343f9794fa10663970ff837f644972f8"
+      },
+      {
+        "path": "examples/browser-model-chat/memory/conversation-index.mjs",
+        "bytes": 10785,
+        "sha256": "2fc92a2c7106feb516d70c08a98912f8127c9a8d57a886be333618c0bd5706a6"
       },
       {
         "path": "examples/browser-model-chat/memory/events.mjs",
@@ -97,13 +107,13 @@
       },
       {
         "path": "examples/browser-model-chat/memory/panel.css",
-        "bytes": 9242,
-        "sha256": "c1b45e039b8f4045d1ee2e586dc52ea890de27428f7656e985415d460d49c284"
+        "bytes": 10027,
+        "sha256": "cdfb328310b153de29a96610b63084a7db30396667efd8002e04f5ad26e52353"
       },
       {
         "path": "examples/browser-model-chat/memory/panel.mjs",
-        "bytes": 22953,
-        "sha256": "3be12e28c201c2d4711042dc8ad1efa1454625ffaf91d4ec2181a3425e41a511"
+        "bytes": 30881,
+        "sha256": "f83123021533f886980724599aedfd30602f9533739b33f53d77ed9c770265da"
       },
       {
         "path": "examples/browser-model-chat/memory/rag-adapter.mjs",
@@ -116,9 +126,19 @@
         "sha256": "d24864e4927d94490bec59dea31a33ec0b111b26260440449b4c35c002a0965a"
       },
       {
+        "path": "examples/browser-model-chat/memory/scoped-pockets.mjs",
+        "bytes": 17944,
+        "sha256": "49190041783285b39884e2b91aaaca1af163e8ae664b06fe76182f6774752601"
+      },
+      {
+        "path": "examples/browser-model-chat/memory/starter-facts.mjs",
+        "bytes": 608,
+        "sha256": "80f009e01277791c89ef1b32ada87a937bf9b159d51e1b6a1f9ca506cba154e7"
+      },
+      {
         "path": "examples/browser-model-chat/memory/store.mjs",
-        "bytes": 10921,
-        "sha256": "a608498d649df5c932862a6747721d850505dc4fefac5e5edb35fd71462e9c04"
+        "bytes": 11319,
+        "sha256": "313bac2885180e79a458735349c5995fed483c50617cb0556873ac17250a1eec"
       },
       {
         "path": "examples/browser-model-chat/memory/structured-context.mjs",
@@ -127,8 +147,8 @@
       },
       {
         "path": "examples/browser-model-chat/memory/workspace.mjs",
-        "bytes": 4002,
-        "sha256": "b2ab07410d21dcd29e7385f6567b022a2186a199d646f28064219fd1ac077939"
+        "bytes": 6958,
+        "sha256": "0cc27d0d580378c0103053453bb21d52591ab11b854e86f2a368a6c8def39be5"
       },
       {
         "path": "examples/browser-model-chat/model-contract.mjs",
@@ -152,8 +172,8 @@
       },
       {
         "path": "examples/browser-model-chat/stage-static.mjs",
-        "bytes": 20947,
-        "sha256": "16c7a750d26581499f42ef919673b82ecbfd29dab01dbd567f13c815e1cab804"
+        "bytes": 22799,
+        "sha256": "73475dc88b8956799464e8ffb6d2cd073c97506c17cf21d38dca2a43e9a60660"
       },
       {
         "path": "examples/browser-model-chat/style.css",
@@ -254,8 +274,8 @@
   "files": [
     {
       "path": "app.mjs",
-      "bytes": 18030,
-      "sha256": "532aebb9087bf61091bd2d5003ebd36098865399c22fcda6a6ed4e9f4c81bdc3"
+      "bytes": 18292,
+      "sha256": "8c2dda70dc59ed7cc8f59d7852c1f263ebb0acd648cbc28c4022a64a11b332cd"
     },
     {
       "path": "bootstrap.mjs",
@@ -308,14 +328,24 @@
       "sha256": "09a82a7dd813344b0a9e49b8657358214314a639a7ff0c41f0f333d3b452872d"
     },
     {
+      "path": "memory/automatic-memory.mjs",
+      "bytes": 10550,
+      "sha256": "17fb2621931178e8e464c815df5552c8bebc364e441c020edef90d8a595a17db"
+    },
+    {
       "path": "memory/citations.mjs",
       "bytes": 12598,
       "sha256": "a51f2de1202bffa5e36a52a86fe30ad937278e4867366898e2ff646b48e9f953"
     },
     {
       "path": "memory/context.mjs",
-      "bytes": 9434,
-      "sha256": "c144a6cd5f19d1a1f9dad828754f037183c91ecdf5e8d02635353873dcdbb598"
+      "bytes": 11532,
+      "sha256": "dfa8f047c4e83077a5ebc60c026f3d46343f9794fa10663970ff837f644972f8"
+    },
+    {
+      "path": "memory/conversation-index.mjs",
+      "bytes": 10785,
+      "sha256": "2fc92a2c7106feb516d70c08a98912f8127c9a8d57a886be333618c0bd5706a6"
     },
     {
       "path": "memory/events.mjs",
@@ -329,13 +359,13 @@
     },
     {
       "path": "memory/panel.css",
-      "bytes": 9242,
-      "sha256": "c1b45e039b8f4045d1ee2e586dc52ea890de27428f7656e985415d460d49c284"
+      "bytes": 10027,
+      "sha256": "cdfb328310b153de29a96610b63084a7db30396667efd8002e04f5ad26e52353"
     },
     {
       "path": "memory/panel.mjs",
-      "bytes": 22953,
-      "sha256": "3be12e28c201c2d4711042dc8ad1efa1454625ffaf91d4ec2181a3425e41a511"
+      "bytes": 30881,
+      "sha256": "f83123021533f886980724599aedfd30602f9533739b33f53d77ed9c770265da"
     },
     {
       "path": "memory/rag-adapter.mjs",
@@ -353,9 +383,19 @@
       "sha256": "d24864e4927d94490bec59dea31a33ec0b111b26260440449b4c35c002a0965a"
     },
     {
+      "path": "memory/scoped-pockets.mjs",
+      "bytes": 17944,
+      "sha256": "49190041783285b39884e2b91aaaca1af163e8ae664b06fe76182f6774752601"
+    },
+    {
+      "path": "memory/starter-facts.mjs",
+      "bytes": 608,
+      "sha256": "80f009e01277791c89ef1b32ada87a937bf9b159d51e1b6a1f9ca506cba154e7"
+    },
+    {
       "path": "memory/store.mjs",
-      "bytes": 10921,
-      "sha256": "a608498d649df5c932862a6747721d850505dc4fefac5e5edb35fd71462e9c04"
+      "bytes": 11319,
+      "sha256": "313bac2885180e79a458735349c5995fed483c50617cb0556873ac17250a1eec"
     },
     {
       "path": "memory/structured-context.mjs",
@@ -364,8 +404,8 @@
     },
     {
       "path": "memory/workspace.mjs",
-      "bytes": 4002,
-      "sha256": "b2ab07410d21dcd29e7385f6567b022a2186a199d646f28064219fd1ac077939"
+      "bytes": 6958,
+      "sha256": "0cc27d0d580378c0103053453bb21d52591ab11b854e86f2a368a6c8def39be5"
     },
     {
       "path": "model-contract.mjs",
@@ -374,13 +414,13 @@
     },
     {
       "path": "NOTICE.txt",
-      "bytes": 1664,
-      "sha256": "446ea2055d8b326b7e4626df576496b1cc1d986b2123bfc8b19f1b9885b77df9"
+      "bytes": 1929,
+      "sha256": "bccd459c16e17ff7b55a9e01759e1716a37ddeb20dc66f06a3ee19973c3ed188"
     },
     {
       "path": "README.txt",
-      "bytes": 2549,
-      "sha256": "311c5080d8fbc948c000dbffb7e6f3bbc7f6eca392489db324b25de75f403191"
+      "bytes": 3505,
+      "sha256": "36c69a8f39d2f342da78c8317674df8907c0c8f691e3d6e52f358f60be12b577"
     },
     {
       "path": "runtime-adapter.mjs",
@@ -438,5 +478,5 @@
       "sha256": "4baf1abc8a47bb8eb7a41fdc1e924cf8ac80f4645f4524611a6d7ecb3712983e"
     }
   ],
-  "identitySha256": "bfc96a2c760a64c385784f0be5bcb8ef1dde009ab3ec13d2da2e9564c4eb27bb"
+  "identitySha256": "89884eef3b73c111060cd480b10994e0959cbf6094738ad0b404ad070dcfeeb0"
 }

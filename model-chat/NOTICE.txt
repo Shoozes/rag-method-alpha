@@ -18,5 +18,7 @@ The graph bundle reuses the existing admitted TSL renderer and local layout; no 
 Model weights are not included in this static payload. Download is an explicit browser action.
 The model license applies to model use and redistribution; inspect its pinned terms before deployment.
 
+Automatic message nodes derive from canonical user and generated-assistant turns; assistant output is not admitted as user evidence.
+Global Space starters cite NASA Earth facts, Moon facts and Mars moons pages; they are separate from personal conversation history.
 Experimental model limitation: after a correction, the model used Thursday instead of Tuesday but omitted the codename and city in a multi-field answer.
 Automatic passage/provenance checks do not establish generated-answer completeness or truth.

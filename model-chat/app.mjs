@@ -19,6 +19,11 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
   };
   let previousPhase = '', messages = [], pendingMessage, latestReport = '';
   let preparingContext = false;
+  async function persistWorkspace() {
+    const result = await workspace.persist();
+    if (result.error) { $('chat-error').hidden = false; $('chat-error').textContent = 'Memory changed in this session, but saving failed: ' + result.error; }
+    return result;
+  }
   const log = $('messages');
   let followTail = true, viewportFrame, documentFrame, loadingScrollY = 0;
   function scrollLatest(force = false) {
@@ -252,7 +257,7 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
     $('prompt').focus({ preventScroll: true });
     pendingMessage = message('assistant', '', true);
     try {
-      if (workspace) await workspace.persist();
+      if (workspace) await persistWorkspace();
       if (workspace) { $('send').disabled = true; $('session-status').textContent = 'Preparing context'; }
       const prepared = workspace ? await workspace.prepare() : null;
       const answer = await controller.send(prepared?.messages || [{ role: 'system', content: 'You are a concise, helpful assistant. Answer in plain text.' }, ...messages]);
@@ -263,7 +268,7 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
         pendingMessage.id = 'turn-' + accepted.id; pendingMessage.tabIndex = -1;
         await workspace.captureAnswerSources({ answerTurnId: accepted.id, requestSha256: prepared.measurement.requestSha256 });
         answerSources(pendingMessage, accepted.id);
-        await workspace.persist();
+        await persistWorkspace();
       }
       scrollLatest();
       messages.push({ role: 'assistant', content: answer });
@@ -271,7 +276,7 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
       pendingMessage.classList.remove('pending'); pendingMessage.classList.add('interrupted');
       if (!pendingMessage.querySelector('.content').textContent) pendingMessage.querySelector('.content').textContent = 'No completed answer.';
       // Incomplete attempts remain visible, but are not silently sent as accepted history.
-      if (workspace) { $('chat-error').hidden = false; $('chat-error').textContent = error.message; await workspace.persist(); }
+      if (workspace) { $('chat-error').hidden = false; $('chat-error').textContent = error.message; await persistWorkspace(); }
       else messages.pop();
     } finally { pendingMessage = null; preparingContext = false; render(controller.getState()); }
   });
