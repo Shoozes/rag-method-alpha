@@ -4,16 +4,16 @@
   "publicReleaseQualified": false,
   "memoryPreview": true,
   "source": {
-    "head": "62231575bfa2f7cc1990ebbb23f29f0d1df13bc5",
+    "head": "c5bc7d7ebd85d5601ba73aca60c827e08e020b9c",
     "dirty": false,
     "reviewStatus": "unreviewed",
     "fingerprintScope": "allowlisted browser sources, generated memory core, build source, theme, licenses and packager",
-    "fingerprintSha256": "485c2476cfd6a7148791868565ce8a436fa06b2a15a0b09a3a2995b0a3d998bd",
+    "fingerprintSha256": "515921c5e0dc3ad68370deb3793670e0d56927a52f2d645e30df67555dce75de",
     "files": [
       {
         "path": ".artifacts/memory/graph-renderer.mjs",
-        "bytes": 1316713,
-        "sha256": "f0218f4a62109c67708a73d0068b6afb73d7857aa563b31c3a1363b9bf0cba6f"
+        "bytes": 1316780,
+        "sha256": "90783080f8ce7849f5d0544864c7ac7bfb7875c689aecf1fa7951204b4112b3a"
       },
       {
         "path": ".artifacts/memory/LICENSES/forcegraph-tsl.txt",
@@ -117,8 +117,8 @@
       },
       {
         "path": "examples/browser-model-chat/memory/panel.mjs",
-        "bytes": 33081,
-        "sha256": "e30693e1dd61bf29f86b06f6fb5c5cfb038734ae19bbf281fbaf827e42e354c6"
+        "bytes": 33111,
+        "sha256": "e36f8b8fd2e8c9426f834426928d854ccce2610a2218009a87134bb336dda665"
       },
       {
         "path": "examples/browser-model-chat/memory/rag-adapter.mjs",
@@ -178,7 +178,7 @@
       {
         "path": "examples/browser-model-chat/stage-static.mjs",
         "bytes": 23125,
-        "sha256": "e6ef69a9017bd126213c42eaed8379db86797c618e2aadc301e0285780c0cd0c"
+        "sha256": "b90d5f36d1878c7e64c0822afa7e1911cb0d6b61faf37c9a71466b245478ca9f"
       },
       {
         "path": "examples/browser-model-chat/style.css",
@@ -212,8 +212,8 @@
       },
       {
         "path": "modules/browser-rag-ts/src/application/graphRenderer.ts",
-        "bytes": 22541,
-        "sha256": "3283f8bbf45a8620cf7fcfbf6a6d4ad834f167d1b1c1d9168a081b6044a86a80"
+        "bytes": 22883,
+        "sha256": "f152f0971b1bda83adc680bd8a6a88438dacc90d9ac9f9508aae121a67074e91"
       },
       {
         "path": "modules/browser-rag-ts/src/application/layoutGraph.ts",
@@ -255,7 +255,7 @@
     "version": "0.3.0-alpha.1",
     "threeVersion": "0.185.0",
     "bundlePath": "memory/graph-renderer.mjs",
-    "bundleSha256": "f0218f4a62109c67708a73d0068b6afb73d7857aa563b31c3a1363b9bf0cba6f",
+    "bundleSha256": "90783080f8ce7849f5d0544864c7ac7bfb7875c689aecf1fa7951204b4112b3a",
     "layoutBackend": "local",
     "licenses": {
       "LICENSES/forcegraph-tsl.txt": "1a897e0ee6f1fc65889976eadb848acefac9db7f9c97274a6c490f52390cd474",
@@ -359,8 +359,8 @@
     },
     {
       "path": "memory/graph-renderer.mjs",
-      "bytes": 1316713,
-      "sha256": "f0218f4a62109c67708a73d0068b6afb73d7857aa563b31c3a1363b9bf0cba6f"
+      "bytes": 1316780,
+      "sha256": "90783080f8ce7849f5d0544864c7ac7bfb7875c689aecf1fa7951204b4112b3a"
     },
     {
       "path": "memory/navigation.mjs",
@@ -374,8 +374,8 @@
     },
     {
       "path": "memory/panel.mjs",
-      "bytes": 33081,
-      "sha256": "e30693e1dd61bf29f86b06f6fb5c5cfb038734ae19bbf281fbaf827e42e354c6"
+      "bytes": 33111,
+      "sha256": "e36f8b8fd2e8c9426f834426928d854ccce2610a2218009a87134bb336dda665"
     },
     {
       "path": "memory/rag-adapter.mjs",
@@ -488,5 +488,5 @@
       "sha256": "4baf1abc8a47bb8eb7a41fdc1e924cf8ac80f4645f4524611a6d7ecb3712983e"
     }
   ],
-  "identitySha256": "fa358247d4eced589c521fe35f1023f4abd5a7a42fc2b37a11c4c8667ca4c30b"
+  "identitySha256": "38270e43c8eabd1460abedb265d10306829eab77ec081b3ab4ba421724281f9f"
 }
