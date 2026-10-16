@@ -8,19 +8,20 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startServer } from '../examples/browser-model-chat/serve.mjs';
+import { NODE_COLOR_THRESHOLDS, measureNodeColorArea, assessNodeColorArea } from './node-color-area.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url)),live=process.argv.includes('--live');
 const liveProofRoot=resolve(root,'../rag-mobile-memory/.artifacts/proof/memory-mobile');
 if(live&&resolve(process.env.BROWSER_MEMORY_PROOF_ROOT||'')!==liveProofRoot)throw Error('Live proof requires the explicit existing mobile proof root.');
 const output=live?liveProofRoot:join(root,'.artifacts/proof/memory-mobile');
 const phase=live||process.argv.includes('--after')?'after':'before',profilePrefix='rag-memory-mobile-';
-const palette={conversation:'#bce4ff',persona:'#d3a5ed',global:'#e8c991'};
+const palette={conversation:'#0ea5ff',persona:'#c81fff',global:'#f59e0b'};
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const harnessSha256=digest(await readFile(fileURLToPath(import.meta.url)));
 const checks=[],observations=[],screenshots=[],forbidden=[],pageErrors=[],fixtureCalls=[];
 const servedAssets=[];
 const assetFailures=[],network={requests:0,bytes:0};
-const limitations=['Pale blue renders near white under metallic lighting; legend and exact base colors remain available.','Trusted mouse detail selection is tested in an emulated touch viewport; physical touch selection and iOS are unqualified.'];
+const limitations=['Trusted mouse detail selection is tested in an emulated touch viewport; physical touch selection and iOS are unqualified.'];
 const cleanup={contextClosed:false,serverClosed:false,ownedProfileRemoved:false};
 const sourcePaths=['bootstrap.mjs','app.mjs','style.css','memory/panel.mjs','memory/panel.css','memory/automatic-memory.mjs'];
 let context,server,profile,session,page,error,browserVersion,sourceIdentity,graphIdentity,coreIdentity,prior,lastGesture,base,manifest,preflight,workers=0;
@@ -110,15 +111,20 @@ function pairScale(before,after){const previous=new Map(before.nodes.filter(node
 async function colorProof(label,requiredScopes=Object.keys(palette)){
   await settle();const state=await snapshot(),colors=new Map((state.nodeColors||[]).map(value=>[value.node_id,typeof value.base_color==='number'?'#'+value.base_color.toString(16).padStart(6,'0'):value.base_color?.toLowerCase()]));
   for(const node of state.nodes)assert.equal(colors.get(node.id),palette[node.scope],'actual resolved style '+node.id);
-  const samples=requiredScopes.map(scope=>{const node=state.nodes.find(node=>node.visible&&node.centerOwner===node.id&&node.scope===scope&&node.x>=20&&node.y>180&&node.x+node.width<390&&node.y+node.height<800);assert.ok(node,'visible '+scope+' color sample');return{id:node.id,scope,x:node.x+node.width/2,y:node.y+node.height/2};});
-  const png=await page.screenshot();const pixels=await page.evaluate(async({data,samples})=>{const image=new Image();image.src='data:image/png;base64,'+data;await image.decode();const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;const context=canvas.getContext('2d');context.drawImage(image,0,0);
-    const hsv=rgb=>{const [r,g,b]=rgb.map(value=>value/255),max=Math.max(r,g,b),min=Math.min(r,g,b),delta=max-min;let h=delta===0?0:max===r?60*(((g-b)/delta)%6):max===g?60*((b-r)/delta+2):60*((r-g)/delta+4);if(h<0)h+=360;return{h,s:max?delta/max:0,v:max};};
-    return samples.map(sample=>{const candidates=[],all=[];for(let dy=-5;dy<=5;dy++)for(let dx=-5;dx<=5;dx++){const rgb=[...context.getImageData(Math.round(sample.x)+dx,Math.round(sample.y)+dy,1,1).data].slice(0,3),value=hsv(rgb),[r,g,b]=rgb;all.push({rgb,...value});const tint=sample.scope==='conversation'?Math.min(g-r,b-r,b-g+2):sample.scope==='persona'?Math.min(r-g,b-g):Math.min(r-g,g-b);if(value.v>.06)candidates.push({rgb,...value,tint});}candidates.sort((a,b)=>b.tint-a.tint);all.sort((a,b)=>b.v-a.v);return{...sample,pixel:candidates[0]||null,brightest:all[0]};});
-  },{data:png.toString('base64'),samples});
-  const diagnosticIndex=observations.push({colorDiagnostic:label,samples:pixels})-1;
-  for(const sample of pixels){assert.ok(sample.pixel&&sample.pixel.tint>0,'actual rendered pocket channel tint '+JSON.stringify(sample));}
-  for(let a=0;a<pixels.length;a++)for(let b=a+1;b<pixels.length;b++){const vector=sample=>{const[r,g,blue]=sample.pixel.rgb,peak=Math.max(r,g,blue);return[(r-g)/peak,(blue-g)/peak];},left=vector(pixels[a]),right=vector(pixels[b]);assert.ok(Math.hypot(left[0]-right[0],left[1]-right[1])>.04,'actual cross-scope tints remain distinct');}
-  observations[diagnosticIndex]={colors:label,samples:pixels.map(({id,scope,pixel})=>({id,scope,pixel})),palette};
+  const projected=await page.locator('#memory-graph canvas').evaluate(canvas=>({targets:JSON.parse(canvas.dataset.nodeTargets),hitIds:JSON.parse(canvas.dataset.hitNodeIds||'[]'),selected:canvas.dataset.selectedNodeId}));
+  const pose=state.cameraPose;assert.ok(pose);assert.ok(Math.abs(pose.position.x-pose.target.x)<.0001&&Math.abs(pose.position.y-pose.target.y)<.0001,'front-facing fixture radius contract');
+  // Pinned real styled radius: chunk1.9/source3.8, z0/2, FOV50, native minima1/1.8CSS px.
+  const units=2*Math.abs(pose.position.z-pose.target.z)*Math.tan(25*Math.PI/180)/state.graph.height;
+  const samples=state.nodes.filter(node=>node.visible&&node.centerOwner===node.id).map(node=>{
+    const target=projected.targets.find(value=>value.node_id===node.id);assert.ok(target?.visible,'actual TSL projection '+node.id);
+    const global=node.scope==='global',base=Math.max(global?3.8:1.9,units*(global?1.8:1)),scale=(projected.selected===node.id?1.42:1)*(projected.hitIds.includes(node.id)?1.2:1);
+    return{id:node.id,scope:node.scope,x:state.graph.x+target.x,y:state.graph.y+target.y,radius:base*scale*state.graph.height/(2*(pose.position.z-(global?2:0))*Math.tan(25*Math.PI/180))};
+  }).filter(node=>node.x-node.radius>state.graph.x&&node.x+node.radius<state.graph.x+state.graph.width&&node.y-node.radius>state.graph.y&&node.y+node.radius<state.graph.y+state.graph.height);
+  const saved=await page.locator('.memory-map-node').evaluateAll(nodes=>nodes.map(node=>{const previous=node.getAttribute('style');node.style.setProperty('opacity','0','important');return previous;}));
+  let png;try{await settle();png=await page.screenshot();}finally{await page.locator('.memory-map-node').evaluateAll((nodes,saved)=>nodes.forEach((node,index)=>saved[index]===null?node.removeAttribute('style'):node.setAttribute('style',saved[index])),saved);}
+  const pixels=await page.evaluate(measureNodeColorArea,{data:png.toString('base64'),samples,thresholds:NODE_COLOR_THRESHOLDS,viewport:state.viewport});
+  const result=assessNodeColorArea(pixels,{requiredScopes});observations.push({colors:label,...result,palette,thresholds:NODE_COLOR_THRESHOLDS});
+  assert.deepEqual(result.failures,[],'actual body area, not text or isolated tint: '+label);
 }
 
 try{

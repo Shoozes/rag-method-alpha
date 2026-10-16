@@ -102,7 +102,7 @@ async function verifyManifest(expectedSha,expectedHead,expectedFingerprint) {
   assert.deepEqual(manifest.files.map(file=>file.path).sort(),payloadPaths);assert.equal(payloadPaths.length,42);
   for(const file of manifest.files){assert.match(file.sha256,/^[a-f0-9]{64}$/);assert.ok(Number.isSafeInteger(file.bytes)&&file.bytes>0);}
   for(const [path,hash] of Object.entries({'memory/rag-core.mjs':'c282ebb3965c4a25b48fb66082ce18c72184449f2123633a901ffceb9939ace6',
-    'memory/graph-renderer.mjs':'f0218f4a62109c67708a73d0068b6afb73d7857aa563b31c3a1363b9bf0cba6f',
+    'memory/graph-renderer.mjs':'90783080f8ce7849f5d0544864c7ac7bfb7875c689aecf1fa7951204b4112b3a',
     'LICENSES/lfm-open-license-1.0.txt':'30adf9d6478191fb87f2424f63ba0728598335aaf99cd2848ef17e8e545fe94b'}))assert.equal(manifest.files.find(file=>file.path===path)?.sha256,hash,path);
   sourceIdentity={head:expectedHead,fingerprintSha256:expectedFingerprint,manifestSha256,identitySha256};
   // Exercise this standalone nested server separately from any repo server.

@@ -26,7 +26,7 @@ const memoryFiles = Object.freeze([
 const automaticMemoryFiles = new Set(['memory/automatic-memory.mjs', 'memory/conversation-index.mjs',
   'memory/scoped-pockets.mjs', 'memory/starter-facts.mjs']);
 const memoryCoreSha256 = 'c282ebb3965c4a25b48fb66082ce18c72184449f2123633a901ffceb9939ace6';
-const graphRendererSha256 = 'f0218f4a62109c67708a73d0068b6afb73d7857aa563b31c3a1363b9bf0cba6f';
+const graphRendererSha256 = '90783080f8ce7849f5d0544864c7ac7bfb7875c689aecf1fa7951204b4112b3a';
 const graphLicenses = Object.freeze({
   'LICENSES/forcegraph-tsl.txt': '1a897e0ee6f1fc65889976eadb848acefac9db7f9c97274a6c490f52390cd474',
   'LICENSES/three.txt': '8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc',

@@ -1,6 +1,6 @@
 import { mountMemoryNavigation } from './navigation.mjs';
 
-export const MEMORY_SCOPE_COLORS = Object.freeze({ conversation: '#bce4ff', persona: '#d3a5ed', global: '#e8c991' });
+export const MEMORY_SCOPE_COLORS = Object.freeze({ conversation: '#0ea5ff', persona: '#c81fff', global: '#f59e0b' });
 export function memoryScopeColor(scope) {
   const color = Object.hasOwn(MEMORY_SCOPE_COLORS, scope) ? MEMORY_SCOPE_COLORS[scope] : undefined;
   return color === undefined ? undefined : Number.parseInt(color.slice(1), 16);
@@ -242,7 +242,7 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
       canvas.hidden = false;
       const value = await module.createTslRagGraphRenderer({ canvas, backend, onNodeActivate: id => {
         const node = currentMap.nodes.find(node => node.id === id); if (node) showDetail(node, true);
-      }, nodeColor: id => memoryScopeColor(currentMap.nodes.find(node => node.id === id)?.scope), preserveNodeColors: true,
+      }, nodeColor: id => memoryScopeColor(currentMap.nodes.find(node => node.id === id)?.scope), preserveNodeColors: true, nodeSurface: 'scope-colored',
       onTerminalFailure: () => fallback('device unavailable') });
       if (generation !== rendererGeneration || disposed || !dialog.open) { value.dispose(); return; }
       renderer = value; rendererModule = module; renderer.setMotionEnabled(!motionPreference.matches);

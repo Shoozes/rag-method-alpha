@@ -30,7 +30,7 @@ const navigationAdded = ['memory/navigation.mjs'];
 const modelLicensePath = 'LICENSES/lfm-open-license-1.0.txt';
 const graphAdded = ['memory/graph-renderer.mjs', 'LICENSES/forcegraph-tsl.txt', 'LICENSES/three.txt'];
 const previewAdded = [...memoryFiles, modelLicensePath, ...graphAdded.filter(name => name.startsWith('LICENSES/'))];
-const graphPins = { 'memory/graph-renderer.mjs': 'f0218f4a62109c67708a73d0068b6afb73d7857aa563b31c3a1363b9bf0cba6f',
+const graphPins = { 'memory/graph-renderer.mjs': '90783080f8ce7849f5d0544864c7ac7bfb7875c689aecf1fa7951204b4112b3a',
   'LICENSES/forcegraph-tsl.txt': '1a897e0ee6f1fc65889976eadb848acefac9db7f9c97274a6c490f52390cd474',
   'LICENSES/three.txt': '8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc' };
 const modelLicenseSha256 = '30adf9d6478191fb87f2424f63ba0728598335aaf99cd2848ef17e8e545fe94b';

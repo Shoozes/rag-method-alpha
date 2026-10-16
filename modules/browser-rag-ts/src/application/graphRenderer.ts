@@ -82,6 +82,8 @@ export interface CreateRagGraphRendererOptions {
   readonly backend?: RagRendererBackend;
   readonly nodeColor?: (nodeId: string) => number | undefined;
   readonly preserveNodeColors?: boolean;
+  /** Flat scope colors for memory maps; other consumers retain the metallic surface. */
+  readonly nodeSurface?: "default" | "scope-colored";
   readonly onNodeActivate: (nodeId: string) => void;
   readonly onTerminalFailure: (message: string) => void;
 }
@@ -130,6 +132,7 @@ function frameVisibleGraph(
 }
 
 export async function createTslRagGraphRenderer(options: CreateRagGraphRendererOptions): Promise<RagGraphRenderer> {
+  const scopeColoredSurface = options.nodeSurface === "scope-colored";
   const baseColors = new Map<string, number>();
   const resolvedNodeColor = (node: { readonly id: string | number; readonly data?: RenderNodeData }): number => {
     const id = String(node.id), supplied = options.nodeColor?.(id);
@@ -149,11 +152,11 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
       linkWidthUnit: "pixel",
       pixelRatio: { minimum: 1, maximum: 2 },
       nodeSurface: {
-        profile: "metallic",
+        profile: scopeColoredSurface ? "flat" : "metallic",
         metalness: 0.88,
         roughness: 0.2,
         emissive: 0.62,
-        selectionEffect: { enabled: true, bubbleScale: 2.1, intensity: 0.9, color: options.preserveNodeColors ? 0xffffff : graphColorNumber("selected"), breathAmount: 0 },
+        selectionEffect: { enabled: true, bubbleScale: 2.1, intensity: scopeColoredSurface ? 0.12 : 0.9, color: options.preserveNodeColors ? 0xffffff : graphColorNumber("selected"), breathAmount: 0 },
       },
       linkFlow: {
         enabled: false,
@@ -178,6 +181,7 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
     stateTheme: {
       selected: { color: graphColorNumber("selected"), colorMix: options.preserveNodeColors ? 0 : 0.98, scale: 1.42 },
       focused: { color: graphColorNumber("hit"), colorMix: options.preserveNodeColors ? 0 : 0.82, scale: 1.2 },
+      ...(scopeColoredSurface ? { hovered: { colorMix: 0 } } : {}),
     },
   });
 

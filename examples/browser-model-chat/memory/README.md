@@ -37,9 +37,10 @@ Drag the graph background or a node to pan, pinch or wheel to zoom, and use
 dragging does not select it. Only the graph captures navigation gestures.
 Details and the graph-disabled list retain native scrolling and selection;
 page zoom is left unrestricted outside the graph. Reduced motion disables graph
-animation. Conversation is light blue, Persona soft purple and Global gold,
-with scope labels and base colors retained during search/selection. The existing
-metallic lighting makes pale-blue points appear close to white. Colors do not
+animation. Conversation is sky blue, Persona violet and Global amber,
+with scope labels and base colors retained during search/selection. The memory
+view opts into flat colored node bodies and a quiet selection halo to avoid the
+metallic shader's white washout; other renderer consumers keep their defaults. Colors do not
 change memory ownership, access or compaction policy.
 
 Desktop Chrome touch-emulation checks cover pan, pinch, Fit, capture transfer,
