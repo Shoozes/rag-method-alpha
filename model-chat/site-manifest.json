@@ -4,11 +4,11 @@
   "publicReleaseQualified": false,
   "memoryPreview": true,
   "source": {
-    "head": "c5bc7d7ebd85d5601ba73aca60c827e08e020b9c",
+    "head": "77ddfe792a27a3b42d70a8a1878ea03b82452595",
     "dirty": false,
     "reviewStatus": "unreviewed",
     "fingerprintScope": "allowlisted browser sources, generated memory core, build source, theme, licenses and packager",
-    "fingerprintSha256": "515921c5e0dc3ad68370deb3793670e0d56927a52f2d645e30df67555dce75de",
+    "fingerprintSha256": "2cafc463dd77bcfbe34a689329f68eefce4947679b60cd8db983f3a743fbcb1c",
     "files": [
       {
         "path": ".artifacts/memory/graph-renderer.mjs",
@@ -32,8 +32,8 @@
       },
       {
         "path": "examples/browser-model-chat/app.mjs",
-        "bytes": 18292,
-        "sha256": "8c2dda70dc59ed7cc8f59d7852c1f263ebb0acd648cbc28c4022a64a11b332cd"
+        "bytes": 22990,
+        "sha256": "3e08016c8e662d41cb4047b08d1732602aded7489bff8b5bf0baa39fe0da9ef5"
       },
       {
         "path": "examples/browser-model-chat/bootstrap.mjs",
@@ -52,8 +52,8 @@
       },
       {
         "path": "examples/browser-model-chat/index.html",
-        "bytes": 6916,
-        "sha256": "04980eb889b97843e17025bce522e5e94e1f48188ad92d4e846b689ae67281d0"
+        "bytes": 7450,
+        "sha256": "640150d345ae4e9bfc241191a36fdc53e07b8d601ad4d4a69e792a5139e0a88a"
       },
       {
         "path": "examples/browser-model-chat/licenses/LFM-Open-License-1.0.txt",
@@ -91,9 +91,14 @@
         "sha256": "a51f2de1202bffa5e36a52a86fe30ad937278e4867366898e2ff646b48e9f953"
       },
       {
+        "path": "examples/browser-model-chat/memory/compaction-cue.mjs",
+        "bytes": 2674,
+        "sha256": "fe7a54213648904ec7c1857709afd4eccfeca6a5a82f1be4dfe744fc2772627c"
+      },
+      {
         "path": "examples/browser-model-chat/memory/context.mjs",
-        "bytes": 11532,
-        "sha256": "dfa8f047c4e83077a5ebc60c026f3d46343f9794fa10663970ff837f644972f8"
+        "bytes": 17912,
+        "sha256": "9fcf824a076a7ef8efa26fadf0a2395ee1e082b5ebc63b6562b7c77072999144"
       },
       {
         "path": "examples/browser-model-chat/memory/conversation-index.mjs",
@@ -112,13 +117,13 @@
       },
       {
         "path": "examples/browser-model-chat/memory/panel.css",
-        "bytes": 11121,
-        "sha256": "285b2cd5f9af9c4b36ad3009c629366d08ee788161c5d3248f6cdd7aa87a4149"
+        "bytes": 11873,
+        "sha256": "6ebafbc26d7f7567d9adbba87ea5a6f81fdd73e1155ede8037c05aa31dacb627"
       },
       {
         "path": "examples/browser-model-chat/memory/panel.mjs",
-        "bytes": 33111,
-        "sha256": "e36f8b8fd2e8c9426f834426928d854ccce2610a2218009a87134bb336dda665"
+        "bytes": 35441,
+        "sha256": "aa97d8e501fd408822ee857f86942f39b4daa00125503a5fb87ad39bc22aa99d"
       },
       {
         "path": "examples/browser-model-chat/memory/rag-adapter.mjs",
@@ -152,8 +157,8 @@
       },
       {
         "path": "examples/browser-model-chat/memory/workspace.mjs",
-        "bytes": 6958,
-        "sha256": "0cc27d0d580378c0103053453bb21d52591ab11b854e86f2a368a6c8def39be5"
+        "bytes": 7009,
+        "sha256": "463841b368b980c000dc6253db223a31fe0b5a19e34bd7794934ba40b444fec1"
       },
       {
         "path": "examples/browser-model-chat/model-contract.mjs",
@@ -177,13 +182,13 @@
       },
       {
         "path": "examples/browser-model-chat/stage-static.mjs",
-        "bytes": 23125,
-        "sha256": "b90d5f36d1878c7e64c0822afa7e1911cb0d6b61faf37c9a71466b245478ca9f"
+        "bytes": 23434,
+        "sha256": "7c285beb76b4e8271d2d64394bdc49a3ba30d222b4e7497625f07ecd3e398115"
       },
       {
         "path": "examples/browser-model-chat/style.css",
-        "bytes": 13108,
-        "sha256": "e218dfad918e2a9b8f963a603abcc4bc50514d801a4416a7464fcb8a419d5f23"
+        "bytes": 14070,
+        "sha256": "c2695522707cf7f7a47478706f0cec165d6c1147de3d4277ed5b29aee8173a37"
       },
       {
         "path": "examples/browser-model-chat/wasm-memory.mjs",
@@ -279,8 +284,8 @@
   "files": [
     {
       "path": "app.mjs",
-      "bytes": 18292,
-      "sha256": "8c2dda70dc59ed7cc8f59d7852c1f263ebb0acd648cbc28c4022a64a11b332cd"
+      "bytes": 22990,
+      "sha256": "3e08016c8e662d41cb4047b08d1732602aded7489bff8b5bf0baa39fe0da9ef5"
     },
     {
       "path": "bootstrap.mjs",
@@ -299,8 +304,8 @@
     },
     {
       "path": "index.html",
-      "bytes": 6916,
-      "sha256": "04980eb889b97843e17025bce522e5e94e1f48188ad92d4e846b689ae67281d0"
+      "bytes": 7450,
+      "sha256": "640150d345ae4e9bfc241191a36fdc53e07b8d601ad4d4a69e792a5139e0a88a"
     },
     {
       "path": "LICENSES/forcegraph-tsl.txt",
@@ -343,9 +348,14 @@
       "sha256": "a51f2de1202bffa5e36a52a86fe30ad937278e4867366898e2ff646b48e9f953"
     },
     {
+      "path": "memory/compaction-cue.mjs",
+      "bytes": 2674,
+      "sha256": "fe7a54213648904ec7c1857709afd4eccfeca6a5a82f1be4dfe744fc2772627c"
+    },
+    {
       "path": "memory/context.mjs",
-      "bytes": 11532,
-      "sha256": "dfa8f047c4e83077a5ebc60c026f3d46343f9794fa10663970ff837f644972f8"
+      "bytes": 17912,
+      "sha256": "9fcf824a076a7ef8efa26fadf0a2395ee1e082b5ebc63b6562b7c77072999144"
     },
     {
       "path": "memory/conversation-index.mjs",
@@ -369,13 +379,13 @@
     },
     {
       "path": "memory/panel.css",
-      "bytes": 11121,
-      "sha256": "285b2cd5f9af9c4b36ad3009c629366d08ee788161c5d3248f6cdd7aa87a4149"
+      "bytes": 11873,
+      "sha256": "6ebafbc26d7f7567d9adbba87ea5a6f81fdd73e1155ede8037c05aa31dacb627"
     },
     {
       "path": "memory/panel.mjs",
-      "bytes": 33111,
-      "sha256": "e36f8b8fd2e8c9426f834426928d854ccce2610a2218009a87134bb336dda665"
+      "bytes": 35441,
+      "sha256": "aa97d8e501fd408822ee857f86942f39b4daa00125503a5fb87ad39bc22aa99d"
     },
     {
       "path": "memory/rag-adapter.mjs",
@@ -414,8 +424,8 @@
     },
     {
       "path": "memory/workspace.mjs",
-      "bytes": 6958,
-      "sha256": "0cc27d0d580378c0103053453bb21d52591ab11b854e86f2a368a6c8def39be5"
+      "bytes": 7009,
+      "sha256": "463841b368b980c000dc6253db223a31fe0b5a19e34bd7794934ba40b444fec1"
     },
     {
       "path": "model-contract.mjs",
@@ -474,8 +484,8 @@
     },
     {
       "path": "style.css",
-      "bytes": 13108,
-      "sha256": "e218dfad918e2a9b8f963a603abcc4bc50514d801a4416a7464fcb8a419d5f23"
+      "bytes": 14070,
+      "sha256": "c2695522707cf7f7a47478706f0cec165d6c1147de3d4277ed5b29aee8173a37"
     },
     {
       "path": "theme/aurel-gold.css",
@@ -488,5 +498,5 @@
       "sha256": "4baf1abc8a47bb8eb7a41fdc1e924cf8ac80f4645f4524611a6d7ecb3712983e"
     }
   ],
-  "identitySha256": "38270e43c8eabd1460abedb265d10306829eab77ec081b3ab4ba421724281f9f"
+  "identitySha256": "c5bf5a2b5219ed0738efb2cf47bc843667d5bf63c188d674deb10d3b20d74bf2"
 }

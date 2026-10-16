@@ -3,6 +3,32 @@ import { createRuntimeAdapter } from './runtime-adapter.mjs';
 import { MODEL, RUNTIME } from './model-contract.mjs';
 import { formatRuntimeError } from './runtime-errors.mjs';
 
+// A read-only view of the existing send-time meter, never a token estimator.
+export function contextUsageView(state) {
+  const phase = state?.phase || 'unmeasured';
+  const capacity = state?.capacity, reserve = state?.reserve, budget = state?.usablePromptTokens;
+  const validBudget = Number.isSafeInteger(capacity) && Number.isSafeInteger(reserve) && reserve > 0
+    && reserve < capacity && budget === capacity - reserve;
+  const measured = state?.measurement;
+  const known = validBudget && Number.isSafeInteger(measured?.promptTokens) && measured.promptTokens > 0
+    && measured.contextTokens === capacity && typeof measured.overflow === 'boolean';
+  const labels = { unmeasured: 'Not measured', measuring: 'Checking context', compacting: 'Compacting context',
+    ready: state?.compaction ? 'Compacted' : 'Last prompt', stale: 'Last prompt', error: 'Check failed', cancelled: 'Check stopped' };
+  const label = labels[phase] || 'Not measured';
+  const quality = measured?.quality === 'estimate' ? 'Estimated' : measured?.quality === 'fixture' ? 'Fixture measurement, not native tokens' : 'Measured';
+  const budgetText = validBudget ? `${budget.toLocaleString('en-US')} prompt tokens; ${reserve.toLocaleString('en-US')} reserved for the reply (${capacity.toLocaleString('en-US')} total).` : 'Context budget unavailable.';
+  const count = known ? `${quality}: ${measured.promptTokens.toLocaleString('en-US')} of ${budget.toLocaleString('en-US')} usable prompt tokens.` : 'Prompt occupancy is not measured.';
+  const status = phase === 'compacting' ? 'Compacting; the bar still shows the before count, not percentage completion.'
+    : phase === 'measuring' ? 'Checking the next prompt; previous counts stay visible until a new measurement is available.'
+      : phase === 'error' ? 'Context preparation failed; no successful compacted prompt is claimed.'
+        : phase === 'cancelled' ? 'Context preparation stopped; no later result is applied.'
+          : 'Last checked prompt; the current draft and subsequent reply are not remeasured.';
+  return { phase, label, busy: phase === 'measuring' || phase === 'compacting',
+    max: validBudget ? budget : null, value: known ? Math.min(measured.promptTokens, budget) : null,
+    fraction: known ? Math.min(measured.promptTokens / budget, 1) : null,
+    detail: `${count} ${budgetText} System instructions and retrieved text are included, not subtracted again. ${status} The bar endpoint is the prompt limit; compaction selects context and keeps the original transcript.` };
+}
+
 export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, workspace } = {}) {
   const $ = id => document.getElementById(id);
   const app = $('app');
@@ -18,7 +44,32 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
     unsupported: 'This browser cannot run this runtime.',
   };
   let previousPhase = '', messages = [], pendingMessage, latestReport = '';
-  let preparingContext = false;
+  let preparingContext = false, preparationController, unsubscribeUsage = () => {};
+  function showContextUsage(state) {
+    const node = $('context-usage');
+    if (!node) return;
+    const view = contextUsageView(state);
+    node.hidden = false; node.dataset.phase = view.phase;
+    node.dataset.measured = String(view.value !== null);
+    node.setAttribute('role', view.value === null ? 'group' : 'meter');
+    node.setAttribute('aria-label', 'Prompt context'); node.setAttribute('aria-busy', String(view.busy));
+    node.title = view.detail; $('context-detail').textContent = view.detail;
+    if (view.value === null) {
+      for (const name of ['aria-valuemin', 'aria-valuemax', 'aria-valuenow', 'aria-valuetext']) node.removeAttribute(name);
+      node.setAttribute('aria-describedby', 'context-detail');
+    } else {
+      node.removeAttribute('aria-describedby'); node.setAttribute('aria-valuemin', '0');
+      node.setAttribute('aria-valuemax', String(view.max)); node.setAttribute('aria-valuenow', String(view.value));
+      node.setAttribute('aria-valuetext', view.detail);
+    }
+    $('context-fill').style.width = view.fraction === null ? '0%' : `${view.fraction * 100}%`;
+    if ($('context-state').textContent !== view.label) $('context-announcement').textContent = view.label;
+    $('context-state').textContent = view.label;
+  }
+  function stopContextPreparation() {
+    preparationController?.abort();
+    workspace?.context?.invalidateUsage?.();
+  }
   async function persistWorkspace() {
     const result = await workspace.persist();
     if (result.error) { $('chat-error').hidden = false; $('chat-error').textContent = 'Memory changed in this session, but saving failed: ' + result.error; }
@@ -120,8 +171,8 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
       errorCode: state.errorCode, errorDetail: reportText(state.error), browser: reportText(navigator.userAgent), pageVisible: !document.hidden,
     }, null, 2);
     if (document.activeElement !== $('diagnostic-report')) $('diagnostic-report').value = latestReport;
-    $('send').disabled = state.phase !== 'ready';
-    $('stop').hidden = state.phase !== 'generating';
+    $('send').disabled = state.phase !== 'ready' || preparingContext;
+    $('stop').hidden = state.phase !== 'generating' && !preparingContext;
     $('unload').disabled = state.phase === 'generating';
     $('clear').disabled = state.phase === 'generating';
     $('download').textContent = ['error', 'cancelled'].includes(state.phase) ? 'Retry cached load' : 'Load model';
@@ -129,9 +180,9 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
     $('error').textContent = state.error || '';
     if (state.phase !== previousPhase) {
       $('load-status').textContent = state.errorCode === 'INIT_WAIT_LIMIT' ? 'Initialization waiting limit reached. Cached bytes can be retried.' : labels[state.phase] || state.phase;
-      $('session-status').textContent = inChat ? (state.phase === 'generating' ? 'Writing' : 'On device') : busy ? 'Loading' : unsupported ? 'Unavailable' : 'Not loaded';
       if (unsupported || initRecovery) $('error').focus();
     }
+    $('session-status').textContent = inChat ? (state.phase === 'generating' ? 'Writing' : preparingContext ? 'Preparing context' : 'On device') : busy ? 'Loading' : unsupported ? 'Unavailable' : 'Not loaded';
     if (state.determinate) {
       $('load-progress').value = state.progress;
       $('percent').textContent = `${Math.floor(state.progress * 100)}%`;
@@ -192,7 +243,7 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
     if (file) load('file', file);
     $('local-file').value = '';
   });
-  $('cancel').addEventListener('click', () => controller.cancel());
+  $('cancel').addEventListener('click', () => { stopContextPreparation(); void controller.cancel(); });
   $('diagnostic-report').addEventListener('blur', () => { $('diagnostic-report').value = latestReport; });
   $('copy-report').addEventListener('click', async () => {
     const snapshot = latestReport;
@@ -227,8 +278,8 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
   document.addEventListener('pointerdown', closeOptions);
   const visibility = () => app.classList.toggle('is-hidden', document.hidden);
   document.addEventListener('visibilitychange', visibility); visibility();
-  $('unload').addEventListener('click', async () => { $('draft').value = $('prompt').value; await controller.cancel(); });
-  $('stop').addEventListener('click', () => controller.cancel());
+  $('unload').addEventListener('click', async () => { $('draft').value = $('prompt').value; stopContextPreparation(); await controller.cancel(); });
+  $('stop').addEventListener('click', () => { stopContextPreparation(); void controller.cancel(); });
   $('clear').addEventListener('click', () => {
     if (workspace) return; // Canonical preview history stays intact; no silent reset.
     options.open = false;
@@ -249,6 +300,8 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
       $('chat-error').hidden = false; $('chat-error').textContent = 'This preview has reached its conversation limit. Clear the conversation to start fresh.'; return;
     }
     preparingContext = Boolean(workspace); // Reserve before persistence can yield.
+    preparationController = workspace ? new AbortController() : undefined;
+    render(controller.getState());
     $('chat-error').hidden = true;
     const userTurn = workspace?.conversation.append({ role: 'user', content: text });
     messages.push({ role: 'user', content: text }); message('user', text, false, userTurn?.id);
@@ -259,7 +312,9 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
     try {
       if (workspace) await persistWorkspace();
       if (workspace) { $('send').disabled = true; $('session-status').textContent = 'Preparing context'; }
-      const prepared = workspace ? await workspace.prepare() : null;
+      preparationController?.signal.throwIfAborted();
+      const prepared = workspace ? await workspace.prepare({ signal: preparationController.signal }) : null;
+      preparationController?.signal.throwIfAborted();
       const answer = await controller.send(prepared?.messages || [{ role: 'system', content: 'You are a concise, helpful assistant. Answer in plain text.' }, ...messages]);
       pendingMessage.querySelector('.content').textContent = answer;
       pendingMessage.classList.remove('pending');
@@ -278,9 +333,10 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
       // Incomplete attempts remain visible, but are not silently sent as accepted history.
       if (workspace) { $('chat-error').hidden = false; $('chat-error').textContent = error.message; await persistWorkspace(); }
       else messages.pop();
-    } finally { pendingMessage = null; preparingContext = false; render(controller.getState()); }
+    } finally { pendingMessage = null; preparingContext = false; preparationController = undefined; render(controller.getState()); }
   });
   window.addEventListener('pagehide', () => {
+    stopContextPreparation(); unsubscribeUsage();
     void controller.dispose(); document.removeEventListener('visibilitychange', visibility);
     workspace?.dispose();
     document.removeEventListener('keydown', closeOptions);
@@ -292,6 +348,10 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
     cancelAnimationFrame(documentFrame);
   }, { once: true });
   if (workspace) {
+    if (typeof workspace.context.subscribeUsage === 'function') {
+      unsubscribeUsage = workspace.context.subscribeUsage(showContextUsage);
+      showContextUsage(workspace.context.usageSnapshot());
+    }
     const turns = workspace.conversation.snapshot().turns;
     messages = turns.map(({ role, content }) => ({ role, content }));
     for (const turn of turns) {
