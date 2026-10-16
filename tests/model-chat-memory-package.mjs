@@ -17,7 +17,8 @@ const chrome = process.env.BROWSER_RAG_CHROMIUM_PATH || process.env.MODEL_CHAT_B
 const playwright = process.env.BROWSER_MODEL_PLAYWRIGHT_MODULE?.trim() || process.env.PLAYWRIGHT_MODULE?.trim();
 if (!playwright) throw new Error('Set BROWSER_MODEL_PLAYWRIGHT_MODULE (or PLAYWRIGHT_MODULE) to an already-installed Playwright module file. Automatic installation is disabled.');
 const prefix = '/portable/preview/';
-const memoryAssets = ['workspace', 'store', 'events', 'context', 'structured-context', 'automatic-context', 'rag-adapter',
+const memoryAssets = ['workspace', 'store', 'events', 'context', 'structured-context', 'automatic-context', 'automatic-memory',
+  'conversation-index', 'scoped-pockets', 'starter-facts', 'rag-adapter',
   'restore-events', 'citations', 'panel', 'rag-core', 'graph-renderer'].map(name => `memory/${name}.mjs`).concat('memory/panel.css');
 const payloadPaths = ['index.html', 'style.css', 'app.mjs', 'loader-controller.mjs', 'model-contract.mjs',
   'runtime-adapter.mjs', 'engine-worker.mjs', 'runtime-errors.mjs', 'wasm-memory.mjs', 'runtime-profile.mjs',
@@ -45,6 +46,11 @@ const priorAttempts = [];
 const cleanup = { browserContextClosed: false, loopbackServerClosed: false, ownedTemporaryProfileRemoved: false };
 let manifest, packageIdentity, sourceIdentity, fixture, server, context, profile, origin, browserVersion, failure, workers = 0;
 const started = Date.now();
+function required(name, pattern) {
+  const value = process.env[name];
+  if (!value || !pattern.test(value)) throw new Error(`Set ${name} explicitly to the reviewed value.`);
+  return value;
+}
 
 function inside(base, target) {
   const suffix = relative(base, target);
@@ -95,6 +101,9 @@ async function startIsolatedServer() {
 }
 
 try {
+  const expectedManifest = required('BROWSER_MEMORY_EXPECTED_MANIFEST_SHA256', /^[a-f0-9]{64}$/);
+  const expectedHead = required('BROWSER_MEMORY_EXPECTED_SOURCE_HEAD', /^[a-f0-9]{40}$/);
+  const expectedFingerprint = required('BROWSER_MEMORY_EXPECTED_SOURCE_FINGERPRINT', /^[a-f0-9]{64}$/);
   // Keep bounded failed verifier attempts when correcting proof-only defects.
   // This never treats an earlier attempt as evidence for the current package.
   const previous = await readFile(resultPath, 'utf8').then(text => {
@@ -110,12 +119,13 @@ try {
       boundary: { actualNativeCalls: previous.boundary?.actualNativeCalls, runtimeWorkersCreated: previous.boundary?.runtimeWorkersCreated,
         externalRequestCount: previous.boundary?.externalRequests?.length, pageErrorCount: previous.boundary?.pageErrors?.length } });
   }
-  await check('exact 37-file payload, complete license pins, source and manifest identities', async () => {
+  await check('exact 41-file payload, complete license pins, source and manifest identities', async () => {
     assert.ok(inside(resolve(root, '.artifacts/model-chat'), packageRoot), 'package stays in its explicitly owned artifact parent');
     assert.equal(await realpath(packageRoot), packageRoot, 'package root has no linked ancestor');
     assert.deepEqual(await filesBelow(packageRoot), expectedFiles);
-    assert.equal(payloadPaths.length, 37); assert.equal(expectedFiles.length, 38);
+    assert.equal(payloadPaths.length, 41); assert.equal(expectedFiles.length, 42);
     const manifestBytes = await readFile(join(packageRoot, 'site-manifest.json'));
+    assert.equal(digest(manifestBytes), expectedManifest, 'expected reviewed manifest bytes');
     manifest = JSON.parse(manifestBytes);
     const { identitySha256, ...body } = manifest;
     assert.equal(manifest.schema, 'rag-model-chat-static/v1'); assert.equal(manifest.memoryPreview, true);
@@ -126,8 +136,9 @@ try {
     assert.equal(manifest.model.licensePath, 'LICENSES/lfm-open-license-1.0.txt');
     assert.equal(manifest.model.licenseSha256, pinned[manifest.model.licensePath]);
     assert.match(manifest.source.head || '', /^[a-f0-9]{40}$/); assert.equal(typeof manifest.source.dirty, 'boolean');
-    if (process.env.BROWSER_MEMORY_EXPECTED_SOURCE_HEAD) assert.equal(manifest.source.head, process.env.BROWSER_MEMORY_EXPECTED_SOURCE_HEAD, 'expected tested revision');
+    assert.equal(manifest.source.head, expectedHead, 'expected tested revision'); assert.equal(manifest.source.dirty, false);
     assert.equal(manifest.source.fingerprintSha256, digest(JSON.stringify(manifest.source.files)));
+    assert.equal(manifest.source.fingerprintSha256, expectedFingerprint, 'expected reviewed source closure');
     packageIdentity = [];
     for (const file of manifest.files) {
       const bytes = await readFile(join(packageRoot, file.path));
@@ -153,7 +164,7 @@ try {
     const readme = await readFile(join(packageRoot, 'README.txt'), 'utf8');
     assert.match(readme, /no special markup is required/); assert.match(readme, /lossy extractive context, not general semantic summarization/);
     assert.match(readme, /not full product-release or iOS qualification/);
-    observations.push({ packagePath: portable(relative(root, packageRoot)), filesIncludingManifest: 38,
+    observations.push({ packagePath: portable(relative(root, packageRoot)), filesIncludingManifest: 42,
       manifestSha256: digest(manifestBytes), manifestIdentitySha256: identitySha256, sourceHead: manifest.source.head,
       sourceDirtyAtStage: manifest.source.dirty, sourceFingerprintSha256: manifest.source.fingerprintSha256,
       packageBytes: packageIdentity.reduce((sum, file) => sum + file.bytes, 0) + manifestBytes.length });
@@ -198,7 +209,8 @@ try {
   context.setDefaultTimeout(8000); browserVersion = context.browser()?.version() || 'installed Chromium';
   await context.route('**/*', async route => {
     const url = new URL(route.request().url());
-    if (url.origin !== origin) { externalRequests.push({ origin: url.origin, path: url.pathname }); await route.abort('blockedbyclient'); }
+    const runtimeOrWorker = /(?:\/runtime\/|\/engine-worker\.mjs$|\.gguf$)/i.test(url.pathname) || route.request().resourceType() === 'worker';
+    if (url.origin !== origin || runtimeOrWorker) { externalRequests.push({ origin: url.origin, path: url.pathname, ...(runtimeOrWorker ? { reason: 'runtime-or-model-blocked' } : {}) }); await route.abort('blockedbyclient'); }
     else await route.continue();
   });
   context.on('page', page => {
@@ -216,15 +228,18 @@ try {
     assert.equal(await page.locator('#app').getAttribute('data-phase'), 'idle');
     assert.equal(await page.locator('#memory-dialog').count(), 1); assert.equal(await page.locator('#memory-query').getAttribute('type'), 'search');
     assert.equal(await page.locator('#memory-recall').textContent(), 'Search'); assert.equal(await page.locator('#memory-graph').count(), 1);
-    assert.equal(await page.locator('#memory-graph [data-memory-node]').count(), 0, 'empty memory does not fabricate graph nodes');
+    assert.equal(await page.locator('#memory-graph [data-memory-kind="global"]').count(), 3, 'only explicitly labeled Global starters exist before chat');
+    assert.equal(await page.locator('#memory-graph [data-memory-kind="message"]').count(), 0, 'no fabricated conversation messages');
     assert.equal(await page.locator('[role="alert"]:visible').filter({ hasText: /\S/ }).count(), 0);
     const state = await page.evaluate(() => ({ turns: window.localMemoryPreview.workspace.conversation.snapshot().turns.length,
-      records: window.localMemoryPreview.workspace.memory.snapshot().records.length, retained: localStorage.length }));
-    assert.deepEqual(state, { turns: 0, records: 0, retained: 0 });
+      records: window.localMemoryPreview.workspace.memory.snapshot().records.length, retained: localStorage.length,
+      pocket: window.localMemoryPreview.workspace.automaticMemory.getScope(),
+      roles: window.localMemoryPreview.workspace.automaticMemory.snapshot().nodes.map(node => node.role) }));
+    assert.deepEqual(state, { turns: 0, records: 0, retained: 0, pocket: 'all', roles: ['source', 'source', 'source'] });
     const loaded = new Set(browserRequests);
     for (const name of memoryAssets.filter(name => name.endsWith('.mjs') && name !== 'memory/graph-renderer.mjs')) assert.ok(loaded.has(prefix + name), 'production module closure: ' + name);
     assert.equal(workers, 0); assert.ok(!browserRequests.some(path => path.includes('/runtime/') || path.endsWith('/engine-worker.mjs')));
-    observations.push({ originalBootstrapResponse: true, bootstrapResponseReplaced: false, initialStorageEmpty: true,
+    observations.push({ originalBootstrapResponse: true, bootstrapResponseReplaced: false, initialStorageEmpty: true, globalStarterNodes: 3, automaticMemoryDefault: true,
       freshTemporaryProfile: true, cacheClearedAndDisabled: true, nonLoopbackRequestsBlocked: true });
   });
   await check('packaged unmarked exact-passage fixture persists source-bound citations and untouched originals', async () => {
@@ -254,6 +269,8 @@ try {
       const persisted = await workspace.persist();
       return { label, calls, original, before, after: workspace.conversation.exportState(), answerTurnId: accepted.id,
         strategy: prepared.compaction?.strategy, sources: citations, savedRecords: workspace.memory.snapshot().records,
+        memorySources: prepared.memorySources, automaticNodes: workspace.automaticMemory.snapshot().nodes,
+        usedNodeIds: workspace.automaticMemory.snapshot().usedNodeIds,
         durable: persisted.durable, originalHash: await hashText(authored), requestSha256: prepared.measurement.requestSha256,
         eventTypes: workspace.events.list().map(event => event.type) };
     });
@@ -262,6 +279,10 @@ try {
     assert.equal(fixture.savedRecords.length, 0); assert.equal(fixture.durable, true);
     assert.deepEqual(JSON.parse(fixture.after).turns.slice(0, 3), JSON.parse(fixture.before).turns, 'all originals survive fixture compaction');
     assert.ok(fixture.sources.length > 0 && fixture.sources.every(source => source.kind === 'extractive'));
+    assert.ok(fixture.memorySources.some(source => source.nodeId === 'turn:' + fixture.original.id && source.role === 'user'));
+    assert.ok(fixture.memorySources.every(source => source.role !== 'assistant'), 'generated text is never quoted as authored memory evidence');
+    assert.ok(fixture.usedNodeIds.includes('turn:' + fixture.original.id), 'only the actual dispatched memory source is marked used');
+    assert.equal(fixture.automaticNodes.filter(node => node.kind === 'message').length, 4, 'all canonical user and generated turns become real nodes');
     assert.ok(fixture.sources.some(source => source.offsets.start > 120));
     for (const source of fixture.sources) {
       assert.equal(source.turnId, fixture.original.id); assert.equal(source.turnHash, fixture.originalHash); assert.equal(source.offsets.unit, 'utf16');
@@ -270,22 +291,28 @@ try {
     assert.ok(fixture.eventTypes.includes('compacted')); assert.ok(fixture.eventTypes.includes('context-dispatched'));
     observations.push({ fixtureLabel: fixture.label, fixtureOperations: fixture.calls, actualNativeCalls: 0,
       savedRecordsCreated: 0, strategy: fixture.strategy, sourceCount: fixture.sources.length, originalHash: fixture.originalHash,
-      requestSha256: fixture.requestSha256, fixtureMeterIsNotNativeTokenProof: true });
+      requestSha256: fixture.requestSha256, usedNodeIds: fixture.usedNodeIds, automaticMessageNodes: 4,
+      fixtureMeterIsNotNativeTokenProof: true });
   });
-  await check('production bootstrap restores answer links without turning historical activity into saved graph nodes', async () => {
+  await check('production bootstrap restores exact answer links and automatic message nodes without manual saves', async () => {
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForFunction(() => window.localMemoryPreview?.workspace && document.getElementById('memory-dialog'));
     assert.equal(await page.locator('#app').getAttribute('data-phase'), 'idle');
     const restored = await page.evaluate(answerTurnId => ({ conversation: window.localMemoryPreview.workspace.conversation.exportState(),
       records: window.localMemoryPreview.workspace.memory.snapshot().records,
       sources: window.localMemoryPreview.workspace.sourcesForAnswer(answerTurnId),
+      automaticNodes: window.localMemoryPreview.workspace.automaticMemory.snapshot().nodes,
       graphNodeCount: window.localMemoryPreview.workspace.graph.snapshot().nodes.length }), fixture.answerTurnId);
     assert.equal(restored.conversation, fixture.after); assert.deepEqual(restored.sources, fixture.sources); assert.deepEqual(restored.records, []);
     assert.ok(restored.graphNodeCount > 0, 'internal execution history remains separate from saved memory presentation');
     const links = await page.locator(`#turn-${fixture.answerTurnId} .memory-sources a`).evaluateAll(nodes => nodes.map(node => node.getAttribute('href')));
     assert.deepEqual(links, fixture.sources.map(source => '#turn-' + source.turnId));
     assert.equal(await page.locator(`#turn-${fixture.original.id} .content`).textContent(), fixture.original.content);
-    assert.equal(await page.locator('#memory-graph [data-memory-node]').count(), 0, 'no saved records means no saved graph nodes despite historical events');
+    assert.equal(restored.automaticNodes.filter(node => node.kind === 'message').length, 4);
+    assert.equal(restored.automaticNodes.filter(node => node.kind === 'global').length, 3);
+    assert.equal(await page.locator('#memory-graph [data-memory-kind="message"]').count(), 4, 'canonical turns, not event-history nodes');
+    assert.equal(await page.locator('#memory-graph [data-memory-kind="global"]').count(), 3);
+    assert.equal(await page.locator('#memory-graph [data-memory-kind="record"]').count(), 0, 'automatic nodes do not manufacture manual saved records');
     assert.equal(await page.locator('#memory-graph svg').count(), 0, 'no substitute SVG renderer');
     assert.equal(workers, 0); assert.equal(await page.locator('[role="alert"]:visible').filter({ hasText: /\S/ }).count(), 0);
   });

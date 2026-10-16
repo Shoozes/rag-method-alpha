@@ -1,52 +1,96 @@
-# Experimental single-chat memory
+# Experimental automatic chat memory
 
 Open the [HTTPS preview](https://shoozes.github.io/rag-method-alpha/model-chat/?memory=1).
-Use `?memory=0` or no memory parameter for basic chat; add `&graph=0` to memory
-mode to use the searchable HTML memory list without the optional TSL graph.
-Model loading is always explicit.
+This approved experiment's public source is curated on
+`workspace/model-loading-onboarding`; the delivery receipt identifies the exact
+revision verified on Pages. Private development history, the private launch
+wrapper and machine paths are excluded from that source and the static payload.
+No memory parameter or `?memory=0` retains basic chat without memory stores.
+Add `&graph=0` for searchable HTML controls. Model loading is always explicit.
 
-Older user passages are selected automatically when native context fills. This
-is bounded, lexical, lossy selection, not general semantic summarization. Exact
-UTF-16 spans and SHA-256 source hashes bind the selected quotes, including CRLF
-and Unicode. The original transcript stays intact. No saved facts are created
-automatically. Up to eight passages, 360 codepoints each and 2200 total are used;
-scan bounds are 512 prior turns, 512 KiB and 2048 candidates. The recent whole-turn
-tail is bounded to four turns / 1000 codepoints when it fits. The latest query
-stays whole. A native prompt count with a 160-token reply reserve decides fit.
+Each accepted user or assistant message automatically becomes a source-linked
+Conversation node. Canonical turn IDs preserve originals; these nodes are not
+saved facts or generated summaries. Assistant text is labeled generated and
+searchable for inspection, but excluded from quoted user evidence. Interrupted
+replies never become accepted assistant nodes. The existing TSL renderer animates
+new node IDs; reduced motion disables that animation.
 
-Add memory lets you select a user turn and Save its exact words separately for
-keyword retrieval. Tap a saved node to read its excerpt and cited user source;
-Back returns to the graph. Edit and Forget apply to the selected record. Search
-uses the same RAG retrieval as chat and lights matching saved records.
-Forget removes a saved record's eligibility and excludes its source turns from
-derived context. It preserves originals and independent repeats elsewhere in
-the transcript. Historical links mean **Sources sent at the time**, not answer
-truth, current eligibility or authenticated execution. Local storage is editable
-and is separate from the model's OPFS cache. Clearing browser data removes it.
+Memory has one graph, one search and one scope filter:
 
-The map displays current saved records and their cited user sources, with at
-most six records / twelve nodes in the view; search prioritizes older matching
-records. An empty ledger produces no memory nodes. The underlying event ledger
-still observes save/recall/compaction/dispatch; it is not a history dashboard.
-The graph has no permission, retrieval, storage or orchestration authority.
-There are no teams, personas, background agents, training or cross-repository
-services in this demo.
+- All memories reads Global plus the current persona and current conversation.
+- Global holds three labeled Space starter facts with NASA links: public
+  knowledge shared within this actor's workspace, separate from user facts.
+- Persona holds only exact user excerpts explicitly remembered for this bot,
+  with their original chat, turn, owner, offsets and source hashes.
+- Conversation indexes only this actor/persona/chat's canonical messages.
 
-The retained 230M experiment selected correct passages over two capacity
-crossings. Its first reply recalled all requested fields; after correction it
-returned Thursday but omitted codename/city. Previous unrelated-question
-abstention and answer-format checks also failed. Check source-linked text when
-model prose is unreliable. This preview makes no general accuracy, unlimited
-memory or physical-iPhone support claim.
+The filter changes retrieval. Workspace identities bind access; selecting a
+label cannot grant another persona or conversation's data. Another chat may
+reuse the same persona's explicit excerpts with bounded original-user proof;
+other actors/personas cannot. There is no persona picker, thread manager or
+autonomous agent. TulpaWeaver's current-companion allow-list informed the scope
+boundary; Conversation is this preview's adaptation, not an identical donor
+pocket. No private donor code was copied.
 
-## Local setup and staging
+A later question uses the existing local keyword RAG core to select up to three
+prior user/public-source excerpts, at most 360 codepoints each. The native prompt
+meter and 160-token reply reserve decide fit; the latest question stays whole.
+Hashes and UTF-16 offsets bind quoted words. Older-context compaction remains
+bounded, lexical and lossy, not general semantic summarization or fact admission.
+Quotes are data, not instructions or verified personal facts. Arbitrary natural
+language corrections or commands are not parsed. Explicit Save/Edit/Forget and
+marked-correction behavior remain; Persona excerpts own their source recall,
+while originals remain inspectable in Conversation.
 
-Use Node 22.12+ and the main example's pinned runtime preparation. Reuse an
-already prepared esbuild 0.21.5 module by setting
-`BROWSER_MEMORY_ESBUILD_MODULE` to its module entry; this helper never installs
-dependencies or builds the full explorer. Prepare the pinned graph/Three inputs
-using the main example's [offline graph setup](../README.md#prepare-the-optional-tsl-graph-offline),
-then run:
+Search lights matching nodes. Last-used highlights refer only to evidence
+actually dispatched with a reply; preparing or cancelling alone does not claim
+use. Tap a node for its excerpt and provenance; Back returns to the graph.
+Conversation citations keep exact references. Global and cross-chat Persona
+excerpts expose their own source; they are not invented current-chat messages.
+Historical links mean **Sources sent at the time**, not answer truth, current
+eligibility or authenticated history. Source hashes establish internal binding,
+not independent authentication of editable browser storage.
+
+Forget excludes the selected indexed message and preserves the transcript.
+Persona Forget and Global removal retain tombstones. All versions of manually
+remembered sources stay protected from automatic recall/compaction resurrection.
+Independent repeats in other turns can still be retrieved. Removed starter IDs
+are not silently reseeded after a successful save and reload. Legacy v1 history
+is adopted only by the original default workspace without inventing new events.
+
+The view shows at most twelve actual nodes, prioritizing matches or last-used
+IDs. Indexing refuses beyond 512 turns or 512 KiB rather than searching a partial
+transcript. Persona memory admits at most 32 excerpts, 4,000 UTF-16 units each,
+and 256 KiB including source proofs/history. Storage failures report session-only
+changes; durability is not promised after a failed write. Detected shared-memory
+changes from another workspace refuse stale operations until reload.
+Browser memory storage is user editable and separate from the model's OPFS cache.
+Removing browser data can remove retained chat and memory.
+
+Current routing/UI checks use labeled provider and token-meter fixtures. They
+prove deterministic scope, source, persistence and dispatch behavior, not new
+native token counts, model accuracy or physical-iOS support. The retained 230M
+experiment selected correct passages over two capacity crossings: its first
+reply recalled all fields; after correction it returned Thursday but omitted
+codename/city. Earlier unrelated-question abstention and answer-format checks
+also failed. That historical run was not repeated for automatic indexing.
+Selected evidence does not guarantee a correct answer. No semantic promotion,
+training, paid inference, teams or worker orchestration is included.
+
+## Sources and local setup
+
+The starter module contains only three brief public astronomy facts and source
+links: [Earth orbits the Sun](https://science.nasa.gov/earth/facts/),
+[the Moon orbits Earth](https://science.nasa.gov/moon/facts/), and
+[Mars has two moons, Phobos and Deimos](https://science.nasa.gov/mars/moons/).
+No NASA images, logos or article passages are included. Application/runtime
+licenses are unchanged; these citations do not turn starter knowledge into user
+facts or establish NASA endorsement.
+
+Use Node 22.12+ and the main example's [runtime preparation](../README.md#run-locally).
+Set `BROWSER_MEMORY_ESBUILD_MODULE` to an already prepared esbuild 0.21.5 module,
+and follow the [offline graph setup](../README.md#prepare-the-optional-tsl-graph-offline)
+for the pinned graph/Three inputs. From this public repository root:
 
 ```sh
 node examples/browser-model-chat/memory/build-core.mjs
@@ -54,16 +98,23 @@ node examples/browser-model-chat/memory/build-graph.mjs
 node examples/browser-model-chat/stage-static.mjs --memory-preview --output .artifacts/model-chat/site
 ```
 
-The output is exactly 37 payload files plus its source-bound manifest. It carries
-first-party/runtime MIT notices, full forcegraph-tsl/Three MIT texts, and the
-complete pinned LFM Open License 1.0.
-Weights, transcripts, tests, proof and source history are excluded. The model's
-distinct license terms remain applicable; no license is changed. Staging alone
-grants no release approval. A source tree carrying `PRIVATE_LOCAL_ONLY` still
-refuses default staging; the public source contains no private marker or history.
+The bounded output and its source-bound manifest retain the application/runtime
+MIT notices, full forcegraph-tsl/Three MIT texts and pinned LFM Open License 1.0.
+Weights, transcripts, tests, proof, local launch scripts and private development
+history are excluded. The model's separate license remains applicable. Staging
+does not itself publish or qualify a broader product release; the default
+private-marker guard remains intact.
 
-Serve the staged directory over HTTPS (loopback HTTP is suitable locally) with
-real missing-file 404s, JavaScript MIME and WASM MIME. A local setup can also use
-the example server with explicit generated-core and graph mounts through its API. This
-packet verifies a prepared-host and fresh-browser-profile journey; fresh OS/npm
-installation and physical-device qualification remain separate.
+Serve the staged directory over HTTPS, or use the existing public loopback API
+with explicit prepared-core and graph mounts:
+
+```powershell
+node --input-type=module -e "import {startServer} from './examples/browser-model-chat/serve.mjs'; console.log((await startServer({port:5187,memoryCoreRoot:'.artifacts/memory',memoryGraphRoot:'.artifacts/memory'})).url+'?memory=1')"
+```
+
+Open the printed URL and stop the server with Ctrl+C. Runtime files use the
+standard `.artifacts/model-chat/runtime` root unless its API option is supplied.
+The server mounts only the named generated core and graph files, with ordinary
+module MIME and real missing-file 404s. These commands reuse prepared inputs;
+fresh-host installation, model/cache recovery and physical-device qualification
+remain separate. No private local launcher or sibling-checkout path is required.

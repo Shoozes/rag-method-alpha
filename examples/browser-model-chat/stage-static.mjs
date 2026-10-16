@@ -20,7 +20,11 @@ const memoryFiles = Object.freeze([
   'memory/structured-context.mjs', 'memory/automatic-context.mjs', 'memory/rag-adapter.mjs',
   'memory/restore-events.mjs', 'memory/citations.mjs', 'memory/panel.mjs', 'memory/panel.css',
   'memory/rag-core.mjs', 'memory/graph-renderer.mjs',
+  'memory/automatic-memory.mjs', 'memory/conversation-index.mjs',
+  'memory/scoped-pockets.mjs', 'memory/starter-facts.mjs',
 ]);
+const automaticMemoryFiles = new Set(['memory/automatic-memory.mjs', 'memory/conversation-index.mjs',
+  'memory/scoped-pockets.mjs', 'memory/starter-facts.mjs']);
 const memoryCoreSha256 = 'c282ebb3965c4a25b48fb66082ce18c72184449f2123633a901ffceb9939ace6';
 const graphRendererSha256 = 'c85fda05a2a6ac5596dc41f5f197064eb3063932eaf574ae93f5f7141d179edd';
 const graphLicenses = Object.freeze({
@@ -37,7 +41,8 @@ const payloadPaths = Object.freeze([...browserFiles, 'theme/aurel-gold.css',
 const preMemoryPayloadPaths = payloadPaths.filter(name => !['wasm-memory.mjs', 'runtime-profile.mjs'].includes(name));
 const priorPayloadPaths = preMemoryPayloadPaths.filter(name => name !== 'runtime-errors.mjs');
 const legacyPayloadPaths = priorPayloadPaths.filter(name => !name.startsWith('runtime/compat/'));
-const previousMemoryPayloadPaths = Object.freeze([...payloadPaths, ...memoryFiles.filter(name => name !== 'memory/graph-renderer.mjs'), modelLicensePath].sort());
+const previousMemoryPayloadPaths = Object.freeze([...payloadPaths, ...memoryFiles.filter(name => name !== 'memory/graph-renderer.mjs' && !automaticMemoryFiles.has(name)), modelLicensePath].sort());
+const previousGraphMemoryPayloadPaths = Object.freeze([...payloadPaths, ...memoryFiles.filter(name => !automaticMemoryFiles.has(name)), modelLicensePath, ...Object.keys(graphLicenses)].sort());
 const memoryPayloadPaths = Object.freeze([...payloadPaths, ...memoryFiles, modelLicensePath, ...Object.keys(graphLicenses)].sort());
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const portable = value => value.split(sep).join('/');
@@ -99,7 +104,7 @@ async function managedOutput(destination, memoryPreview) {
   const previousPaths = previous.files?.map(file => file.path).sort();
   if (previous.schema !== schema || previous.managedBy !== managedBy || identitySha256 !== identity(body)
       || previous.publicReleaseQualified !== false || !Array.isArray(previous.files)
-      || ![...(memoryPreview ? [memoryPayloadPaths, previousMemoryPayloadPaths] : []), payloadPaths, preMemoryPayloadPaths, priorPayloadPaths, legacyPayloadPaths]
+      || ![...(memoryPreview ? [memoryPayloadPaths, previousGraphMemoryPayloadPaths, previousMemoryPayloadPaths] : []), payloadPaths, preMemoryPayloadPaths, priorPayloadPaths, legacyPayloadPaths]
         .some(paths => JSON.stringify(previousPaths) === JSON.stringify(paths))) {
     throw new Error('Refusing output with a foreign or changed managed manifest.');
   }
@@ -204,6 +209,8 @@ export async function stageStatic({ output = join(workspace, '.artifacts/model-c
     'Model weights are not included in this static payload. Download is an explicit browser action.',
     'The model license applies to model use and redistribution; inspect its pinned terms before deployment.', '',
     ...(memoryPreview ? [
+      'Automatic message nodes derive from canonical user and generated-assistant turns; assistant output is not admitted as user evidence.',
+      'Global Space starters cite NASA Earth facts, Moon facts and Mars moons pages; they are separate from personal conversation history.',
       'Experimental model limitation: after a correction, the model used Thursday instead of Tuesday but omitted the codename and city in a multi-field answer.',
       'Automatic passage/provenance checks do not establish generated-answer completeness or truth.', '',
     ] : []),
@@ -227,8 +234,15 @@ export async function stageStatic({ output = join(workspace, '.artifacts/model-c
       'The pinned TSL renderer uses Three WebGPU with a WebGL2 backend fallback; unavailable graphics retain accessible memory controls.',
       'Graph startup or device loss is not a guarantee of mobile GPU support. No new iOS qualification follows from this package.',
       'Older context is selected automatically as source-linked exact passages; no special markup is required.',
+      'Each accepted message creates a canonical Conversation node. Generated-assistant text remains labeled and is excluded from retrieved user evidence.',
+      'The pocket filter changes real retrieval: Global public Space starters, explicit Persona user excerpts, current Conversation, or All pockets.',
+      'Scope bindings include actor, persona and conversation identities; visual selection grants no permissions.',
+      'Space starters cite https://science.nasa.gov/earth/facts/, https://science.nasa.gov/moon/facts/ and https://science.nasa.gov/mars/moons/.',
+      'Search highlights actual matches. Last-used nodes light only after dispatch. No automatic fact promotion or agent orchestration is included.',
       'Automatic passage selection is lossy extractive context, not general semantic summarization or verified fact admission.',
       'Explicit Save stores selected exact user words separately for keyword retrieval; Forget does not erase the transcript.',
+      'Remember for persona retains exact user-source proof. Forget/version exclusions persist when saving succeeds; quota failures report session-only state.',
+      'The index refuses more than 512 turns or 512 KiB; Persona memory is bounded to 32 excerpts and 256 KiB including proof/history.',
       'Historical answer links describe Sources sent at the time, not answer truth, current record eligibility or authenticated execution.',
       'Known 230M model limits include failed unrelated-question abstention and answer-format adherence.',
       'After correction, a native test used Thursday instead of Tuesday but omitted the codename and city in a multi-field answer; answer completeness is not guaranteed.',

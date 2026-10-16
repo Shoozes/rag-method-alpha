@@ -3,14 +3,44 @@
 An optional, separate browser entry point for one pinned local model and a bounded chat. The existing Atlas entry point remains model-free. This example is served separately and is not included in the standard Vite/Atlas build artifact.
 
 Live static preview: **https://shoozes.github.io/rag-method-alpha/model-chat/**.
-The limited [memory preview](https://shoozes.github.io/rag-method-alpha/model-chat/?memory=1)
-adds automatic selected-passage compaction, optional exact-word saved memory and
-a small read-only TSL graph with compact search. It is an experiment: context selection is lossy and the
-230M model can omit or invent details. See [memory setup and limits](./memory/README.md).
+The approved experimental [memory preview](https://shoozes.github.io/rag-method-alpha/model-chat/?memory=1)
+adds automatic conversation indexing, scoped keyword retrieval and a small TSL
+graph with compact search. Source for this update is curated on
+`workspace/model-loading-onboarding`; private development history, the private
+launch wrapper and machine paths are excluded. The source-bound delivery receipt
+identifies the revision actually verified on Pages. Context selection is lossy,
+and the 230M model can omit or invent details. See [memory setup and limits](./memory/README.md).
 The runtime automatically selects a pinned Memory32 compatibility build when
 Memory64 or JSPI is unavailable. OPFS remains required. The user reported a
 successful iPhone conversation after the resource-binding fix; exact device/iOS
 and broader acceptance remain unrecorded. Use the [mobile checklist](./MOBILE.md).
+
+## Current memory experiment
+
+Open `?memory=1` to index accepted user and assistant messages as Conversation
+nodes. Generated assistant text is available for inspection and search, but
+cannot become quoted user evidence. No memory parameter or `?memory=0` keeps
+basic chat; the session-only history and no-RAG descriptions below apply to
+that basic mode. `&graph=0` retains the memory controls as HTML.
+
+One filter selects All memories, Global, Persona or Conversation. All combines
+shared public starter knowledge with only the current persona's explicit user
+excerpts and the current actor/persona/chat transcript. The filter changes
+retrieval, while workspace identities enforce access. There is no persona picker
+or thread manager. Three labeled NASA Space facts are Global starter knowledge,
+not user facts. Search and actual request dispatch highlight matching or used
+nodes; a prepared or cancelled request does not claim model use.
+
+The view shows at most twelve nodes. Requests admit up to three retrieved
+user/public-source excerpts of 360 codepoints each, subject to the native prompt
+meter; indexing refuses beyond 512 turns or 512 KiB. Persona excerpts retain
+their original user-source proof. Forget preserves the transcript while
+excluding the selected source from recall; independent repeats can still be
+retrieved. Browser persistence can fail, and stale shared state requires reload.
+The [memory guide](./memory/README.md) records the full bounds, correction and
+tombstone rules, setup and evidence limits. Current routing checks use labeled
+provider/meter fixtures; they do not establish new native-model quality or iOS
+support. No model training or autonomous orchestration is included.
 
 ## Run locally
 
@@ -90,9 +120,10 @@ node examples/browser-model-chat/stage-static.mjs --memory-preview --output .art
 
 The builder verifies prepared package bytes and emits one self-contained
 `.artifacts/memory/graph-renderer.mjs`, plus complete graph/Three MIT texts.
-The explicit memory export contains **37 payload files plus its manifest**;
-the added destinations are `memory/graph-renderer.mjs`,
-`LICENSES/forcegraph-tsl.txt` and `LICENSES/three.txt`. Preserve those full notices
+The explicit memory export contains **41 payload files plus its manifest**.
+Automatic memory adds `memory/automatic-memory.mjs`, `memory/conversation-index.mjs`,
+`memory/scoped-pockets.mjs` and `memory/starter-facts.mjs`. The existing graph
+bundle and `LICENSES/forcegraph-tsl.txt` / `LICENSES/three.txt` remain included. Preserve those full notices
 alongside the first-party/runtime MIT texts and separate LFM model license.
 Prepared dependencies and build scripts are source/setup inputs, not browser files.
 These commands reuse prepared inputs; they do not constitute a fresh-host install proof.

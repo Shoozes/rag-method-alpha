@@ -23,7 +23,9 @@ const browserFiles = ['index.html', 'style.css', 'app.mjs', 'loader-controller.m
 const helperFiles = ['runtime-errors.mjs', 'wasm-memory.mjs', 'runtime-profile.mjs'];
 const memoryFiles = ['memory/workspace.mjs', 'memory/store.mjs', 'memory/events.mjs', 'memory/context.mjs',
   'memory/structured-context.mjs', 'memory/automatic-context.mjs', 'memory/rag-adapter.mjs', 'memory/restore-events.mjs',
-  'memory/citations.mjs', 'memory/panel.mjs', 'memory/panel.css', 'memory/rag-core.mjs', 'memory/graph-renderer.mjs'];
+  'memory/citations.mjs', 'memory/panel.mjs', 'memory/panel.css', 'memory/rag-core.mjs', 'memory/graph-renderer.mjs',
+  'memory/automatic-memory.mjs', 'memory/conversation-index.mjs', 'memory/scoped-pockets.mjs', 'memory/starter-facts.mjs'];
+const automaticAdded = ['memory/automatic-memory.mjs', 'memory/conversation-index.mjs', 'memory/scoped-pockets.mjs', 'memory/starter-facts.mjs'];
 const modelLicensePath = 'LICENSES/lfm-open-license-1.0.txt';
 const graphAdded = ['memory/graph-renderer.mjs', 'LICENSES/forcegraph-tsl.txt', 'LICENSES/three.txt'];
 const previewAdded = [...memoryFiles, modelLicensePath, ...graphAdded.filter(name => name.startsWith('LICENSES/'))];
@@ -96,7 +98,7 @@ test('missing or wrong pinned runtime bytes fail before creating output', async 
   assert.equal(await exists(output), false);
 });
 
-test('explicit preview export has exactly 37 hashed payload files plus manifest, complete licenses and safe refresh', async t => {
+test('explicit preview export has exactly 41 hashed payload files plus manifest, complete licenses and safe refresh', async t => {
   // The intended delivery site is the sole delivery output. No second runtime tree
   // or model is created; failure cases above use only a few fixture bytes.
   const staged = await stageStatic();
@@ -119,7 +121,7 @@ test('explicit preview export has exactly 37 hashed payload files plus manifest,
     'runtime/LICENSE', 'runtime/compat/wllama.js', 'runtime/compat/wllama.wasm', 'LICENSES/rag-method.txt', 'NOTICE.txt', 'README.txt',
     ...previewAdded].sort();
   assert.deepEqual(manifest.files.map(file => file.path).sort(), expected);
-  assert.equal(manifest.files.length, 37);
+  assert.equal(manifest.files.length, 41);
   const actual = [];
   async function visit(directory, prefix = '') {
     for (const item of await readdir(directory, { withFileTypes: true })) {
@@ -129,7 +131,7 @@ test('explicit preview export has exactly 37 hashed payload files plus manifest,
   }
   await visit(site);
   assert.deepEqual(actual.sort(), [...expected, 'site-manifest.json'].sort());
-  assert.equal(actual.length, 38, 'no additional files, source, models or private products');
+  assert.equal(actual.length, 42, 'no additional files, source, models or private products');
   for (const file of manifest.files) {
     const bytes = await readFile(join(site, file.path));
     assert.equal(bytes.length, file.bytes, file.path);
@@ -176,6 +178,10 @@ test('explicit preview export has exactly 37 hashed payload files plus manifest,
   assert.match(launch, /Writable OPFS is required only for a new remote cache miss/);
   assert.match(launch, /JSPI absence alone is not a loading gate/);
   assert.match(launch, /selected automatically as source-linked exact passages; no special markup is required/);
+  assert.match(launch, /Each accepted message creates a canonical Conversation node/);
+  assert.match(launch, /Global public Space starters, explicit Persona user excerpts, current Conversation/);
+  assert.match(launch, /Generated-assistant text remains labeled and is excluded from retrieved user evidence/);
+  assert.match(launch, /https:\/\/science\.nasa\.gov\/earth\/facts\//);
   assert.match(launch, /lossy extractive context, not general semantic summarization/);
   assert.match(launch, /Sources sent at the time, not answer truth/);
   assert.match(launch, /failed unrelated-question abstention and answer-format adherence/);
@@ -201,7 +207,8 @@ test('the sole managed site migrates exact old 35-file, 21-file and prior payloa
   }
   try {
     for (const absent of [
-      graphAdded,
+      automaticAdded,
+      [...automaticAdded, ...graphAdded],
       previewAdded,
       [...previewAdded, 'wasm-memory.mjs', 'runtime-profile.mjs'],
       [...previewAdded, ...helperFiles],
