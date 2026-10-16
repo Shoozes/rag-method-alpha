@@ -17,7 +17,7 @@ const profilePrefix = 'rag-automatic-pockets-';
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const failureSummary = value => String(value||'').replace(/\u001b\[[0-9;]*m/g,'').split('\n').slice(0,9).filter(line=>!line.trim().startsWith('at ')).join('\n');
 const memoryFiles = ['workspace','store','events','context','structured-context','automatic-context','rag-adapter',
-  'restore-events','citations','panel','navigation','rag-core','graph-renderer','automatic-memory','conversation-index','scoped-pockets','starter-facts']
+  'restore-events','citations','panel','navigation','compaction-cue','rag-core','graph-renderer','automatic-memory','conversation-index','scoped-pockets','starter-facts']
   .map(name=>'memory/'+name+'.mjs').concat('memory/panel.css');
 const payloadPaths = ['index.html','style.css','app.mjs','loader-controller.mjs','model-contract.mjs','runtime-adapter.mjs',
   'engine-worker.mjs','runtime-errors.mjs','wasm-memory.mjs','runtime-profile.mjs','capabilities.mjs','bootstrap.mjs',
@@ -99,7 +99,7 @@ async function verifyManifest(expectedSha,expectedHead,expectedFingerprint) {
   assert.equal(manifest.schema,'rag-model-chat-static/v1');assert.equal(manifest.memoryPreview,true);assert.equal(manifest.publicReleaseQualified,false);
   assert.equal(manifest.model.weightsIncluded,false);assert.equal(manifest.source.head,expectedHead);assert.equal(manifest.source.dirty,false);
   assert.equal(manifest.source.fingerprintSha256,expectedFingerprint);assert.equal(expectedFingerprint,digest(JSON.stringify(manifest.source.files)));
-  assert.deepEqual(manifest.files.map(file=>file.path).sort(),payloadPaths);assert.equal(payloadPaths.length,42);
+  assert.deepEqual(manifest.files.map(file=>file.path).sort(),payloadPaths);assert.equal(payloadPaths.length,43);
   for(const file of manifest.files){assert.match(file.sha256,/^[a-f0-9]{64}$/);assert.ok(Number.isSafeInteger(file.bytes)&&file.bytes>0);}
   for(const [path,hash] of Object.entries({'memory/rag-core.mjs':'c282ebb3965c4a25b48fb66082ce18c72184449f2123633a901ffceb9939ace6',
     'memory/graph-renderer.mjs':'90783080f8ce7849f5d0544864c7ac7bfb7875c689aecf1fa7951204b4112b3a',
@@ -115,7 +115,7 @@ async function verifyManifest(expectedSha,expectedHead,expectedFingerprint) {
   for(const path of ['memory/PRIVATE_LOCAL_ONLY','memory/serve-local.mjs','.git/config','.env','tests/model-chat-automatic-pockets-browser.mjs','node_modules/playwright/index.mjs']){
     const result=await request(path,'HEAD',0);assert.equal(result.response.status,404,path);assert.equal(result.bytes.length,0);
   }
-  preflight={status:'pass',manifestSha256,sourceHead:expectedHead,sourceFingerprint:expectedFingerprint,payloadFiles:42,totalFiles:43,nestedPrefix:base.pathname,privateProbes:6,bootstrapAndOriginalAdapterVerified:true};
+  preflight={status:'pass',manifestSha256,sourceHead:expectedHead,sourceFingerprint:expectedFingerprint,payloadFiles:43,totalFiles:44,nestedPrefix:base.pathname,privateProbes:6,bootstrapAndOriginalAdapterVerified:true};
 }
 
 async function check(name, run) {

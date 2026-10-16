@@ -43,6 +43,34 @@ view opts into flat colored node bodies and a quiet selection halo to avoid the
 metallic shader's white washout; other renderer consumers keep their defaults. Colors do not
 change memory ownership, access or compaction policy.
 
+### Prompt context indicator
+
+The slim bar above the composer shows the **last checked prompt**, not transcript
+size or live model-cache occupancy. It uses the existing send-time meter: 2,048
+context tokens less the actual 160-token reply reservation leaves 1,888 prompt
+tokens. System instructions, retrieval quotes and derived context are already
+included in that measured prompt, so they are not subtracted again. The endpoint
+is the prompt limit; compaction starts above it or when the runtime reports
+overflow. No extra measurement or model call is made for the bar, typing, Memory
+opening or reload. Unknown occupancy stays unmeasured; estimates and fixture
+counts are labeled in the accessible detail. Focus or hover the bar for numbers.
+
+During compaction the bar retains the before count; it has no percentage-complete
+animation. A lower count appears only for a successfully finalized prompt.
+Failure or cancellation cannot apply a late after-count. A later answer or policy
+change makes the reading stale, and reload starts unmeasured rather than treating
+historical events as current occupancy. Stop also cancels context preparation.
+Compaction selects lossy prompt context while keeping the original transcript;
+it does not provide unlimited memory or promote content into Persona.
+
+When Memory next opens after a new successful compaction event, the actual visible
+Conversation source nodes receive a brief blue emphasis and “Context compacted ·
+originals kept.” This is a source cue: the current graph has no retained summary
+node, so no merge destination is fabricated. Each event is consumed before
+playback, including interruptions; historical events and repeated opens stay
+silent. Reduced motion shows only the static text cue. Navigation and selection
+retain their existing behavior.
+
 Desktop Chrome touch-emulation checks cover pan, pinch, Fit, capture transfer,
 cancellation, keyboard/source actions and the real list fallback. Native page
 pinch remained unqualified even on a plain-page automation control; physical

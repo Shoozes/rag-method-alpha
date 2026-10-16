@@ -80,13 +80,13 @@ export async function createWorkspace({ adapter, core, storage, graphEnabled = t
     globalState: globalBaseline ?? undefined, ensureSharedFresh, persist });
   const unsubscribeConversation = conversation.subscribe(() => automaticMemory?.notify());
   const retrieval = createRetrieval({ core, onEvent: event => events.append(event) });
-  const context = createContextManager({ conversation, memory, retrieval, core, automaticMemory, measure: messages => adapter.measure(messages), events });
+  const context = createContextManager({ conversation, memory, retrieval, core, automaticMemory, measure: (messages, options) => adapter.measure(messages, options), events });
   const graph = graphEnabled ? createMemoryGraph(events) : undefined;
   const workspace = {
     conversation, memory, retrieval, context, events, graph, automaticMemory, ownerScope,
     provider: { ...adapter, reply: (messages, options) => adapter.reply(messages, { ...options,
       beforeDispatch: () => context.validateDispatch(messages), onDispatch: () => context.dispatched(messages) }) },
-    prepare: () => context.prepare(),
+    prepare: options => context.prepare(options),
     sourcesForAnswer: answerTurnId => structuredClone(answerCitations.find(item => item.answerTurnId === answerTurnId)?.sources || []),
     async captureAnswerSources({ answerTurnId, requestSha256 }) {
       const annotation = await captureAnswerCitation({ answerTurnId, requestSha256,
@@ -97,7 +97,7 @@ export async function createWorkspace({ adapter, core, storage, graphEnabled = t
     persist,
     attachPanel(value) { panel = value; panel.refresh(); },
     refresh: () => panel?.refresh(),
-    dispose() { unsubscribeConversation(); automaticMemory?.dispose(); graph?.dispose(); panel?.dispose(); },
+    dispose() { unsubscribeConversation(); context.dispose(); automaticMemory?.dispose(); graph?.dispose(); panel?.dispose(); },
   };
   return workspace;
 }

@@ -18,7 +18,7 @@ const browserFiles = Object.freeze([
 const memoryFiles = Object.freeze([
   'memory/workspace.mjs', 'memory/store.mjs', 'memory/events.mjs', 'memory/context.mjs',
   'memory/structured-context.mjs', 'memory/automatic-context.mjs', 'memory/rag-adapter.mjs',
-  'memory/restore-events.mjs', 'memory/citations.mjs', 'memory/panel.mjs', 'memory/panel.css', 'memory/navigation.mjs',
+  'memory/restore-events.mjs', 'memory/citations.mjs', 'memory/panel.mjs', 'memory/panel.css', 'memory/navigation.mjs', 'memory/compaction-cue.mjs',
   'memory/rag-core.mjs', 'memory/graph-renderer.mjs',
   'memory/automatic-memory.mjs', 'memory/conversation-index.mjs',
   'memory/scoped-pockets.mjs', 'memory/starter-facts.mjs',
@@ -41,10 +41,11 @@ const payloadPaths = Object.freeze([...browserFiles, 'theme/aurel-gold.css',
 const preMemoryPayloadPaths = payloadPaths.filter(name => !['wasm-memory.mjs', 'runtime-profile.mjs'].includes(name));
 const priorPayloadPaths = preMemoryPayloadPaths.filter(name => name !== 'runtime-errors.mjs');
 const legacyPayloadPaths = priorPayloadPaths.filter(name => !name.startsWith('runtime/compat/'));
-const previousMemoryFiles = memoryFiles.filter(name => name !== 'memory/navigation.mjs');
+const previousMemoryFiles = memoryFiles.filter(name => !['memory/navigation.mjs', 'memory/compaction-cue.mjs'].includes(name));
 const previousMemoryPayloadPaths = Object.freeze([...payloadPaths, ...previousMemoryFiles.filter(name => name !== 'memory/graph-renderer.mjs' && !automaticMemoryFiles.has(name)), modelLicensePath].sort());
 const previousGraphMemoryPayloadPaths = Object.freeze([...payloadPaths, ...previousMemoryFiles.filter(name => !automaticMemoryFiles.has(name)), modelLicensePath, ...Object.keys(graphLicenses)].sort());
 const previousAutomaticMemoryPayloadPaths = Object.freeze([...payloadPaths, ...previousMemoryFiles, modelLicensePath, ...Object.keys(graphLicenses)].sort());
+const previousNavigationMemoryPayloadPaths = Object.freeze([...payloadPaths, ...memoryFiles.filter(name => name !== 'memory/compaction-cue.mjs'), modelLicensePath, ...Object.keys(graphLicenses)].sort());
 const memoryPayloadPaths = Object.freeze([...payloadPaths, ...memoryFiles, modelLicensePath, ...Object.keys(graphLicenses)].sort());
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const portable = value => value.split(sep).join('/');
@@ -106,7 +107,7 @@ async function managedOutput(destination, memoryPreview) {
   const previousPaths = previous.files?.map(file => file.path).sort();
   if (previous.schema !== schema || previous.managedBy !== managedBy || identitySha256 !== identity(body)
       || previous.publicReleaseQualified !== false || !Array.isArray(previous.files)
-      || ![...(memoryPreview ? [memoryPayloadPaths, previousAutomaticMemoryPayloadPaths, previousGraphMemoryPayloadPaths, previousMemoryPayloadPaths] : []), payloadPaths, preMemoryPayloadPaths, priorPayloadPaths, legacyPayloadPaths]
+      || ![...(memoryPreview ? [memoryPayloadPaths, previousNavigationMemoryPayloadPaths, previousAutomaticMemoryPayloadPaths, previousGraphMemoryPayloadPaths, previousMemoryPayloadPaths] : []), payloadPaths, preMemoryPayloadPaths, priorPayloadPaths, legacyPayloadPaths]
         .some(paths => JSON.stringify(previousPaths) === JSON.stringify(paths))) {
     throw new Error('Refusing output with a foreign or changed managed manifest.');
   }

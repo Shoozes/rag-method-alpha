@@ -19,7 +19,7 @@ if (!playwright) throw new Error('Set BROWSER_MODEL_PLAYWRIGHT_MODULE (or PLAYWR
 const prefix = '/portable/preview/';
 const memoryAssets = ['workspace', 'store', 'events', 'context', 'structured-context', 'automatic-context', 'automatic-memory',
   'conversation-index', 'scoped-pockets', 'starter-facts', 'rag-adapter',
-  'restore-events', 'citations', 'panel', 'navigation', 'rag-core', 'graph-renderer'].map(name => `memory/${name}.mjs`).concat('memory/panel.css');
+  'restore-events', 'citations', 'panel', 'navigation', 'compaction-cue', 'rag-core', 'graph-renderer'].map(name => `memory/${name}.mjs`).concat('memory/panel.css');
 const payloadPaths = ['index.html', 'style.css', 'app.mjs', 'loader-controller.mjs', 'model-contract.mjs',
   'runtime-adapter.mjs', 'engine-worker.mjs', 'runtime-errors.mjs', 'wasm-memory.mjs', 'runtime-profile.mjs',
   'capabilities.mjs', 'bootstrap.mjs', 'theme/aurel-gold.css', 'runtime/index.js', 'runtime/wllama.wasm',
@@ -119,11 +119,11 @@ try {
       boundary: { actualNativeCalls: previous.boundary?.actualNativeCalls, runtimeWorkersCreated: previous.boundary?.runtimeWorkersCreated,
         externalRequestCount: previous.boundary?.externalRequests?.length, pageErrorCount: previous.boundary?.pageErrors?.length } });
   }
-  await check('exact 42-file payload, complete license pins, source and manifest identities', async () => {
+  await check('exact 43-file payload, complete license pins, source and manifest identities', async () => {
     assert.ok(inside(resolve(root, '.artifacts/model-chat'), packageRoot), 'package stays in its explicitly owned artifact parent');
     assert.equal(await realpath(packageRoot), packageRoot, 'package root has no linked ancestor');
     assert.deepEqual(await filesBelow(packageRoot), expectedFiles);
-    assert.equal(payloadPaths.length, 42); assert.equal(expectedFiles.length, 43);
+    assert.equal(payloadPaths.length, 43); assert.equal(expectedFiles.length, 44);
     const manifestBytes = await readFile(join(packageRoot, 'site-manifest.json'));
     assert.equal(digest(manifestBytes), expectedManifest, 'expected reviewed manifest bytes');
     manifest = JSON.parse(manifestBytes);
@@ -164,7 +164,7 @@ try {
     const readme = await readFile(join(packageRoot, 'README.txt'), 'utf8');
     assert.match(readme, /no special markup is required/); assert.match(readme, /lossy extractive context, not general semantic summarization/);
     assert.match(readme, /not full product-release or iOS qualification/);
-    observations.push({ packagePath: portable(relative(root, packageRoot)), filesIncludingManifest: 43,
+    observations.push({ packagePath: portable(relative(root, packageRoot)), filesIncludingManifest: 44,
       manifestSha256: digest(manifestBytes), manifestIdentitySha256: identitySha256, sourceHead: manifest.source.head,
       sourceDirtyAtStage: manifest.source.dirty, sourceFingerprintSha256: manifest.source.fingerprintSha256,
       packageBytes: packageIdentity.reduce((sum, file) => sum + file.bytes, 0) + manifestBytes.length });

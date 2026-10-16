@@ -37,6 +37,9 @@
 /* The renderer owns the dots and edges. These are transparent text controls. */
 .memory-dialog .memory-map-node{position:absolute;z-index:1;left:var(--node-x,50%);top:var(--node-y,50%);transform:translate(-50%,-50%);display:block;width:44px;max-width:44px;height:44px;min-height:44px;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;color:var(--memory-node-color,var(--muted,#c2b9aa));font:12px/1.35 "Segoe UI",sans-serif;text-align:center;overflow-wrap:anywhere;text-shadow:0 1px 3px #11110f,0 -1px 3px #11110f;cursor:pointer}
 .memory-node-label{position:absolute;left:50%;top:100%;transform:translateX(-50%);width:112px;max-width:32vw;pointer-events:none;visibility:hidden}
+.memory-compaction-cue{position:absolute;z-index:2;inset-inline:8px;top:0;max-width:100%;margin:0;text-align:center;pointer-events:none;color:var(--subtle,#bcb2a2);font:11px/1.5 "Segoe UI",sans-serif;overflow-wrap:anywhere}
+.memory-graph[data-renderer=tsl] .memory-map-node.is-compaction-source[data-memory-scope=conversation]:after{content:"";position:absolute;left:50%;top:50%;width:12px;height:12px;border:1px solid var(--memory-scope-conversation);border-radius:50%;opacity:0;transform:translate(-50%,-50%);pointer-events:none;animation:memory-compaction-source 1100ms ease-out both}
+@keyframes memory-compaction-source{0%{opacity:0;transform:translate(-50%,-50%) scale(.8)}25%{opacity:.8}100%{opacity:0;transform:translate(-50%,-50%) scale(2.4)}}
 .memory-map-node:is(:hover,:focus-visible,[aria-pressed=true]) .memory-node-label{visibility:visible}
 .memory-dialog .memory-map-node[data-memory-kind=source]{font-size:11px;color:var(--memory-node-color,var(--subtle,#bcb2a2))}
 .memory-dialog .memory-map-node:hover,.memory-dialog .memory-map-node:focus-visible{color:var(--memory-node-color,#fff0d5);text-decoration:underline;text-underline-offset:3px;background:transparent}

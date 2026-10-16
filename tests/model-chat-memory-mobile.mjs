@@ -23,7 +23,7 @@ const servedAssets=[];
 const assetFailures=[],network={requests:0,bytes:0};
 const limitations=['Trusted mouse detail selection is tested in an emulated touch viewport; physical touch selection and iOS are unqualified.'];
 const cleanup={contextClosed:false,serverClosed:false,ownedProfileRemoved:false};
-const sourcePaths=['bootstrap.mjs','app.mjs','style.css','memory/panel.mjs','memory/panel.css','memory/automatic-memory.mjs'];
+const sourcePaths=['bootstrap.mjs','app.mjs','style.css','memory/panel.mjs','memory/panel.css','memory/compaction-cue.mjs','memory/automatic-memory.mjs'];
 let context,server,profile,session,page,error,browserVersion,sourceIdentity,graphIdentity,coreIdentity,prior,lastGesture,base,manifest,preflight,workers=0;
 const started=Date.now();
 const longText='My notebooks use copper covers. These are exact user words from this labeled touch fixture. '
@@ -59,8 +59,8 @@ async function livePreflight(){
   const expectedManifest=required('BROWSER_MEMORY_EXPECTED_MANIFEST_SHA256',/^[a-f0-9]{64}$/),head=required('BROWSER_MEMORY_EXPECTED_SOURCE_HEAD',/^[a-f0-9]{40}$/),fingerprint=required('BROWSER_MEMORY_EXPECTED_SOURCE_FINGERPRINT',/^[a-f0-9]{64}$/);
   const {response,bytes}=await liveAsset('site-manifest.json',128*1024);assert.match(response.headers.get('content-type')||'',/^application\/json(?:;|$)/i);assert.equal(digest(bytes),expectedManifest);manifest=JSON.parse(bytes);
   const {identitySha256,...body}=manifest;assert.equal(identitySha256,digest(JSON.stringify(body)));assert.equal(manifest.schema,'rag-model-chat-static/v1');assert.equal(manifest.memoryPreview,true);assert.equal(manifest.publicReleaseQualified,false);assert.equal(manifest.model.weightsIncluded,false);
-  assert.equal(manifest.source.head,head);assert.equal(manifest.source.dirty,false);assert.equal(manifest.source.fingerprintSha256,fingerprint);assert.equal(digest(JSON.stringify(manifest.source.files)),fingerprint);assert.equal(manifest.files.length,42);
-  assert.equal(new Set(manifest.files.map(file=>file.path)).size,42);for(const file of manifest.files){assert.match(file.path,/^[A-Za-z0-9_./-]+$/);assert.ok(!file.path.startsWith('/')&&!file.path.split('/').includes('..'));assert.match(file.sha256,/^[a-f0-9]{64}$/);assert.ok(Number.isSafeInteger(file.bytes)&&file.bytes>0);}
+  assert.equal(manifest.source.head,head);assert.equal(manifest.source.dirty,false);assert.equal(manifest.source.fingerprintSha256,fingerprint);assert.equal(digest(JSON.stringify(manifest.source.files)),fingerprint);assert.equal(manifest.files.length,43);
+  assert.equal(new Set(manifest.files.map(file=>file.path)).size,43);for(const file of manifest.files){assert.match(file.path,/^[A-Za-z0-9_./-]+$/);assert.ok(!file.path.startsWith('/')&&!file.path.split('/').includes('..'));assert.match(file.sha256,/^[a-f0-9]{64}$/);assert.ok(Number.isSafeInteger(file.bytes)&&file.bytes>0);}
   coreIdentity={sha256:'c282ebb3965c4a25b48fb66082ce18c72184449f2123633a901ffceb9939ace6'};graphIdentity={sha256:required('BROWSER_MEMORY_EXPECTED_GRAPH_SHA256',/^[a-f0-9]{64}$/)};
   assert.equal(manifest.files.find(file=>file.path==='memory/rag-core.mjs')?.sha256,coreIdentity.sha256);assert.equal(manifest.files.find(file=>file.path==='memory/graph-renderer.mjs')?.sha256,graphIdentity.sha256);
   sourceIdentity=sourcePaths.map(path=>({path,sha256:manifest.files.find(file=>file.path===path)?.sha256}));

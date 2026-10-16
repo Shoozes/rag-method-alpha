@@ -23,10 +23,11 @@ const browserFiles = ['index.html', 'style.css', 'app.mjs', 'loader-controller.m
 const helperFiles = ['runtime-errors.mjs', 'wasm-memory.mjs', 'runtime-profile.mjs'];
 const memoryFiles = ['memory/workspace.mjs', 'memory/store.mjs', 'memory/events.mjs', 'memory/context.mjs',
   'memory/structured-context.mjs', 'memory/automatic-context.mjs', 'memory/rag-adapter.mjs', 'memory/restore-events.mjs',
-  'memory/citations.mjs', 'memory/panel.mjs', 'memory/panel.css', 'memory/navigation.mjs', 'memory/rag-core.mjs', 'memory/graph-renderer.mjs',
+  'memory/citations.mjs', 'memory/panel.mjs', 'memory/panel.css', 'memory/navigation.mjs', 'memory/compaction-cue.mjs', 'memory/rag-core.mjs', 'memory/graph-renderer.mjs',
   'memory/automatic-memory.mjs', 'memory/conversation-index.mjs', 'memory/scoped-pockets.mjs', 'memory/starter-facts.mjs'];
 const automaticAdded = ['memory/automatic-memory.mjs', 'memory/conversation-index.mjs', 'memory/scoped-pockets.mjs', 'memory/starter-facts.mjs'];
 const navigationAdded = ['memory/navigation.mjs'];
+const compactionAdded = ['memory/compaction-cue.mjs'];
 const modelLicensePath = 'LICENSES/lfm-open-license-1.0.txt';
 const graphAdded = ['memory/graph-renderer.mjs', 'LICENSES/forcegraph-tsl.txt', 'LICENSES/three.txt'];
 const previewAdded = [...memoryFiles, modelLicensePath, ...graphAdded.filter(name => name.startsWith('LICENSES/'))];
@@ -99,7 +100,7 @@ test('missing or wrong pinned runtime bytes fail before creating output', async 
   assert.equal(await exists(output), false);
 });
 
-test('explicit preview export has exactly 42 hashed payload files plus manifest, complete licenses and safe refresh', async t => {
+test('explicit preview export has exactly 43 hashed payload files plus manifest, complete licenses and safe refresh', async t => {
   // The intended delivery site is the sole delivery output. No second runtime tree
   // or model is created; failure cases above use only a few fixture bytes.
   const staged = await stageStatic();
@@ -122,7 +123,7 @@ test('explicit preview export has exactly 42 hashed payload files plus manifest,
     'runtime/LICENSE', 'runtime/compat/wllama.js', 'runtime/compat/wllama.wasm', 'LICENSES/rag-method.txt', 'NOTICE.txt', 'README.txt',
     ...previewAdded].sort();
   assert.deepEqual(manifest.files.map(file => file.path).sort(), expected);
-  assert.equal(manifest.files.length, 42);
+  assert.equal(manifest.files.length, 43);
   const actual = [];
   async function visit(directory, prefix = '') {
     for (const item of await readdir(directory, { withFileTypes: true })) {
@@ -132,7 +133,7 @@ test('explicit preview export has exactly 42 hashed payload files plus manifest,
   }
   await visit(site);
   assert.deepEqual(actual.sort(), [...expected, 'site-manifest.json'].sort());
-  assert.equal(actual.length, 43, 'no additional files, source, models or private products');
+  assert.equal(actual.length, 44, 'no additional files, source, models or private products');
   for (const file of manifest.files) {
     const bytes = await readFile(join(site, file.path));
     assert.equal(bytes.length, file.bytes, file.path);
@@ -199,7 +200,7 @@ test('explicit preview export has exactly 42 hashed payload files plus manifest,
   assert.equal(await readFile(join(foreign, '.env'), 'utf8'), 'PRIVATE-FIXTURE-KEEP');
 });
 
-test('the sole managed site migrates the exact 41-file automatic preview and older payloads; partial memory sets are refused', async () => {
+test('the sole managed site migrates exact 42-file navigation, 41-file automatic and older previews; partial memory sets are refused', async () => {
   const manifestBytes = await readFile(join(site, 'site-manifest.json'));
   const manifest = JSON.parse(manifestBytes);
   const retained = new Map();
@@ -208,9 +209,10 @@ test('the sole managed site migrates the exact 41-file automatic preview and old
   }
   try {
     for (const absent of [
-      navigationAdded,
-      [...navigationAdded, ...automaticAdded],
-      [...navigationAdded, ...automaticAdded, ...graphAdded],
+      compactionAdded,
+      [...compactionAdded, ...navigationAdded],
+      [...compactionAdded, ...navigationAdded, ...automaticAdded],
+      [...compactionAdded, ...navigationAdded, ...automaticAdded, ...graphAdded],
       previewAdded,
       [...previewAdded, 'wasm-memory.mjs', 'runtime-profile.mjs'],
       [...previewAdded, ...helperFiles],
@@ -221,18 +223,33 @@ test('the sole managed site migrates the exact 41-file automatic preview and old
       previous.source.files = previous.source.files.filter(file => !absent.some(name => file.path === 'examples/browser-model-chat/' + name));
       previous.source.fingerprintSha256 = hash(JSON.stringify(previous.source.files));
       const previousManifest = { ...previous, identitySha256: hash(JSON.stringify(previous)) };
-      if (absent === navigationAdded) assert.equal(previous.files.length, 41, 'exact previous automatic preview path table');
+      if (absent === compactionAdded) assert.equal(previous.files.length, 42, 'exact previous navigation preview path table');
+      if (absent.length === 2) assert.equal(previous.files.length, 41, 'exact previous automatic preview path table');
       for (const name of absent) await rm(join(site, name));
       await writeFile(join(site, 'site-manifest.json'), JSON.stringify(previousManifest));
       const refreshed = await stageStatic();
       assert.deepEqual(refreshed.manifest, manifest, absent.join(', '));
       for (const name of absent) assert.deepEqual(await readFile(join(site, name)), retained.get(name), name);
+      if (absent === compactionAdded) {
+        assert.equal(refreshed.manifest.files.length, 43, 'old 42-file managed site adds exactly the cue module');
+        const panel = await readFile(join(site, 'memory/panel.mjs'), 'utf8');
+        assert.match(panel, /^import \{ createCompactionCue \} from '\.\/compaction-cue\.mjs';/m);
+        const cuePath = new URL('./compaction-cue.mjs', pathToFileURL(join(site, 'memory/panel.mjs')));
+        assert.equal(cuePath.href, pathToFileURL(join(site, 'memory/compaction-cue.mjs')).href);
+        const cue = await import(cuePath.href);
+        assert.equal(typeof cue.createCompactionCue, 'function', 'new panel dependency is an executable packaged module');
+        assert.equal(cue.createCompactionCue().take([]), null, 'module import creates no fabricated compaction activity');
+      }
     }
-    const { identitySha256, ...partial } = structuredClone(manifest);
-    partial.files = partial.files.filter(file => file.path !== 'memory/automatic-context.mjs');
-    await rm(join(site, 'memory/automatic-context.mjs'));
-    await writeFile(join(site, 'site-manifest.json'), JSON.stringify({ ...partial, identitySha256: hash(JSON.stringify(partial)) }));
-    await assert.rejects(stageStatic(), /foreign or changed/, 'a partial memory subset is not an accepted historical payload');
+    for (const missing of ['memory/navigation.mjs', 'memory/automatic-context.mjs']) {
+      const { identitySha256, ...partial } = structuredClone(manifest);
+      partial.files = partial.files.filter(file => file.path !== missing);
+      await rm(join(site, missing));
+      await writeFile(join(site, 'site-manifest.json'), JSON.stringify({ ...partial, identitySha256: hash(JSON.stringify(partial)) }));
+      await assert.rejects(stageStatic(), /foreign or changed/, 'cue-present partial memory subset is not an accepted historical payload: ' + missing);
+      await writeFile(join(site, missing), retained.get(missing));
+      await writeFile(join(site, 'site-manifest.json'), manifestBytes);
+    }
   } finally {
     // Keep the single intended output recoverable even if this regression fails.
     for (const [name, bytes] of retained) await writeFile(join(site, name), bytes);

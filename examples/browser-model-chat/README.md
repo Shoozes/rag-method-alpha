@@ -120,13 +120,15 @@ node examples/browser-model-chat/stage-static.mjs --memory-preview --output .art
 
 The builder verifies prepared package bytes and emits one self-contained
 `.artifacts/memory/graph-renderer.mjs`, plus complete graph/Three MIT texts.
-The explicit memory export contains **42 payload files plus its manifest**.
+The explicit memory export contains **43 payload files plus its manifest**.
 Automatic memory adds `memory/automatic-memory.mjs`, `memory/conversation-index.mjs`,
 `memory/scoped-pockets.mjs` and `memory/starter-facts.mjs`. The existing graph
 bundle and `LICENSES/forcegraph-tsl.txt` / `LICENSES/three.txt` remain included. Preserve those full notices
 alongside the first-party/runtime MIT texts and separate LFM model license.
 `memory/navigation.mjs` adapts contained pan/pinch input to that same renderer;
 it does not introduce another graph runtime.
+`memory/compaction-cue.mjs` displays committed source-linked compaction activity;
+it does not add a retained summary node or change memory ownership.
 Prepared dependencies and build scripts are source/setup inputs, not browser files.
 These commands reuse prepared inputs; they do not constitute a fresh-host install proof.
 
