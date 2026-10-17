@@ -64,13 +64,29 @@ historical events as current occupancy. Stop also cancels context preparation.
 Compaction selects lossy prompt context while keeping the original transcript;
 it does not provide unlimited memory or promote content into Persona.
 
-When Memory next opens after a new successful compaction event, the actual visible
-Conversation source nodes receive a brief blue emphasis and “Context compacted ·
-originals kept.” This is a source cue: the current graph has no retained summary
-node, so no merge destination is fabricated. Each event is consumed before
-playback, including interruptions; historical events and repeated opens stay
-silent. Reduced motion shows only the static text cue. Navigation and selection
-retain their existing behavior.
+The latest successful compaction retains one **Conversation summary** node with
+the existing exact extractive output, not a generated semantic summary or Persona
+fact. **View summary** opens its body and links to the actual authored originals.
+All and Conversation show it; Persona and Global filters hide it. Originals and
+the protected recent exchange remain intact. The node records what that event
+retained; it does not claim the whole conversation was kept or every later
+request includes the same selection.
+
+On a new committed output, brief blue light trails gather only its actual authored
+source nodes toward this real summary node and finish with a soft pulse. At most
+12 visible sources and 24 sparks animate for 1.32 seconds, using bounded Web
+Animations and one expiry timer; no application frame loop is added. Reduced
+motion shows a static target ring and completion text. Failed, cancelled and
+no-reduction attempts create no success effect. Historical reload, repeated opens
+and interrupted playback stay silent. This does not fix the pinned Three
+renderer's separate visible idle-clock limitation.
+
+One optional event-bound snapshot, at most 96 KiB within the existing 2 MB
+workspace envelope, restores the exact output and cutoff after source, owner,
+policy, quote/offset/hash and structured-lineage validation. Legacy events without
+a retained body never invent a node. Save, Pin and Forget invalidate stale output;
+scope-only filtering preserves it. Reload does not measure tokens or replay
+effects. Browser storage binding is not authentication of historical execution.
 
 Desktop Chrome touch-emulation checks cover pan, pinch, Fit, capture transfer,
 cancellation, keyboard/source actions and the real list fallback. Native page
@@ -111,12 +127,22 @@ not independent authentication of editable browser storage.
 prompt-meter pipeline. A ready loaded model and eligible older history are
 required; protected recent exchanges and original messages remain intact. The
 button explains empty, short-history, loading, active-reply and scope gates.
+Memory inspection remains available before loading a model. An unavailable
+Compact now control can receive pointer/keyboard focus and explain why nothing
+changed; it does not start a model or meter. Active operations remain blocked.
+After memory rules change, the conservative policy-refresh gate requires a new
+ordinary checked request before another manual compaction.
 Cancel stops an in-flight attempt. A success needs a real committed compaction
 event, lower measured prompt count and final fit; it sends no reply request and
 does not save facts or promote Persona memory. Its actual source nodes receive
 the one-time cue described above, including under-budget manual reductions.
 Failure/cancellation cannot apply a late result. A failed save after success is
 reported as session-only compaction, rather than hiding the committed event.
+The retained node is not a second retrieval record. Later requests reselect exact
+excerpts from canonical originals for the current query; represented summary
+sources are excluded from direct automatic recall to avoid duplicate injection.
+Only an exactly matching summary body in an actual submitted request can receive
+a summary-use cue. Inspect Context for what was really sent.
 
 Forget excludes the selected indexed message and preserves the transcript.
 Persona Forget and Global removal retain tombstones. All versions of manually

@@ -25,7 +25,7 @@ const stagedPayload=['index.html','style.css','app.mjs','loader-controller.mjs',
   'theme/aurel-gold.css','runtime/index.js','runtime/wllama.wasm','runtime/LICENSE','runtime/compat/wllama.js','runtime/compat/wllama.wasm',
   'LICENSES/rag-method.txt','LICENSES/lfm-open-license-1.0.txt','LICENSES/forcegraph-tsl.txt','LICENSES/three.txt','NOTICE.txt','README.txt',
   ...['workspace','store','events','context','context-panel','structured-context','automatic-context','automatic-memory',
-    'conversation-index','scoped-pockets','starter-facts','rag-adapter','restore-events','citations','panel','navigation','compaction-cue','rag-core','graph-renderer']
+    'conversation-index','scoped-pockets','starter-facts','rag-adapter','restore-events','citations','panel','navigation','compaction-cue','retained-compaction','summary-effects','rag-core','graph-renderer']
     .map(name=>'memory/'+name+'.mjs'),'memory/panel.css'].sort();
 const stagedFiles=[...stagedPayload,'site-manifest.json'].sort();
 const stagedMime={'.html':'text/html','.css':'text/css','.js':'application/javascript','.mjs':'application/javascript',
@@ -67,7 +67,7 @@ async function validateStage(){
   assert.equal(await realpath(stagedRoot),stagedRoot,'Staged root has no linked ancestor');
   const actual=[];
   async function visit(directory,prefix=''){for(const entry of await readdir(directory,{withFileTypes:true})){const name=prefix+entry.name,path=join(directory,entry.name),info=await lstat(path);assert.ok(!info.isSymbolicLink(),'No linked staged content');if(info.isDirectory())await visit(path,name+'/');else{assert.ok(info.isFile()&&info.nlink===1,'Only ordinary single-link staged files');actual.push(name);}}}
-  await visit(stagedRoot);assert.equal(stagedPayload.length,44);assert.deepEqual(actual.sort(),stagedFiles);
+  await visit(stagedRoot);assert.equal(stagedPayload.length,46);assert.deepEqual(actual.sort(),stagedFiles);
   const bytes=await readFile(join(stagedRoot,'site-manifest.json')),manifest=JSON.parse(bytes),{identitySha256,...body}=manifest;
   for(const name of ['BROWSER_MEMORY_EXPECTED_MANIFEST_SHA256','BROWSER_MEMORY_EXPECTED_SOURCE_FINGERPRINT'])assert.match(process.env[name]||'',/^[a-f0-9]{64}$/,name+' must explicitly bind staged proof');
   assert.match(process.env.BROWSER_MEMORY_EXPECTED_SOURCE_HEAD||'',/^[a-f0-9]{40}$/);
@@ -86,7 +86,7 @@ async function validateStage(){
   assert.equal(manifest.files.find(file=>file.path==='memory/graph-renderer.mjs').sha256,graphSha256);
   assert.equal(manifest.graph.layoutBackend,'local');
   stageIdentity={manifestSha256:digest(bytes),manifestIdentitySha256:identitySha256,sourceHead:manifest.source.head,
-    sourceFingerprintSha256:manifest.source.fingerprintSha256,payloadFiles:44,filesIncludingManifest:45};
+    sourceFingerprintSha256:manifest.source.fingerprintSha256,payloadFiles:46,filesIncludingManifest:47};
 }
 async function startStagedServer(){
   const allowed=new Set(stagedFiles);
@@ -126,7 +126,7 @@ async function verifyStageHttp(){
     stagedPrefix+'runtime/model.gguf',stagedPrefix+'memory/context-inspection.json',stagedPrefix+'unknown.mjs',stagedPrefix+'%2e%2e/%2e%2e/.git/config']){
     const response=await fetch(new URL(path,base));assert.equal(response.status,404,path);assert.equal(response.headers.get('content-type').split(';')[0],'text/plain');assert.equal(await response.text(),'Not found');
   }
-  observations.push({case:'source-free-staged-delivery',...stageIdentity,verifiedGetHeadFiles:45,moduleReferences,dormantWorkerReferences,
+  observations.push({case:'source-free-staged-delivery',...stageIdentity,verifiedGetHeadFiles:47,moduleReferences,dormantWorkerReferences,
     repositoryServerUsed:false,sourceDirectoriesMounted:false,dependencyDirectoriesMounted:false,packageCopiedForProof:false});
 }
 async function touch(type,points=[]){await session.send('Input.dispatchTouchEvent',{type,touchPoints:points.map((point,index)=>({...point,id:point.id??index+1,radiusX:3,radiusY:3,force:1}))});}

@@ -84,33 +84,47 @@ test('cancellation after preparation prevents dispatch and meter failure never m
 
 test('successful dispatch marks exactly prepared Conversation, Persona, and Global IDs with the actual request binding', async t => {
   const { workspace } = await fixture(t);
-  append(workspace, 'Fred owns a copper compass.');
+  const conversation = append(workspace, 'Fred owns a copper compass.');
   const persona = append(workspace, 'The persona beacon is quasarceladon.');
   await workspace.automaticMemory.pinPersona({ turnId: persona.id, text: persona.content });
   append(workspace, 'Find the copper compass, quasarceladon beacon, and Mars moons.');
   const prepared = await workspace.prepare();
-  assert.deepEqual(new Set(prepared.memorySources.map(hit => hit.kind)), new Set(['conversation', 'persona', 'global']));
+  // Pinning refreshes the checked policy. The compass is retained once in the
+  // derived system context instead of a duplicate automatic-retrieval row.
+  assert.deepEqual(new Set(prepared.memorySources.map(hit => hit.kind)), new Set(['persona', 'global']));
+  assert.equal(prepared.memorySources.some(hit => hit.turnId === conversation.id && hit.kind === 'conversation'), false);
+  const summary = workspace.context.snapshot().compacted;
+  assert.equal(prepared.messages.filter(message => message.role === 'system' && message.content === summary.text).length, 1);
+  assert.equal(prepared.messages.filter(message => message.role === 'system').map(message => message.content).join('\n').split(conversation.content).length - 1, 1,
+    'the exact Conversation quote appears once across the actual system context');
+  assert.deepEqual(prepared.extractiveSources.map(({ turnId, turnHash, offsets, lineHash }) => ({ turnId, turnHash, offsets, lineHash })),
+    [{ turnId: conversation.id, turnHash: digest(conversation.content), offsets: { start: 0, end: conversation.content.length, unit: 'utf16' }, lineHash: digest(conversation.content) }]);
+  const admitted = workspace.context.inspectionSnapshot().latestPrepared.admitted;
+  assert.deepEqual(admitted.filter(row => row.kind === 'derived-context').map(row => row.nodeId), ['turn:' + conversation.id]);
+  assert.equal(admitted.some(row => row.kind === 'conversation'), false, 'the inspector must not claim a duplicate automatic admission');
   assert.ok(prepared.memorySources.every(hit => hit.role !== 'assistant'));
   for (const hit of prepared.memorySources) assert.ok(prepared.messages[0].content.includes(JSON.stringify(hit.text)), 'the exact quoted hit is in the assembled request');
   assert.deepEqual(used(workspace), []); workspace.context.validateDispatch(prepared.messages);
   assert.deepEqual(used(workspace), []); workspace.context.dispatched(prepared.messages);
-  assert.deepEqual(sorted(used(workspace)), sorted(sourceIds(prepared)));
+  const expectedIds = sorted(['turn:' + conversation.id, ...sourceIds(prepared)]);
+  assert.deepEqual(sorted(used(workspace)), expectedIds);
   const [event] = dispatches(workspace); assert.equal(dispatches(workspace).length, 1);
   assert.equal(event.queryId, prepared.queryId); assert.equal(event.requestSha256, digest(JSON.stringify(prepared.messages)));
   assert.equal(event.requestSha256, prepared.measurement.requestSha256);
   assert.equal(event.conversationVersion, workspace.conversation.snapshot().version);
   const preview = await workspace.automaticMemory.search({ query: 'unmatchedvioletwhale' });
-  assert.deepEqual(preview.hits, []); assert.deepEqual(sorted(used(workspace)), sorted(sourceIds(prepared)), 'a later search does not replace the last dispatched IDs');
+  assert.deepEqual(preview.hits, []); assert.deepEqual(sorted(used(workspace)), expectedIds, 'a later search does not replace the last dispatched IDs');
   assert.throws(() => workspace.context.dispatched(prepared.messages), /no longer matches/);
   assert.equal(dispatches(workspace).length, 1);
   // Current limitations, not new event-schema requirements: Persona/Global
-  // automatic IDs come from prepared.memorySources + the dispatch callback.
+  // automatic IDs come from prepared.memorySources; Conversation can instead
+  // be an exact derived-context quote. Both are marked only at dispatch.
   // The existing event does not persist that full ID set; usedNodeIds has no
   // request SHA and is ephemeral. Dispatch is not proof of model attention.
   t.diagnostic('Exact automatic highlight IDs are proven at context.dispatched; no model-use, Worker acknowledgement, or persisted complete automatic-source event claim.');
 });
 
-test('compaction input coverage never becomes the dispatched retrieval highlight set', async t => {
+test('compaction input coverage never becomes the dispatched admitted-source highlight set', async t => {
   let measureCount = 0;
   const { workspace } = await fixture(t, () => ++measureCount === 1
     ? { ...measured, promptTokens: 2300, overflow: true } : measured);
@@ -122,10 +136,19 @@ test('compaction input coverage never becomes the dispatched retrieval highlight
   const compacted = workspace.events.list().find(event => event.type === 'compacted');
   assert.ok(prepared.compaction && compacted);
   assert.ok(compacted.sourceTurnIds.includes(ignored.id), 'coverage lists scanned inputs, including an ignored generated turn');
-  assert.deepEqual(sourceIds(prepared), ['turn:' + source.id]);
+  assert.deepEqual(sourceIds(prepared), [], 'a source represented in the summary is not retrieved a second time');
+  const summary = workspace.context.snapshot().compacted;
+  assert.equal(prepared.messages.filter(message => message.role === 'system' && message.content === summary.text).length, 1);
+  assert.equal(prepared.messages.filter(message => message.role === 'system').map(message => message.content).join('\n').split(source.content).length - 1, 1);
+  assert.deepEqual(prepared.extractiveSources.map(({ turnId, turnHash, offsets, lineHash }) => ({ turnId, turnHash, offsets, lineHash })),
+    [{ turnId: source.id, turnHash: digest(source.content), offsets: { start: 0, end: source.content.length, unit: 'utf16' }, lineHash: digest(source.content) }]);
+  assert.deepEqual(workspace.context.inspectionSnapshot().latestPrepared.admitted.map(row => row.nodeId), ['turn:' + source.id]);
   assert.deepEqual(used(workspace), [], 'compaction completion alone is not dispatch');
-  workspace.context.validateDispatch(prepared.messages); workspace.context.dispatched(prepared.messages);
-  assert.deepEqual(used(workspace), sourceIds(prepared));
+  workspace.context.validateDispatch(prepared.messages);
+  assert.deepEqual(used(workspace), [], 'validation alone still cannot mark the real summary source');
+  workspace.context.dispatched(prepared.messages);
+  assert.deepEqual(used(workspace), ['turn:' + source.id]);
+  assert.equal(workspace.context.inspectionSnapshot().lastSubmitted.requestSha256, digest(JSON.stringify(prepared.messages)));
   assert.equal(used(workspace).includes('turn:' + ignored.id), false);
   assert.ok(compacted.sourceTurnIds.some(id => !used(workspace).includes('turn:' + id)));
 });

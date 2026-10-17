@@ -30,10 +30,10 @@ test('compacting shows bounded before occupancy, not invented percent-complete p
 test('only a committed ready prompt is described as compacted; stale/failure/cancel stay explicit', () => {
   const compaction = { cycle: 1, beforePromptTokens: 2200, afterPromptTokens: 500 };
   const ready = contextUsageView(usage('ready', 500, { compaction }));
-  assert.equal(ready.label, 'Compacted'); assert.equal(ready.value, 500);
+  assert.equal(ready.label, 'Context compacted'); assert.equal(ready.value, 500);
   for (const phase of ['stale', 'error', 'cancelled']) {
     const view = contextUsageView(usage(phase, 2200));
-    assert.equal(view.value, 1888); assert.notEqual(view.label, 'Compacted');
+    assert.equal(view.value, 1888); assert.notEqual(view.label, 'Context compacted');
     assert.match(view.detail, /keeps the original transcript/);
   }
   assert.match(contextUsageView(usage('stale', 500)).detail, /draft and subsequent reply are not remeasured/);

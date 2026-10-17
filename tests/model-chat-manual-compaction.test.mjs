@@ -171,8 +171,8 @@ test('policy refresh cannot be forced past a newly authored memory record', asyn
     const turn = f.conversation.snapshot().turns[0];
     await f.memory.save({ sourceTurnIds: [turn.id], text: turn.content,
       scope: { actorId: 'local-user', conversationId: 'local-chat' }, modelSafe: true });
-    assert.equal(f.context.manualCompactionStatus().reason, 'insufficient-history');
-    await assert.rejects(f.context.compactNow(), assertCode('INSUFFICIENT_HISTORY'));
+    assert.equal(f.context.manualCompactionStatus().reason, 'policy-refresh');
+    await assert.rejects(f.context.compactNow(), assertCode('POLICY_REFRESH'));
     assert.equal(f.calls.length, 0); assert.equal(compactions(f.events).length, 0);
   } finally { f.context.dispose(); }
 });

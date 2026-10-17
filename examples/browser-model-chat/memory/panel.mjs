@@ -1,6 +1,7 @@
 import { mountMemoryNavigation } from './navigation.mjs';
 import { createCompactionCue } from './compaction-cue.mjs';
 import { createContextInspector } from './context-panel.mjs';
+import { createSummaryEffects } from './summary-effects.mjs';
 
 export const MEMORY_SCOPE_COLORS = Object.freeze({ conversation: '#0ea5ff', persona: '#c81fff', global: '#f59e0b' });
 export function memoryScopeColor(scope) {
@@ -24,6 +25,28 @@ export function submittedMemoryNodeIds(snapshot, requestSha256, currentScope) {
   return [...new Set(request.admitted.flatMap(row => row?.admitted === false ? [] : [row?.nodeId,
     ...(localSource(row) && Array.isArray(row?.sourceTurnIds) ? row.sourceTurnIds.filter(id => typeof id === 'string').map(id => 'turn:' + id) : [])])
     .filter(id => typeof id === 'string' && id.length > 0))];
+}
+
+/** A retained output is a display projection, never another retrieval record. */
+export function projectConversationSummary(base, summary) {
+  if (!summary || summary.kind !== 'summary' || summary.scope !== 'conversation' || summary.derived !== true
+    || summary.id !== 'summary:' + summary.eventId || !Array.isArray(summary.sourceTurnIds) || !summary.sourceTurnIds.length) return base;
+  const sources = new Set(summary.sourceTurnIds.map(id => 'turn:' + id));
+  const ordered = [...base.nodes.filter(node => sources.has(node.id)), ...base.nodes.filter(node => !sources.has(node.id))];
+  const nodes = [summary, ...ordered].slice(0, 12), ids = new Set(nodes.map(node => node.id));
+  const links = [...base.links.filter(link => ids.has(link.source) && ids.has(link.target)),
+    ...nodes.filter(node => sources.has(node.id)).map(node => ({ id: JSON.stringify([node.id, summary.id]),
+      source: node.id, target: summary.id, kind: 'retained-excerpt' }))];
+  return { ...base, nodes, links };
+}
+
+/** Only the exact retained body in an actual submitted request can light its summary node. */
+export function submittedSummaryNodeIds(snapshot, requestSha256, owner, summary) {
+  const record = snapshot?.lastSubmitted;
+  return summary?.kind === 'summary' && requestSha256 && record?.requestSha256 === requestSha256
+    && owner && ['actorId', 'conversationId'].every(key => owner[key] === record.scope?.[key])
+    && Array.isArray(record.exactMessages) && record.exactMessages.some(message => message.role === 'system' && message.content === summary.text)
+    ? [summary.id] : [];
 }
 
 /** Real saved memories and their cited user messages; bounded view, no admission. */
@@ -102,12 +125,15 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   const detailTitle = el('h3', 'Saved words', { id: 'memory-detail-title', tabindex: '-1' });
   const detailProvenance = el('p', '', { id: 'memory-detail-provenance', class: 'memory-note' }); detailProvenance.hidden = true;
   const detailText = el('p', '', { id: 'memory-detail-text', class: 'memory-record-text' });
+  const summaryExact = el('details', undefined, { id: 'memory-summary-exact', class: 'memory-summary-exact' }); summaryExact.hidden = true;
+  const summaryExactText = el('pre', '', { id: 'memory-summary-exact-text' });
+  summaryExact.append(el('summary', 'Exact retained context'), summaryExactText);
   const detailSources = el('div', undefined, { id: 'memory-detail-sources', class: 'memory-sources' });
   const edit = control('Edit', 'memory-edit'), forget = control('Forget saved record', 'memory-forget'), remember = control('Remember for persona', 'memory-remember-persona'); remember.hidden = true;
   const forgetHint = el('p', 'Forgetting a saved record does not erase the transcript or other messages that repeat it.', { id: 'memory-forget-hint', class: 'memory-note' });
   forget.setAttribute('aria-describedby', 'memory-forget-hint');
   const detailActions = el('div', undefined, { class: 'memory-actions' }); detailActions.append(remember, edit, forget);
-  detail.append(detailTitle, detailProvenance, detailText, detailSources, detailActions, forgetHint); map.append(detail);
+  detail.append(detailTitle, detailProvenance, detailText, summaryExact, detailSources, detailActions, forgetHint); map.append(detail);
   const editor = el('section', undefined, { id: 'memory-editor', class: 'memory-editor', 'aria-label': 'Save exact words from your chat' }); editor.hidden = true;
   const source = el('select', undefined, { id: 'memory-source-turn' });
   const text = el('textarea', undefined, { id: 'memory-text', rows: '5', maxlength: '4000', 'aria-describedby': 'memory-source-hint' });
@@ -119,9 +145,11 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   const savedWords = control('Saved words', 'memory-saved-words'); savedWords.hidden = true;
   const footer = el('div', undefined, { class: 'memory-footer' }); footer.append(add, savedWords);
   const compact = control('Compact now', 'memory-compact-now'), compactCancel = control('Cancel', 'memory-compact-cancel'); compactCancel.hidden = true;
+  const openSummary = control('View summary', 'memory-open-summary'); openSummary.hidden = true;
+  openSummary.setAttribute('aria-controls', 'memory-detail');
   const compactNote = el('p', '', { id: 'memory-compact-status', class: 'memory-note', role: 'status', 'aria-live': 'polite' });
   compact.setAttribute('aria-describedby', 'memory-compact-status');
-  const compactTools = el('div', undefined, { class: 'memory-compact-tools' }); compactTools.append(compact, compactCancel, compactNote);
+  const compactTools = el('div', undefined, { class: 'memory-compact-tools' }); compactTools.append(openSummary, compact, compactCancel, compactNote);
   compactTools.hidden = typeof context?.compactNow !== 'function'; footer.append(compactTools);
   const legend = el('div', undefined, { class: 'memory-scope-legend', role: 'list', 'aria-label': 'Memory scopes' }); legend.hidden = !automaticMemory;
   for (const [scope] of Object.entries(MEMORY_SCOPE_COLORS)) {
@@ -140,8 +168,10 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   let compactController = null, compactMessage = '', manualCueNodeIds = [], lastDispatchSha256 = null;
   const nodeButtons = new Map();
   const compactionCue = createCompactionCue(events.list());
+  const summaryEffects = createSummaryEffects({ container: picture, getTargets: () => renderer?.diagnostics().node_targets ?? [],
+    getMotionEnabled: () => !motionPreference.matches, initialEventIds: events.list().filter(event => event.type === 'compacted').map(event => event.id) });
   let pendingCompactionCue = null, compactionTimer = 0, requestHighlightTimer = 0, requestHighlightUntil = 0;
-  const stopCompactionAnimation = () => { for (const target of nodeButtons.values()) target.classList.remove('is-compaction-source'); };
+  const stopCompactionAnimation = () => { summaryEffects.stop(); for (const target of nodeButtons.values()) target.classList.remove('is-compaction-source'); };
   function cancelCompactionCue() {
     clearTimeout(compactionTimer); compactionTimer = 0; pendingCompactionCue = null; stopCompactionAnimation();
     compactionNote.hidden = true; compactionNote.textContent = ''; delete compactionNote.dataset.eventId;
@@ -149,13 +179,14 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   function playCompactionCue() {
     if (!pendingCompactionCue || compactionTimer || !dialog.open || graphRegion.hidden || !isAutomaticView() || !editor.hidden || !detail.hidden) return;
     if (picture.dataset.renderer === 'loading') return;
-    const cue = pendingCompactionCue; pendingCompactionCue = null;
-    compactionNote.textContent = cue.message; compactionNote.dataset.eventId = cue.eventIds.at(-1); compactionNote.hidden = false;
-    // These halos annotate actual visible sources. No summary node exists to merge into.
-    const visibleIds = new Set(renderer?.diagnostics().node_targets.filter(target => target.visible).map(target => target.node_id) ?? []);
-    if (!motionPreference.matches) for (const id of cue.nodeIds) {
-      if (visibleIds.has(id)) nodeButtons.get(id)?.classList.add('is-compaction-source');
-    }
+    const cue = pendingCompactionCue, summary = context.summarySnapshot?.();
+    const actualSummary = summary && cue.eventIds.includes(summary.eventId) && currentMap.nodes.some(node => node.id === summary.id);
+    if (actualSummary && renderer && !renderer.diagnostics().node_targets.some(target => target.node_id === summary.id && target.visible)) return;
+    pendingCompactionCue = null;
+    compactionNote.textContent = actualSummary ? 'Conversation summary ready · ' + summary.sourceTurnIds.length + ' authored sources. Originals kept.' : cue.message;
+    compactionNote.dataset.eventId = cue.eventIds.at(-1); compactionNote.hidden = false;
+    if (actualSummary && renderer) summaryEffects.play({ eventId: summary.eventId,
+      sourceNodeIds: summary.sourceTurnIds.map(id => 'turn:' + id), targetNodeId: summary.id });
     compactionTimer = setTimeout(cancelCompactionCue, cue.durationMs);
   }
   const snapshot = () => conversation.snapshot();
@@ -174,7 +205,7 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
     viewFrame = requestAnimationFrame(() => { viewFrame = 0; if (!disposed && dialog.open) { if (view === 'graph') drawMap(); buttons(); } });
   } });
   body.prepend(inspector.tabs); body.append(inspector.panel);
-  const autoSnapshot = () => automaticMemory.snapshot({ preferredNodeIds: hits?.map(hit => hit.nodeId) ?? manualCueNodeIds, limit: 12 });
+  const autoSnapshot = () => projectConversationSummary(automaticMemory.snapshot({ preferredNodeIds: hits?.map(hit => hit.nodeId) ?? manualCueNodeIds, limit: 12 }), context.summarySnapshot?.());
   const setStatus = (value, error = false) => { status.textContent = value; status.classList.toggle('memory-error', error); status.setAttribute('role', error ? 'alert' : 'status'); status.hidden = !value; };
   const errorText = error => typeof error?.message === 'string' ? error.message.slice(0, 180) : 'The memory operation could not finish.';
   const currentSearchBinding = () => JSON.stringify([isAutomaticView(), scope(), snapshot().version,
@@ -188,10 +219,11 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
     if (selected || !node || !dialog.open || !editor.hidden) return;
     previewNodeId = node.id;
     const scopeLabel = node.scope ? node.scope[0].toUpperCase() + node.scope.slice(1) : 'Saved words';
-    previewTitle.textContent = scopeLabel + ' · ' + (node.role === 'assistant' ? 'Assistant · generated' : node.kind === 'global' ? 'Public starter' : 'Your words');
-    previewText.textContent = [...(hits?.find(hit => hit.nodeId === node.id)?.text ?? node.text ?? node.label)].slice(0, 240).join('');
+    previewTitle.textContent = scopeLabel + ' · ' + (node.kind === 'summary' ? 'Retained summary' : node.role === 'assistant' ? 'Assistant · generated' : node.kind === 'global' ? 'Public starter' : 'Your words');
+    const previewContent = node.kind === 'summary' ? node.items.map(item => item.quote).join('\n\n') : hits?.find(hit => hit.nodeId === node.id)?.text ?? node.text ?? node.label;
+    previewText.textContent = [...previewContent].slice(0, 240).join('');
     const origin = node.provenance?.origin;
-    previewSource.textContent = node.kind === 'global' ? node.sourceTitle ?? 'NASA source' : origin?.conversationId && origin?.turnId
+    previewSource.textContent = node.kind === 'summary' ? node.sourceTurnIds.length + ' authored sources · derived excerpts' : node.kind === 'global' ? node.sourceTitle ?? 'NASA source' : origin?.conversationId && origin?.turnId
       ? 'Source ' + origin.conversationId + ' / ' + origin.turnId : 'Source ' + (node.turnId ?? node.sourceTurnId ?? node.recordId ?? node.id);
     preview.hidden = false;
     nodeButtons.get(node.id)?.setAttribute('aria-describedby', preview.id);
@@ -199,15 +231,20 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   function updateCompactControls() {
     if (compactTools.hidden) return;
     const state = context.manualCompactionStatus();
-    compact.disabled = busy || searching || Boolean(compactController) || !state.eligible;
+    compact.disabled = busy || searching || Boolean(compactController) || state.busy;
+    compact.setAttribute('aria-disabled', String(compact.disabled || !state.eligible));
+    openSummary.hidden = !context.summarySnapshot?.();
+    openSummary.disabled = busy || Boolean(compactController);
     compactCancel.hidden = !compactController;
     compactCancel.disabled = !compactController || compactController.signal.aborted;
     const reason = { ready: 'Selects older context; recent messages and originals stay intact.',
       'model-not-ready': 'Load the model before compacting context.', unavailable: 'Manual compaction is unavailable.',
       busy: 'Wait for the active reply or context operation.', empty: 'No conversation to compact.',
       'insufficient-history': 'More eligible older history is needed; the recent exchange is protected.',
+      'policy-refresh': 'Memory rules changed. Send a message to refresh checked context before compacting.',
       'scope-disabled': 'Select All pockets or Conversation to compact older context.', disposed: 'This workspace is closed.' };
     const readiness = reason[state.reason] || 'Manual compaction is unavailable.';
+    compact.title = state.eligible ? 'Retain eligible older excerpts in this conversation. Originals stay intact.' : readiness + ' Select for an explanation.';
     compactNote.textContent = compactController ? 'Compacting context…'
       : compactMessage ? compactMessage + (state.eligible ? '' : ' ' + readiness) : readiness;
   }
@@ -230,7 +267,8 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   }
   function matchingNodeIds() {
     if (isAutomaticView()) return (hits ? hits.map(hit => hit.nodeId) : !query.value.trim() && Date.now() < requestHighlightUntil
-      ? submittedMemoryNodeIds(context.inspectionSnapshot(), lastDispatchSha256, scope()) : []).filter(id => currentMap.nodes.some(node => node.id === id));
+      ? [...submittedMemoryNodeIds(context.inspectionSnapshot(), lastDispatchSha256, scope()),
+        ...submittedSummaryNodeIds(context.inspectionSnapshot(), lastDispatchSha256, scope(), context.summarySnapshot?.())] : []).filter(id => currentMap.nodes.some(node => node.id === id));
     if (!hits) return [];
     const current = new Map(active().map(item => [item.id, item]));
     return hits.filter(hit => current.get(hit.recordId)?.version === hit.version)
@@ -241,7 +279,9 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
     hidePreview();
     cancelCompactionCue();
     navigation.cancel();
+    const previousSummary = detail.dataset.summaryHash;
     selected = node; editor.hidden = true; map.hidden = false; searchForm.hidden = false; detail.hidden = !node;
+    if (node?.kind !== 'summary') { summaryExact.hidden = true; summaryExact.open = false; summaryExactText.textContent = ''; delete detail.dataset.summaryHash; }
     back.hidden = !node && !legacyView; title.textContent = legacyView ? 'Saved words' : 'Memory'; editRecord = null;
     detailProvenance.hidden = !node || !isAutomaticView(); remember.hidden = true;
     if (node) {
@@ -249,6 +289,19 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
         const current = currentMap.nodes.find(item => item.id === node.id);
         if (!current) { showDetail(null); return; }
         selected = current;
+        if (current.kind === 'summary') {
+          detailTitle.textContent = 'Conversation summary';
+          detailProvenance.textContent = 'Retained excerpts · Current conversation · ' + current.sourceTurnIds.length + ' authored sources. Derived context, not a Persona memory.';
+          if (submittedSummaryNodeIds(context.inspectionSnapshot(), lastDispatchSha256, scope(), current).length) detailProvenance.textContent += ' This exact summary was included in the last submitted request.';
+          detailText.textContent = current.items.map(item => item.quote).join('\n\n'); detail.dataset.summaryHash = current.summaryHash;
+          if (previousSummary !== current.summaryHash) summaryExact.open = false;
+          summaryExact.hidden = false; summaryExactText.textContent = current.text;
+          sourceLinks(current.sourceTurnIds);
+          for (const anchor of detailSources.querySelectorAll('[data-memory-source]')) anchor.textContent = 'Source ' + anchor.dataset.memorySource + ' · Open in chat';
+          edit.hidden = true; forget.hidden = true; remember.hidden = true; forgetHint.hidden = false;
+          forgetHint.textContent = 'Originals stay in Conversation. Forget an original source to exclude it from retained context. Later requests select context again; this node records the committed output.';
+        } else {
+        delete detail.dataset.summaryHash;
         detailTitle.textContent = current.kind === 'global' ? 'Space starter · Global' : current.role === 'assistant' ? 'Assistant · generated' : current.scope === 'persona' ? 'Your words · Persona' : 'Your message';
         detailProvenance.textContent = current.kind === 'global' ? 'Shared starter knowledge · NASA source' : (current.role === 'assistant' ? 'Generated text · ' : 'Exact source words · ') + (current.scope === 'persona' ? 'Current persona' : 'Current conversation');
         const origin = current.provenance?.origin;
@@ -265,6 +318,7 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
         forget.textContent = current.kind === 'global' ? 'Remove starter' : current.scope === 'persona' ? 'Forget persona memory' : 'Forget from memory';
         forgetHint.textContent = current.kind === 'global' ? 'Removes this starter from your local memory pockets.' : current.scope === 'persona' ? 'Removes this persona memory. Your original message stays in chat.' : 'Excludes this message from memory and retrieval. The original message stays in chat.';
         remember.hidden = current.kind !== 'message' || current.role !== 'user' || !current.turnId;
+        }
       } else {
       const record = node.kind === 'record' ? active().find(item => item.id === node.recordId) : null;
       const original = node.kind === 'source' ? userTurns().find(turn => turn.id === node.sourceTurnId) : null;
@@ -289,6 +343,7 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
       node.style.setProperty('--node-size', size + 'px'); node.style.zIndex = String(order.get(target.node_id));
       if (node.hidden && previewNodeId === target.node_id) hidePreview();
     }
+    playCompactionCue();
   }
   const renderAllowed = () => !disposed && dialog.open && !graphRegion.hidden && editor.hidden && doc.visibilityState !== 'hidden';
   const cameraMapKey = () => JSON.stringify([legacyView, scope(), automaticMemory?.getScope(),
@@ -396,12 +451,14 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
         picture.append(target); nodeButtons.set(node.id, target);
       }
       target.firstChild.textContent = node.label;
-      const provenance = isAutomaticView() ? node.kind === 'global' ? 'Space starter · Global: ' : (node.role === 'assistant' ? 'Assistant · generated' : 'Your words') + ' · ' + node.scope + ': ' : node.kind === 'record' ? 'Memory: ' : 'Source message ' + node.sourceTurnId + ': ';
+      const provenance = isAutomaticView() ? node.kind === 'summary' ? 'Derived conversation summary · ' + node.sourceTurnIds.length + ' authored sources: '
+        : node.kind === 'global' ? 'Space starter · Global: ' : (node.role === 'assistant' ? 'Assistant · generated' : 'Your words') + ' · ' + node.scope + ': ' : node.kind === 'record' ? 'Memory: ' : 'Source message ' + node.sourceTurnId + ': ';
       const highlight = matches.has(node.id) ? hits ? 'search' : 'last-request' : '';
       target.dataset.memoryHighlight = highlight;
       const highlightLabel = highlight === 'search' ? 'Search match · graph only' : highlight === 'last-request' ? 'Source included in last submitted request' : '';
       target.setAttribute('aria-label', provenance + node.label + (highlightLabel ? ' · ' + highlightLabel : ''));
       target.title = provenance + node.label + (highlightLabel ? ' · ' + highlightLabel : '');
+      if (node.kind === 'summary') { target.dataset.summaryEventId = node.eventId; target.dataset.summaryHash = node.summaryHash; }
       if (isAutomaticView()) { target.dataset.memoryScope = node.scope; target.dataset.memoryRole = node.role; }
       else { delete target.dataset.memoryScope; delete target.dataset.memoryRole; }
       if (memoryScopeColor(node.scope) !== undefined) target.style.setProperty('--memory-node-color', MEMORY_SCOPE_COLORS[node.scope]);
@@ -415,7 +472,9 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   }
   function refresh() {
     if (disposed) return;
-    button.hidden = options.hidden; if (button.hidden && dialog.open) dialog.close();
+    // Reading an existing local memory never requires loading the model.
+    const effectEvent = summaryEffects.diagnostics().eventId;
+    if (effectEvent && context.summarySnapshot?.()?.eventId !== effectEvent) cancelCompactionCue();
     let bindingChanged = false;
     try { bindingChanged = Boolean(searchBinding && searchBinding !== currentSearchBinding()); }
     catch (error) {
@@ -475,7 +534,7 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   listen(correct, 'click', () => write(() => memory.correct({ recordId: editRecord.id, text: text.value, sourceTurnIds: [source.value], expectedVersion: editRecord.version }), 'Memory corrected.'));
   listen(forget, 'click', () => {
     if (isAutomaticView()) {
-      const node = selected; if (!node || !currentMap.nodes.some(item => item.id === node.id)) return;
+      const node = selected; if (!node || node.kind === 'summary' || !currentMap.nodes.some(item => item.id === node.id)) return;
       void write(() => automaticMemory.forget(node), node.kind === 'global' ? 'Starter removed.' : 'Forgotten from memory. The chat is unchanged.', true); return;
     }
     const item = selectedRecord(); if (!item || item.version !== selected.version) { graphView(); setStatus('That memory changed. Select it again.', true); return; }
@@ -533,24 +592,41 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
     event.preventDefault(); await searchGraph();
   });
   listen(compactCancel, 'click', () => { compactController?.abort(); buttons(); });
+  listen(openSummary, 'click', () => {
+    invalidateSearch(); query.value = ''; setSearchSummary(''); legacyView = false; graphView(false);
+    const node = currentMap.nodes.find(node => node.kind === 'summary'); if (node) showDetail(node, true);
+  });
   listen(compact, 'click', async () => {
-    if (busy || searching || compactController || !context.manualCompactionStatus().eligible) return;
+    if (busy || searching || compactController) return;
+    const eligibility = context.manualCompactionStatus();
+    if (!eligibility.eligible) {
+      compactMessage = eligibility.reason === 'model-not-ready' ? 'Nothing changed. Load the model before compacting.'
+        : eligibility.reason === 'insufficient-history' || eligibility.reason === 'empty' ? 'Nothing to compact yet. The recent exchange is protected; keep chatting to create older history.'
+          : eligibility.reason === 'policy-refresh' ? 'Nothing changed. Memory rules changed; send a message to refresh checked context before compacting.'
+            : eligibility.reason === 'busy' ? 'Nothing changed. Wait for the active reply or context operation.' : 'Nothing changed. Conversation context must be available to compact.';
+      setStatus(compactMessage); buttons(); return;
+    }
     invalidateSearch(); query.value = ''; setSearchSummary(''); hidePreview(); cancelCompactionCue();
     const controller = compactController = new AbortController(); compactMessage = ''; busy = true; buttons();
     try {
       const result = await context.compactNow({ signal: controller.signal });
       if (disposed) return;
       const event = events.list().findLast(item => item.type === 'compacted' && item.cycle === result.compaction?.cycle);
-      manualCueNodeIds = event?.sourceTurnIds.map(id => 'turn:' + id) ?? [];
-      graphView(false); pendingCompactionCue = compactionCue.take(currentMap.nodes); playCompactionCue();
-      compactMessage = 'Context compacted · ' + result.compaction.before.promptTokens + ' → ' + result.compaction.after.promptTokens + ' prompt tokens. Originals kept; nothing sent.';
+      const summary = context.summarySnapshot?.();
+      manualCueNodeIds = summary?.eventId === event?.id ? summary.sourceTurnIds.map(id => 'turn:' + id) : [];
+      graphView(false); navigation.fit(); pendingCompactionCue = compactionCue.take(currentMap.nodes); playCompactionCue();
+      compactMessage = (summary ? 'Conversation summary ready · ' + summary.sourceTurnIds.length + ' authored sources retained. ' : 'Context compacted. ')
+        + result.compaction.before.promptTokens + ' → ' + result.compaction.after.promptTokens + ' prompt tokens. Originals kept; nothing sent.';
       // The real compaction is already committed; saving cannot undo its event.
       let persistenceFailed = false;
       try { persistenceFailed = Boolean((await onChange?.())?.error); }
       catch { persistenceFailed = true; }
       if (persistenceFailed) compactMessage += ' Saving did not finish; this change is session-only.';
     } catch (error) {
-      if (!disposed) compactMessage = error.name === 'AbortError' ? 'Compaction cancelled. Prior context and originals kept.' : errorText(error);
+      if (!disposed) {
+        compactMessage = error.name === 'AbortError' ? 'Compaction cancelled. Prior context and originals kept.' : 'Compaction did not finish. ' + errorText(error);
+        setStatus(compactMessage, error.name !== 'AbortError');
+      }
     } finally { if (compactController === controller) compactController = null; busy = false; if (!disposed) refresh(); }
   });
   listen(canvas, 'rag-camera-frame', overlayPositions);
@@ -591,7 +667,18 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   listen(dialog, 'click', event => {
     const anchor = event.target.closest?.('a[data-memory-source]'); if (!anchor) return;
     event.preventDefault(); const target = doc.getElementById('turn-' + anchor.dataset.memorySource);
-    if (!target) { setStatus('That source is not in this conversation view.', true); return; }
+    if (!target || target.closest('[hidden]')) {
+      // Reading a retained source must not require model loading or focus a
+      // hidden chat. Use the same authorized original node in this local view.
+      const id = 'turn:' + anchor.dataset.memorySource;
+      if (isAutomaticView()) {
+        invalidateSearch(); query.value = ''; setSearchSummary(''); manualCueNodeIds = [id]; graphView(false);
+      }
+      const original = currentMap.nodes.find(node => node.id === id && ['message', 'source'].includes(node.kind));
+      if (original) { showDetail(original, true); setStatus('Your original message. Reading it does not load the model.'); }
+      else setStatus('That source is outside this memory view.', true);
+      return;
+    }
     skipFocusReturn = true; dialog.close(); const old = target.getAttribute('tabindex');
     target.setAttribute('tabindex', '-1'); target.scrollIntoView({ block: 'center', behavior: 'auto' }); target.focus({ preventScroll: true });
     target.addEventListener('blur', () => { if (old === null) target.removeAttribute('tabindex'); else target.setAttribute('tabindex', old); }, { once: true });
@@ -600,6 +687,15 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   const appRoot = doc.getElementById('app'); if (appRoot) observer.observe(appRoot, { attributes: true, attributeFilter: ['data-phase'] });
   const unsubscribe = events.subscribe(event => {
     compactionCue.observe(event);
+    if (event.type === 'compacted' && !compactController) queueMicrotask(() => {
+      if (disposed) return;
+      const summary = context.summarySnapshot?.();
+      if (summary?.eventId !== event.id) return;
+      manualCueNodeIds = summary.sourceTurnIds.map(id => 'turn:' + id); refresh();
+      if (dialog.open && isAutomaticView()) {
+        navigation.fit(); pendingCompactionCue = compactionCue.take(currentMap.nodes); playCompactionCue();
+      }
+    });
     if (event.type === 'context-dispatched') {
       lastDispatchSha256 = event.requestSha256;
       manualCueNodeIds = [];
@@ -612,7 +708,7 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
     } else refresh();
   }), unsubscribeAutomatic = automaticMemory?.subscribe?.(refresh), unsubscribeInspection = context.subscribeInspection?.(() => { if (!disposed) refresh(); }); refresh();
   return Object.freeze({ button, dialog, refresh, dispose() {
-    if (disposed) return; disposed = true; compactController?.abort(); invalidateSearch(); inspector.dispose(); if (viewFrame) cancelAnimationFrame(viewFrame); viewFrame = 0; clearTimeout(requestHighlightTimer); requestHighlightTimer = 0; if (expandFrame) cancelAnimationFrame(expandFrame); expandFrame = 0; stopRenderer(); compactionCue.dispose(); navigation.dispose(); observer.disconnect(); unsubscribe(); unsubscribeAutomatic?.(); unsubscribeInspection?.(); listeners.abort();
+    if (disposed) return; disposed = true; compactController?.abort(); invalidateSearch(); inspector.dispose(); if (viewFrame) cancelAnimationFrame(viewFrame); viewFrame = 0; clearTimeout(requestHighlightTimer); requestHighlightTimer = 0; if (expandFrame) cancelAnimationFrame(expandFrame); expandFrame = 0; stopRenderer(); summaryEffects.dispose(); compactionCue.dispose(); navigation.dispose(); observer.disconnect(); unsubscribe(); unsubscribeAutomatic?.(); unsubscribeInspection?.(); listeners.abort();
     if (dialog.open) dialog.close(); dialog.remove(); button.remove(); stylesheet?.remove();
   } });
 }

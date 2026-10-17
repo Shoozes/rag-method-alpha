@@ -13,7 +13,7 @@ export function contextUsageView(state) {
   const known = validBudget && Number.isSafeInteger(measured?.promptTokens) && measured.promptTokens > 0
     && measured.contextTokens === capacity && typeof measured.overflow === 'boolean';
   const labels = { unmeasured: 'Not measured', measuring: 'Checking context', compacting: 'Compacting context',
-    ready: state?.compaction ? 'Compacted' : 'Last prompt', stale: 'Last prompt', error: 'Check failed', cancelled: 'Check stopped' };
+    ready: state?.compaction ? 'Context compacted' : 'Last prompt', stale: 'Last prompt', error: 'Check failed', cancelled: 'Check stopped' };
   const label = labels[phase] || 'Not measured';
   const quality = measured?.quality === 'estimate' ? 'Estimated' : measured?.quality === 'fixture' ? 'Fixture measurement, not native tokens' : 'Measured';
   const budgetText = validBudget ? `${budget.toLocaleString('en-US')} prompt tokens; ${reserve.toLocaleString('en-US')} reserved for the reply (${capacity.toLocaleString('en-US')} total).` : 'Context budget unavailable.';

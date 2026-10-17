@@ -48,6 +48,9 @@ export async function createAutomaticMemory({ ownerScope, conversation, memory, 
     personaState, globalState, getActiveScope: getScope, getProtectedTurnIds: () => [...new Set([...legacyProtectedIds(), ...blockedIds()])] });
   const notify = () => { for (const observer of [...observers]) { try { observer(); } catch { /* Views do not own source data. */ } } };
   const identity = () => { ensureSharedFresh(); return JSON.stringify([selectedScope, [...blocked].sort(), pockets.exportPersona(), pockets.exportGlobal()]); };
+  // A presentation filter cannot destroy a still-valid conversation output.
+  // Content exclusions and shared-source changes still invalidate that output.
+  const retentionIdentity = () => { ensureSharedFresh(); return JSON.stringify([[...blocked].sort(), pockets.exportPersona(), pockets.exportGlobal()]); };
   const normalize = node => node.nodeId
     ? { ...node, text: conversation.snapshot().turns.find(turn => turn.id === node.turnId)?.content ?? node.text,
       id: node.nodeId, kind: 'message', scope: 'conversation', label: label(node.text) }
@@ -71,7 +74,7 @@ export async function createAutomaticMemory({ ownerScope, conversation, memory, 
   }
   const changed = async operation => { ensureSharedFresh(); await operation(); used = []; notify(); const result = await persist(); notify(); return result; };
   const api = {
-    ownerScope: owner, getScope, identity, notify,
+    ownerScope: owner, getScope, identity, retentionIdentity, notify,
     allowConversation: () => selectedScope === 'all' || selectedScope === 'conversation',
     getBlockedTurnIds: () => [...new Set([...blockedIds(), ...personaSources()])],
     snapshot({ preferredNodeIds = [], limit = 12 } = {}) {
@@ -91,8 +94,8 @@ export async function createAutomaticMemory({ ownerScope, conversation, memory, 
         ...(chat.status.state === 'limit' ? { message: chat.status.reason } : {}) } };
     },
     search: args => search({ ...args, purpose: 'display' }),
-    async prepareContext({ query, excludeTurnId } = {}) {
-      const result = await search({ query, purpose: 'prompt', excludeTurnIds: [excludeTurnId] });
+    async prepareContext({ query, excludeTurnId, excludeTurnIds = [] } = {}) {
+      const result = await search({ query, purpose: 'prompt', excludeTurnIds: [...new Set([excludeTurnId, ...excludeTurnIds].filter(Boolean))] });
       if (result.status.state === 'limit') throw Error(result.status.message || 'Conversation memory exceeded its local scan bound.');
       const hits = [];
       for (const hit of result.hits.slice(0, 3)) {
