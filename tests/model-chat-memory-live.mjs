@@ -22,7 +22,7 @@ const checks = [], assets = [], privatePaths = [], forbiddenRequests = [], pageE
 const automaticFixtureCheck = `labeled synthetic messages exercise the production ${deliveryLabel} automatic TSL graph and real search`;
 const spatialFixtureCheck = 'live spatial Graph expansion and honest empty Context navigation preserve canonical state';
 const fixtureScopes = new Map([
-  ['real panel binding and graph-disabled assembly work without loading a model', 'Binding-only presentation fixture: exposes the existing Memory entry while the model controller stays idle.'],
+  ['real panel binding and graph-disabled assembly work without loading a model', 'Native unloaded Memory entry and graph-disabled assembly; model controller stays idle.'],
   [automaticFixtureCheck, 'Synthetic conversation fixture only: canonical user/generated turns and public Global starters, actual production bootstrap/storage/renderer/retrieval; no model loaded.'],
   [spatialFixtureCheck, 'Synthetic canonical conversation from the preceding fixture; real production spatial renderer and empty request inspector, no prepare/dispatch/provider calls.'],
 ]);
@@ -218,11 +218,10 @@ try {
     assert.equal(await page.locator('#memory-graph [data-memory-kind="message"]').count(), 0);
   });
   await check('real panel binding and graph-disabled assembly work without loading a model', async () => {
-    // The production entry is intentionally hidden until a model is ready.
-    // This explicit presentation fixture tests its binding without a ready UI.
-    await page.evaluate(() => { document.getElementById('chat-options').hidden = false; });
+    // Memory and canonical originals remain inspectable before model loading.
+    assert.equal(await page.locator('#memory-open').isVisible(), true);
     assert.equal(await page.locator('#app').getAttribute('data-phase'), 'idle');
-    await page.locator('#memory-open').evaluate(button => button.click());
+    await page.locator('#memory-open').click();
     assert.equal(await page.locator('#memory-dialog').evaluate(dialog => dialog.open), true);
     const bounds = await page.locator('#memory-dialog').boundingBox(); assert.ok(bounds && bounds.x >= -1 && bounds.y >= -1 && bounds.x + bounds.width <= 391 && bounds.y + bounds.height <= 845);
     await page.locator('#memory-close').click();
@@ -230,7 +229,7 @@ try {
     assert.equal(await page.locator('#memory-graph svg, #memory-graph canvas:visible').count(), 0);
     assert.equal(await page.locator('#memory-graph [data-memory-kind="global"]').count(), 3);
     assert.equal(await page.locator('#memory-graph [data-memory-kind="message"]').count(), 0);
-    observations.push({ panelOpenedProgrammaticallyWhileModelUnloaded: true, graphDisabledAssemblyVerified: true });
+    observations.push({ nativeMemoryEntryWhileModelUnloaded: true, graphDisabledAssemblyVerified: true });
   });
   await check(`essential screenshot shows actual idle ${deliveryLabel} preview and its visible experimental notice`, async () => {
     await productionPage('?memory=1'); await settle();
@@ -272,8 +271,7 @@ try {
       assert.equal(await page.evaluate(() => window.localMemoryPreview.app.controller.getState().phase), 'idle');
       assert.equal(await page.evaluate(() => window.localMemoryPreview.workspace.conversation.exportState()), seeded.conversation);
       await page.evaluate(label => {
-        // Presentation-only entry exposure; no controller/model-ready change.
-        document.getElementById('chat-options').hidden = false;
+        // Label only; no controller/model-ready or entry-visibility change.
         const badge = document.createElement('p'); badge.id = 'live-automatic-memory-fixture-label'; badge.textContent = label;
         badge.style.cssText = 'margin:0;padding:6px;color:#ffedc8;background:#252014;font:10px/1.4 ui-monospace,monospace;pointer-events:none';
         document.querySelector('#memory-dialog .memory-panel-body').prepend(badge);
@@ -382,10 +380,15 @@ try {
       assert.equal(await message.evaluate(node => document.activeElement === node), true);
       assert.equal(await page.locator('[data-memory-node][aria-pressed="true"]').count(), 0);
       await page.keyboard.press('Enter'); await sourceLink.click();
-      assert.equal(await page.locator('#memory-dialog').evaluate(dialog => dialog.open), false);
+      assert.equal(await page.locator('#memory-dialog').evaluate(dialog => dialog.open), true);
+      assert.equal(await page.locator('#memory-detail-title').textContent(), 'Your message');
+      assert.equal(await page.locator('#memory-detail-text').textContent(), seeded.sourceText,
+        'an unloaded source stays readable as its exact canonical original inside Memory');
+      assert.equal(await message.getAttribute('aria-pressed'), 'true');
       assert.equal(await page.evaluate(() => window.localMemoryPreview.workspace.conversation.exportState()), seeded.conversation);
       fixture.originalTranscriptPreserved = true;
       fixture.sourceLinkVerifiedAgainstCanonicalTurn = true;
+      fixture.unloadedSourceKeptReadableInMemory = true;
       assert.equal(await page.locator('#app').getAttribute('data-phase'), 'idle');
     } catch (error) { fixtureFailure = error; }
     finally {
