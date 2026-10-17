@@ -15,12 +15,18 @@ The model download, cache, and inference run only after an explicit browser acti
 Open ?memory=1 for this one-chat memory preview; add &graph=0 for its searchable HTML memory list without the optional TSL graph.
 The pinned TSL renderer uses Three WebGPU with a WebGL2 backend fallback; unavailable graphics retain accessible memory controls.
 Graph startup or device loss is not a guarantee of mobile GPU support. No new iOS qualification follows from this package.
+Graph supports orbit, expanded view and read-only Context inspection. Visual selection grants no additional permissions.
+Three 0.185.0 retains an internal frame clock while Graph is visible; the strict visible zero-RAF criterion remains unmet.
+Physical iOS, new native inference and full installed dependency parity remain unqualified; the source guide records the missing vite/client declaration limit.
 Older context is selected automatically as source-linked exact passages; no special markup is required.
 Each accepted message creates a canonical Conversation node. Generated-assistant text remains labeled and is excluded from retrieved user evidence.
 The pocket filter changes real retrieval: Global public Space starters, explicit Persona user excerpts, current Conversation, or All pockets.
 Scope bindings include actor, persona and conversation identities; visual selection grants no permissions.
 Space starters cite https://science.nasa.gov/earth/facts/, https://science.nasa.gov/moon/facts/ and https://science.nasa.gov/mars/moons/.
 Search highlights actual matches. Last-used nodes light only after dispatch. No automatic fact promotion or agent orchestration is included.
+The Context tab distinguishes latest prepared from last submitted requests; submission does not prove model use or answer truth.
+Exact memory/request text is session-only and unavailable when its inspection bound is exceeded; retained rows report supplied totals and omissions.
+Retrieval candidates are the supplied core-returned stage, not all indexed documents. Scores and reasons appear only when actually supplied.
 Automatic passage selection is lossy extractive context, not general semantic summarization or verified fact admission.
 Explicit Save stores selected exact user words separately for keyword retrieval; Forget does not erase the transcript.
 Remember for persona retains exact user-source proof. Forget/version exclusions persist when saving succeeds; quota failures report session-only state.

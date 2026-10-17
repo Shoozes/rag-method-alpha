@@ -60,7 +60,13 @@ export async function createAutomaticMemory({ ownerScope, conversation, memory, 
     const hits = [...chat.hits.map(hit => ({ ...hit, kind: 'conversation', scope: 'conversation' })),
       ...shared.hits.map(hit => ({ ...hit, nodeId: hit.id, kind: hit.scope }))];
     const limited = chat.status.state === 'limit';
-    return { hits, status: { state: limited ? 'limit' : 'ok', ...(limited ? { message: chat.status.reason } : {}) } };
+    const candidates = [...(chat.inspection?.candidates ?? []), ...(shared.inspection?.candidates ?? [])];
+    const scored = candidates.reduce((total, row) => total + Number(row.score_micro !== null) + Number(row.keyword_micro !== null), 0);
+    const inspection = freeze({ candidates,
+      coverage: 'Conversation core returns followed by shared-pocket core returns, before the existing automatic first-three limit; no cross-source ranking or exhaustive scanned candidate list.',
+      availability: { scores: scored && scored === candidates.length * 2 ? 'available' : scored ? 'partial' : 'unavailable',
+        reasons: 'unavailable', reason: limited ? chat.status.reason : scored === candidates.length * 2 && candidates.length ? null : 'No complete numeric core ranking was returned.' } });
+    return { hits, status: { state: limited ? 'limit' : 'ok', ...(limited ? { message: chat.status.reason } : {}) }, inspection };
   }
   const changed = async operation => { ensureSharedFresh(); await operation(); used = []; notify(); const result = await persist(); notify(); return result; };
   const api = {
@@ -96,7 +102,8 @@ export async function createAutomaticMemory({ ownerScope, conversation, memory, 
         hits.push({ ...hit, text, ...(offsets ? { offsets, lineHash: await hashText(text) } : {}),
           ...(origin ? { quoteSource: { ...origin, offsets: { start: origin.offsets.start + offset, end: origin.offsets.start + offset + text.length, unit: 'utf16' }, lineHash: await hashText(text) } } : {}) });
       }
-      return { hits, identity: identity() };
+      return { hits, identity: identity(), inspection: freeze({ ...result.inspection,
+        selectedNodeIds: hits.map(hit => hit.nodeId), finalLimit: 3 }) };
     },
     markUsed(hits) { used = [...new Set(hits.map(hit => hit.nodeId))]; notify(); },
     setScope(value) { if (!scopes.has(value)) throw Error('Unknown memory pocket.'); return changed(() => { selectedScope = value; }); },

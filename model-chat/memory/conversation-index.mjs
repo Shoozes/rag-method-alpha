@@ -1,4 +1,5 @@
 // A disposable view of canonical messages, never an admission to saved memory.
+import { inspectRetrievalResults } from './rag-adapter.mjs';
 const limits = Object.freeze({ maxTurns: 512, maxScanBytes: 512 * 1024, maxTextUnits: 4000, maxNodes: 12 });
 const activeScopes = new Set(['all', 'global', 'persona', 'conversation']);
 const functionWords = new Set(('what which when where why how is are was were be been being the a an of to for does do did it its you your i my me we our us and or in on at by as with from that this these those can could would should will has have had please tell about explain again more continue above earlier').split(' '));
@@ -127,7 +128,12 @@ export function createConversationIndex({ conversation, core, ownerScope, getAct
     // A policy/owner switch cannot release results prepared under an old scope.
     const after = read();
     if (after.signature !== current.signature) return freeze({ hits: [], status: { ...status, state: 'stale', reason: 'conversation-or-policy-changed' } });
-    return freeze({ hits, status: { ...status, coreTruncated: response.truncated === true } });
+    const inspection = inspectRetrievalResults(response.results, result => {
+      const turn = byId.get(result.record.id);
+      return { nodeId: 'turn:' + turn.id, kind: 'conversation', scope: 'conversation', role: turn.role,
+        turnId: turn.id, sourceTurnIds: [turn.id] };
+    }, limits.maxNodes);
+    return freeze({ hits, status: { ...status, coreTruncated: response.truncated === true }, inspection });
   }
   return Object.freeze({ snapshot, search });
 }
