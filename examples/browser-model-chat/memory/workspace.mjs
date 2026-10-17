@@ -84,14 +84,20 @@ export async function createWorkspace({ adapter, core, storage, graphEnabled = t
   const graph = graphEnabled ? createMemoryGraph(events) : undefined;
   const workspace = {
     conversation, memory, retrieval, context, events, graph, automaticMemory, ownerScope,
-    provider: { ...adapter, reply: (messages, options) => adapter.reply(messages, { ...options,
-      beforeDispatch: () => context.validateDispatch(messages), onDispatch: () => context.dispatched(messages) }) },
+    provider: { ...adapter, reply: (messages, options) => {
+      const requestSha256 = context.inspectionSnapshot().latestPrepared?.requestSha256;
+      const failed = error => { context.replyFailed({ requestSha256, cancelled: error?.name === 'AbortError' }); throw error; };
+      try { return Promise.resolve(adapter.reply(messages, { ...options,
+        beforeDispatch: () => context.validateDispatch(messages), onDispatch: () => context.dispatched(messages) })).catch(failed); }
+      catch (error) { return failed(error); }
+    } },
     prepare: options => context.prepare(options),
     sourcesForAnswer: answerTurnId => structuredClone(answerCitations.find(item => item.answerTurnId === answerTurnId)?.sources || []),
     async captureAnswerSources({ answerTurnId, requestSha256 }) {
       const annotation = await captureAnswerCitation({ answerTurnId, requestSha256,
         conversation: conversation.snapshot(), records: memory.snapshot().records, events: events.list() });
       if (annotation && !answerCitations.some(item => item.answerTurnId === answerTurnId)) answerCitations.push(annotation);
+      context.bindReply({ answerTurnId, requestSha256 });
       return this.sourcesForAnswer(answerTurnId);
     },
     persist,

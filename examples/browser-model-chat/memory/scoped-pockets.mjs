@@ -1,5 +1,6 @@
 // Explicit, origin-bound excerpts and public starter sources. Imported proofs
 // establish internal source binding, not authenticated conversation history.
+import { inspectRetrievalResults } from './rag-adapter.mjs';
 const PERSONA_SCHEMA = 'scoped-persona-pockets/v1', GLOBAL_SCHEMA = 'scoped-global-pockets/v1';
 const MAX_PERSONA = 32, MAX_BYTES = 256 * 1024, MAX_GLOBAL = 128;
 const encoder = new TextEncoder(), scopes = new Set(['all', 'global', 'persona', 'conversation']);
@@ -195,7 +196,12 @@ export async function createScopedPockets({ ownerScope, conversation, core, star
         top_k: purpose === 'prompt' ? 3 : 12, max_context_tokens: 1800, expand: false });
       if (!Array.isArray(response.results) || response.results.some(result => !result.has_retrieval_signal || result.keyword_micro <= 0 || !origins.has(result.record.id))) fail('core retrieval signal');
       check();
-      return frozen({ activeScope: scope, purpose, queryHash, hits: response.results.map(result => origins.get(result.record.id)) });
+      const inspection = inspectRetrievalResults(response.results, result => {
+        const node = origins.get(result.record.id);
+        return { nodeId: node.id, recordId: node.recordId, version: node.version, kind: node.scope, scope: node.scope,
+          role: node.role, sourceTurnIds: node.provenance?.origin ? [node.provenance.origin.turnId] : [] };
+      }, purpose === 'prompt' ? 3 : 12);
+      return frozen({ activeScope: scope, purpose, queryHash, hits: response.results.map(result => origins.get(result.record.id)), inspection });
     },
     pin(request = {}) { const copied = structuredClone(request); return transact(() => changePersona(copied, false)); },
     correct(request = {}) { const copied = structuredClone(request); return transact(() => changePersona(copied, true)); },

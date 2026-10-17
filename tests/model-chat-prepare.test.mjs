@@ -10,7 +10,7 @@ import { COMPAT, RUNTIME } from '../examples/browser-model-chat/model-contract.m
 import { parseSetupArgs, prepareRuntime, verifiedRuntimeFiles } from '../examples/browser-model-chat/prepare-runtime.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const runtimeRoot = join(root, '.artifacts/model-chat/runtime');
+const runtimeRoot = process.env.BROWSER_MODEL_RUNTIME_ROOT || join(root, '.artifacts/model-chat/runtime');
 const hash = (bytes, algorithm = 'sha256', encoding = 'hex') => createHash(algorithm).update(bytes).digest(encoding);
 
 async function fixture(t) {
@@ -78,12 +78,12 @@ test('verified retained profiles skip all fetches and writes, including explicit
     before.set(name, (await lstat(path)).mtimeMs);
   }
   let fetches = 0;
-  const result = await prepareRuntime({ fetchMissing: true, fetchImpl() { fetches++; throw new Error('retained assets must not be fetched'); } });
+  const result = await prepareRuntime({ output: runtimeRoot, fetchMissing: true, fetchImpl() { fetches++; throw new Error('retained assets must not be fetched'); } });
   assert.equal(fetches, 0); assert.equal(result.filesWritten, 0); assert.equal(result.modelsDownloaded, 0);
   assert.deepEqual(result.profiles.map(item => item.prepared), [[], []]);
   assert.equal(result.profiles.flatMap(item => item.retained).length, 5);
   const directory = await fixture(t), bad = join(directory, 'compat-bad.tgz');
   await writeFile(bad, 'bad explicit compatibility archive');
-  await assert.rejects(prepareRuntime({ archives: { compat: bad } }), /integrity mismatch/);
+  await assert.rejects(prepareRuntime({ output: runtimeRoot, archives: { compat: bad } }), /integrity mismatch/);
   for (const name of Object.keys(identities)) assert.equal((await lstat(join(runtimeRoot, name))).mtimeMs, before.get(name), name + ' retained without rewriting');
 });

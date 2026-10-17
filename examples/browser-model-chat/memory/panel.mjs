@@ -1,5 +1,6 @@
 import { mountMemoryNavigation } from './navigation.mjs';
 import { createCompactionCue } from './compaction-cue.mjs';
+import { createContextInspector } from './context-panel.mjs';
 
 export const MEMORY_SCOPE_COLORS = Object.freeze({ conversation: '#0ea5ff', persona: '#c81fff', global: '#f59e0b' });
 export function memoryScopeColor(scope) {
@@ -33,7 +34,7 @@ export function projectMemoryMap({ active, turns, graphData, preferredRecordIds 
 }
 
 /** Storage and retrieval retain authority; this view owns only presentation. */
-export function mountMemoryPanel({ conversation, memory, retrieval, events, graph, automaticMemory, onChange, rendererBackend = 'auto' } = {}) {
+export function mountMemoryPanel({ conversation, memory, retrieval, events, graph, automaticMemory, context, onChange, rendererBackend = 'auto' } = {}) {
   if (!['auto', 'webgl2'].includes(rendererBackend)) throw Error('Unsupported memory graph backend.');
   const doc = document, options = doc.getElementById('chat-options');
   const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
@@ -56,9 +57,11 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   const dialog = el('dialog', undefined, { id: 'memory-dialog', class: 'memory-dialog', 'aria-labelledby': 'memory-title' });
   for (const [scope, color] of Object.entries(MEMORY_SCOPE_COLORS)) dialog.style.setProperty('--memory-scope-' + scope, color);
   const header = el('header', undefined, { class: 'memory-panel-header' });
-  const back = control('Back', 'memory-back'), fit = control('Fit', 'memory-fit'), close = control('Close', 'memory-close'); back.hidden = true; fit.hidden = true;
+  const back = control('Back', 'memory-back'), fit = control('Fit', 'memory-fit'), expand = control('⤢', 'memory-expand'), close = control('Chat', 'memory-close'); back.hidden = true; fit.hidden = true;
+  expand.setAttribute('aria-label', 'Expand Memory'); expand.setAttribute('aria-expanded', 'false'); expand.title = 'Expand Memory';
+  close.setAttribute('aria-label', 'Back to chat'); close.title = 'Back to chat';
   fit.setAttribute('aria-label', 'Fit memory graph');
-  const title = el('h2', 'Memory', { id: 'memory-title' }); header.append(back, title, fit, close);
+  const title = el('h2', 'Memory', { id: 'memory-title' }); header.append(back, title, fit, expand, close);
   const body = el('div', undefined, { class: 'memory-panel-body' });
   const searchForm = el('form', undefined, { id: 'memory-recall-form', class: 'memory-search-form' });
   const query = el('input', undefined, { id: 'memory-query', type: 'search', maxlength: '1024', placeholder: automaticMemory ? 'Search memory' : 'Search saved words', 'aria-label': automaticMemory ? 'Search memory' : 'Search saved words', enterkeyhint: 'search' });
@@ -98,14 +101,16 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
     label.style.setProperty('--memory-node-color', 'var(--memory-scope-' + scope + ')'); legend.append(label);
   }
   const status = el('p', '', { id: 'memory-status', role: 'status', 'aria-live': 'polite' });
-  body.append(searchForm, legend, map, editor, status, footer); dialog.append(header, body); doc.body.append(dialog);
+  const graphRegion = el('section', undefined, { id: 'memory-graph-view', class: 'memory-graph-view', role: 'tabpanel', 'aria-labelledby': 'memory-graph-tab' });
+  graphRegion.append(searchForm, legend, map, editor, status, footer);
+  body.append(graphRegion); dialog.append(header, body); doc.body.append(dialog);
 
   let disposed = false, busy = false, hits = null, sequence = 0, selected = null, editRecord = null, skipFocusReturn = false;
-  let renderer = null, rendererModule = null, rendererPromise = null, rendererGeneration = 0, topology = '', currentMap = { nodes: [], links: [] };
-  let legacyView = false;
+  let renderer = null, rendererModule = null, rendererPromise = null, rendererGeneration = 0, topology = '', currentMap = { nodes: [], links: [] }, expandFrame = 0, viewFrame = 0;
+  let legacyView = false, suspendedCamera = null;
   const nodeButtons = new Map();
   const compactionCue = createCompactionCue(events.list());
-  let pendingCompactionCue = null, compactionTimer = 0;
+  let pendingCompactionCue = null, compactionTimer = 0, requestHighlightTimer = 0, requestHighlightUntil = 0;
   const stopCompactionAnimation = () => { for (const target of nodeButtons.values()) target.classList.remove('is-compaction-source'); };
   function cancelCompactionCue() {
     clearTimeout(compactionTimer); compactionTimer = 0; pendingCompactionCue = null; stopCompactionAnimation();
@@ -130,8 +135,15 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   const selectedSource = () => userTurns().find(turn => turn.id === source.value);
   const selectedRecord = () => selected?.kind === 'record' ? active().find(item => item.id === selected.recordId) : null;
   const isAutomaticView = () => Boolean(automaticMemory && !legacyView);
-  const navigation = mountMemoryNavigation({ surface: picture,
-    getRenderer: () => dialog.open && editor.hidden && detail.hidden && picture.dataset.renderer === 'tsl' ? renderer : null });
+  const navigation = mountMemoryNavigation({ surface: picture, getMotionEnabled: () => !motionPreference.matches,
+    getRenderer: () => dialog.open && !graphRegion.hidden && editor.hidden && detail.hidden && picture.dataset.renderer === 'tsl' ? renderer : null });
+  const inspector = createContextInspector({ context, document: doc, graphPanelId: graphRegion.id, onViewChange: view => {
+    cancelCompactionCue(); navigation.cancel(); graphRegion.hidden = view !== 'graph';
+    if (view !== 'graph') stopRenderer(true);
+    if (viewFrame) cancelAnimationFrame(viewFrame);
+    viewFrame = requestAnimationFrame(() => { viewFrame = 0; if (!disposed && dialog.open) { if (view === 'graph') drawMap(); buttons(); } });
+  } });
+  body.prepend(inspector.tabs); body.append(inspector.panel);
   const autoSnapshot = () => automaticMemory.snapshot({ preferredNodeIds: hits?.map(hit => hit.nodeId) ?? [], limit: 12 });
   const setStatus = (value, error = false) => { status.textContent = value; status.classList.toggle('memory-error', error); status.setAttribute('role', error ? 'alert' : 'status'); status.hidden = !value; };
   const errorText = error => typeof error?.message === 'string' ? error.message.slice(0, 180) : 'The memory operation could not finish.';
@@ -144,7 +156,7 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
     savedWords.hidden = !automaticMemory || legacyView || !editor.hidden || selected !== null || active().length === 0;
     pocket.hidden = !isAutomaticView();
     legend.hidden = !isAutomaticView() || !editor.hidden;
-    fit.hidden = !renderer || !detail.hidden || !editor.hidden;
+    fit.hidden = graphRegion.hidden || !renderer || !detail.hidden || !editor.hidden;
     searchForm.classList.toggle('has-pockets', isAutomaticView());
   }
   function sourceLinks(ids) {
@@ -152,7 +164,7 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
     for (const id of ids) detailSources.append(el('a', 'Open in chat', { href: '#turn-' + id, 'data-memory-source': id }));
   }
   function matchingNodeIds() {
-    if (isAutomaticView()) return (hits ? hits.map(hit => hit.nodeId) : currentMap.usedNodeIds ?? []).filter(id => currentMap.nodes.some(node => node.id === id));
+    if (isAutomaticView()) return (hits ? hits.map(hit => hit.nodeId) : Date.now() < requestHighlightUntil ? currentMap.usedNodeIds ?? [] : []).filter(id => currentMap.nodes.some(node => node.id === id));
     if (!hits) return [];
     const current = new Map(active().map(item => [item.id, item]));
     return hits.filter(hit => current.get(hit.recordId)?.version === hit.version)
@@ -205,10 +217,18 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
       node.style.setProperty('--node-x', target.x + 'px'); node.style.setProperty('--node-y', target.y + 'px'); node.hidden = !target.visible;
     }
   }
-  function stopRenderer() {
+  const renderAllowed = () => !disposed && dialog.open && !graphRegion.hidden && editor.hidden && doc.visibilityState !== 'hidden';
+  const cameraMapKey = () => JSON.stringify([legacyView, scope(), automaticMemory?.getScope(),
+    currentMap.nodes.map(node => node.id), currentMap.links.map(link => link.id)]);
+  function stopRenderer(preserveCamera = false) {
     cancelCompactionCue();
     navigation.cancel(); fit.hidden = true;
-    ++rendererGeneration; renderer?.dispose(); renderer = null; rendererPromise = null; topology = ''; canvas.hidden = true;
+    if (preserveCamera && renderer) suspendedCamera = { key: cameraMapKey(), pose: renderer.getCameraPose() };
+    else if (!preserveCamera) suspendedCamera = null;
+    ++rendererGeneration; renderer?.dispose(); renderer = null; topology = ''; canvas.hidden = true;
+    // A stale constructor still owns this canvas until its public dispose runs.
+    if (rendererPromise) picture.dataset.renderer = 'stopping';
+    else if (preserveCamera) picture.dataset.renderer = 'suspended';
   }
   function fallback(reason = '') {
     navigation.cancel(); fit.hidden = true;
@@ -219,38 +239,28 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
     playCompactionCue();
   }
   function drawRenderer() {
-    if (!renderer || !rendererModule) return;
+    if (!renderer || !rendererModule || !renderAllowed()) return;
     const width = Math.max(1, canvas.clientWidth), height = Math.max(1, canvas.clientHeight), count = currentMap.nodes.length;
-    const compact = isAutomaticView() && count > 6 && (width < 600 || height < 360);
-    const columns = compact ? Math.max(2, Math.min(count, Math.ceil(Math.sqrt(count * width / height)))) : 0;
-    canvas.dataset.memoryPacking = compact ? 'compact' : 'force';
-    const key = JSON.stringify({ nodes: currentMap.nodes, links: currentMap.links, packing: canvas.dataset.memoryPacking, columns });
+    const aspect = Number((width / height).toFixed(2));
+    canvas.dataset.memoryPacking = 'spatial';
+    picture.dataset.presentation = 'spatial';
+    const key = JSON.stringify({ nodes: currentMap.nodes, links: currentMap.links, aspect });
     if (topology !== key) {
       navigation.cancel();
       const data = { view: 'evidence', nodes: currentMap.nodes.map(node => ({ ...node, kind: node.kind === 'source' || node.kind === 'global' ? 'source' : 'chunk',
         record_id: node.recordId ?? null, source_id: node.turnId ?? node.sourceTurnId ?? node.recordId ?? node.id, path: 'memory/' + (node.recordId ?? node.sourceTurnId ?? node.id) })),
         links: currentMap.links, total_nodes: currentMap.nodes.length, total_links: currentMap.links.length, omitted_nodes: 0, omitted_links: 0 };
-      const positioned = rendererModule.layoutRagGraph(data, hits?.map(hit => hit.recordId) ?? []);
-      let nodes = positioned.nodes.map(node => ({ ...node, x: node.x * 2.5, y: node.y * 2.5 }));
-      if (compact) {
-        // Keep dense touch controls apart in graph coordinates; native projection and camera fit still own the screen positions.
-        nodes = positioned.nodes.map((node, index) => {
-          const row = Math.floor(index / columns);
-          return { ...node, x: (index % columns) * 50 + (row % 2) * 25, y: row * 43.30127018922193 };
-        });
-        const centerX = (Math.min(...nodes.map(node => node.x)) + Math.max(...nodes.map(node => node.x))) / 2;
-        const centerY = (Math.min(...nodes.map(node => node.y)) + Math.max(...nodes.map(node => node.y))) / 2;
-        nodes = nodes.map(node => ({ ...node, x: node.x - centerX, y: node.y - centerY }));
-      }
+      const positioned = rendererModule.layoutMemoryGraph(data, hits?.map(hit => hit.recordId) ?? [], { aspect });
+      const nodes = positioned.nodes;
       renderer.render({ ...positioned, nodes }); topology = key;
     }
     renderer.setInteractionState(selected?.id ?? null, matchingNodeIds()); renderer.refreshViewport(); overlayPositions();
   }
   async function ensureRenderer() {
-    if (!graph || !dialog.open || !editor.hidden || !currentMap.nodes.length || disposed) return;
+    if (!graph || !renderAllowed() || !currentMap.nodes.length) return;
     if (renderer) { drawRenderer(); return; } if (rendererPromise) return;
     const generation = ++rendererGeneration; picture.dataset.renderer = 'loading'; picture.classList.add('is-fallback');
-    rendererPromise = (async () => {
+    const startup = (async () => {
       // Avoid starting Three with a null WebGL context on devices without a GPU.
       let backend = rendererBackend, hasWebGpu = false;
       if (backend === 'auto' && navigator.gpu) {
@@ -262,17 +272,28 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
         context.getExtension('WEBGL_lose_context')?.loseContext(); backend = 'webgl2';
       }
       const module = await import('./graph-renderer.mjs');
-      if (generation !== rendererGeneration || disposed || !dialog.open) return;
+      if (generation !== rendererGeneration || !renderAllowed()) return;
       canvas.hidden = false;
       const value = await module.createTslRagGraphRenderer({ canvas, backend, onNodeActivate: id => {
         const node = currentMap.nodes.find(node => node.id === id); if (node) showDetail(node, true);
-      }, nodeColor: id => memoryScopeColor(currentMap.nodes.find(node => node.id === id)?.scope), preserveNodeColors: true, nodeSurface: 'scope-colored',
-      onTerminalFailure: () => fallback('device unavailable') });
-      if (generation !== rendererGeneration || disposed || !dialog.open) { value.dispose(); return; }
+      }, nodeColor: id => memoryScopeColor(currentMap.nodes.find(node => node.id === id)?.scope), preserveNodeColors: true, nodeSurface: 'scope-colored', presentation: 'memory-spatial',
+      onTerminalFailure: () => { if (generation === rendererGeneration && renderAllowed()) fallback('device unavailable'); } });
+      if (generation !== rendererGeneration || !renderAllowed()) { value.dispose(); return; }
       renderer = value; rendererModule = module; renderer.setMotionEnabled(!motionPreference.matches);
-      picture.dataset.renderer = 'tsl'; picture.dataset.backend = renderer.backend; picture.classList.remove('is-fallback'); drawRenderer(); buttons(); playCompactionCue();
+      picture.dataset.renderer = 'tsl'; picture.dataset.backend = renderer.backend; picture.classList.remove('is-fallback'); drawRenderer();
+      const restoreCamera = Boolean(suspendedCamera?.pose && suspendedCamera.key === cameraMapKey());
+      navigation.bind(renderer, { preserveLimits: restoreCamera });
+      if (restoreCamera) renderer.setCameraPose(suspendedCamera.pose);
+      suspendedCamera = null; buttons(); playCompactionCue();
     })().catch(() => { if (generation === rendererGeneration && !disposed) fallback('initialization failed'); })
-      .finally(() => { if (generation === rendererGeneration) rendererPromise = null; });
+      .finally(() => {
+        if (rendererPromise !== startup) return;
+        rendererPromise = null;
+        if (disposed) return;
+        if (generation !== rendererGeneration && renderAllowed()) void ensureRenderer();
+        else if (picture.dataset.renderer === 'stopping') picture.dataset.renderer = 'suspended';
+      });
+    rendererPromise = startup;
   }
   function drawMap() {
     currentMap = isAutomaticView() ? autoSnapshot() : projectMemoryMap({ active: active(), turns: snapshot().turns, graphData: graph?.snapshot() ?? null, preferredRecordIds: hits?.map(hit => hit.recordId) ?? [] });
@@ -297,7 +318,11 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
       }
       target.firstChild.textContent = node.label;
       const provenance = isAutomaticView() ? node.kind === 'global' ? 'Space starter · Global: ' : (node.role === 'assistant' ? 'Assistant · generated' : 'Your words') + ' · ' + node.scope + ': ' : node.kind === 'record' ? 'Memory: ' : 'Source message ' + node.sourceTurnId + ': ';
-      target.setAttribute('aria-label', provenance + node.label);
+      const highlight = matches.has(node.id) ? hits ? 'search' : 'last-request' : '';
+      target.dataset.memoryHighlight = highlight;
+      const highlightLabel = highlight === 'search' ? 'Search match' : highlight === 'last-request' ? 'Sent in last model request' : '';
+      target.setAttribute('aria-label', provenance + node.label + (highlightLabel ? ' · ' + highlightLabel : ''));
+      if (highlightLabel) target.title = highlightLabel; else target.removeAttribute('title');
       if (isAutomaticView()) { target.dataset.memoryScope = node.scope; target.dataset.memoryRole = node.role; }
       else { delete target.dataset.memoryScope; delete target.dataset.memoryRole; }
       if (memoryScopeColor(node.scope) !== undefined) target.style.setProperty('--memory-node-color', MEMORY_SCOPE_COLORS[node.scope]);
@@ -383,6 +408,16 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   });
   listen(canvas, 'rag-camera-frame', overlayPositions);
   listen(fit, 'click', () => { cancelCompactionCue(); navigation.fit(); });
+  listen(expand, 'click', () => {
+    cancelCompactionCue(); navigation.cancel();
+    const expanded = dialog.classList.toggle('is-expanded');
+    expand.textContent = expanded ? '⤡' : '⤢';
+    expand.setAttribute('aria-expanded', String(expanded));
+    expand.setAttribute('aria-label', expanded ? 'Collapse Memory' : 'Expand Memory');
+    expand.title = expanded ? 'Collapse Memory' : 'Expand Memory';
+    if (expandFrame) cancelAnimationFrame(expandFrame);
+    expandFrame = requestAnimationFrame(() => { expandFrame = 0; if (!disposed && dialog.open) { drawRenderer(); navigation.fit(); } });
+  });
   for (const type of ['pointerdown', 'wheel']) listen(picture, type, cancelCompactionCue);
   for (const type of ['dragstart', 'selectstart', 'contextmenu']) listen(picture, type, event => {
     if (picture.dataset.renderer === 'tsl') event.preventDefault();
@@ -390,15 +425,22 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   listen(motionPreference, 'change', () => { if (motionPreference.matches) stopCompactionAnimation(); renderer?.setMotionEnabled(!motionPreference.matches); });
   const viewport = () => { cancelCompactionCue(); dialog.style.setProperty('--memory-viewport-height', (window.visualViewport?.height ?? window.innerHeight) + 'px'); drawRenderer(); renderer?.refreshViewport(); };
   if (window.visualViewport) listen(window.visualViewport, 'resize', viewport); listen(window, 'resize', viewport); viewport();
+  listen(doc, 'visibilitychange', () => {
+    if (doc.visibilityState === 'hidden') {
+      if (viewFrame) cancelAnimationFrame(viewFrame); viewFrame = 0;
+      if (expandFrame) cancelAnimationFrame(expandFrame); expandFrame = 0;
+      stopRenderer(true);
+    } else if (renderAllowed()) { drawMap(); buttons(); }
+  });
   listen(button, 'click', () => {
-    options.open = false; graphView(false); dialog.showModal(); refresh();
+    options.open = false; inspector.showGraph(); graphView(false); dialog.showModal(); refresh();
     // take() marks each new event seen before asynchronous renderer startup or playback.
     if (isAutomaticView()) pendingCompactionCue = compactionCue.take(currentMap.nodes);
     playCompactionCue(); query.focus({ preventScroll: true });
   });
   listen(close, 'click', () => dialog.close());
-  listen(dialog, 'cancel', event => { if (!editor.hidden || selected) { event.preventDefault(); graphView(); } else if (query.value) { event.preventDefault(); clearQuery(); } });
-  listen(dialog, 'close', () => { stopRenderer(); if (!skipFocusReturn && !button.hidden && !disposed) button.focus({ preventScroll: true }); skipFocusReturn = false; });
+  listen(dialog, 'cancel', event => { if (inspector.selectedTab === 'context') return; if (!editor.hidden || selected) { event.preventDefault(); graphView(); } else if (query.value) { event.preventDefault(); clearQuery(); } });
+  listen(dialog, 'close', () => { if (viewFrame) cancelAnimationFrame(viewFrame); viewFrame = 0; if (expandFrame) cancelAnimationFrame(expandFrame); expandFrame = 0; stopRenderer(); if (!skipFocusReturn && !button.hidden && !disposed) button.focus({ preventScroll: true }); skipFocusReturn = false; });
   listen(dialog, 'click', event => {
     const anchor = event.target.closest?.('a[data-memory-source]'); if (!anchor) return;
     event.preventDefault(); const target = doc.getElementById('turn-' + anchor.dataset.memorySource);
@@ -408,9 +450,19 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
     target.addEventListener('blur', () => { if (old === null) target.removeAttribute('tabindex'); else target.setAttribute('tabindex', old); }, { once: true });
   });
   const observer = new MutationObserver(refresh); observer.observe(options, { attributes: true, attributeFilter: ['hidden'] });
-  const unsubscribe = events.subscribe(event => { compactionCue.observe(event); refresh(); }), unsubscribeAutomatic = automaticMemory?.subscribe?.(refresh); refresh();
+  const unsubscribe = events.subscribe(event => {
+    compactionCue.observe(event);
+    if (event.type === 'context-dispatched') {
+      // markUsed() publishes the actual assembled automatic hits synchronously after this event.
+      // Read that authoritative session state; never infer hits from compaction inputs or reply text.
+      requestHighlightUntil = Date.now() + 3200;
+      clearTimeout(requestHighlightTimer);
+      requestHighlightTimer = setTimeout(() => { requestHighlightTimer = 0; requestHighlightUntil = 0; if (!disposed) refresh(); }, 3200);
+      queueMicrotask(() => { if (!disposed) refresh(); });
+    } else refresh();
+  }), unsubscribeAutomatic = automaticMemory?.subscribe?.(refresh); refresh();
   return Object.freeze({ button, dialog, refresh, dispose() {
-    if (disposed) return; disposed = true; stopRenderer(); compactionCue.dispose(); navigation.dispose(); observer.disconnect(); unsubscribe(); unsubscribeAutomatic?.(); listeners.abort();
+    if (disposed) return; disposed = true; inspector.dispose(); if (viewFrame) cancelAnimationFrame(viewFrame); viewFrame = 0; clearTimeout(requestHighlightTimer); requestHighlightTimer = 0; if (expandFrame) cancelAnimationFrame(expandFrame); expandFrame = 0; stopRenderer(); compactionCue.dispose(); navigation.dispose(); observer.disconnect(); unsubscribe(); unsubscribeAutomatic?.(); listeners.abort();
     if (dialog.open) dialog.close(); dialog.remove(); button.remove(); stylesheet?.remove();
   } });
 }

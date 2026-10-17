@@ -80,3 +80,57 @@
 @media(max-height:480px){.memory-dialog{min-height:0}.memory-panel-header{padding-block:4px}.memory-panel-body{flex:1 0 auto;min-height:240px;overflow:visible;padding-block:8px;gap:8px}.memory-map{flex:none;min-height:260px}.memory-detail{position:relative;inset:auto;max-height:none;flex:none;margin-top:-4px;padding:12px 0;background:transparent}.memory-editor{flex:none;overflow:visible}.memory-dialog textarea{min-height:88px;max-height:160px}#memory-status{max-height:none;overflow:visible}}
 @media(prefers-reduced-motion:reduce){.memory-dialog,.memory-dialog *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 @media(forced-colors:active){.memory-dialog,.memory-detail{background:Canvas;color:CanvasText;border-color:CanvasText;box-shadow:none}.memory-dialog :is(select,input,textarea){background:Field;color:FieldText;border-color:FieldText}.memory-dialog :is(button,a,select,input,textarea):focus-visible{outline-color:Highlight}.memory-dialog .memory-map-node,.memory-dialog .memory-map-node[data-memory-kind=source]{color:CanvasText;text-shadow:none}.memory-dialog .memory-map-node[data-matched=true],.memory-dialog .memory-map-node:is([aria-pressed=true],[data-selected=true]){color:LinkText;text-decoration:underline}.memory-sources a,#memory-status,#memory-status.memory-error{color:LinkText}}
+
+/* HAIO 1.5 spatial memory: quiet cosmic atmosphere, real scope-colored cores.
+   Static layers and glows follow existing projected node controls; no extra graph nodes. */
+.memory-dialog{--memory-ink:#f4f0ff;--memory-line:#cabcff2e;color:var(--memory-ink);font-family:"Century Gothic",Futura,"Segoe UI",sans-serif;background:radial-gradient(ellipse at 18% 28%,#51215b3d,transparent 54%),radial-gradient(ellipse at 78% 70%,#08464d40,transparent 56%),radial-gradient(ellipse at 60% 35%,#26133566,transparent 70%),#07070d;border-color:#cabaff2e;border-radius:14px;box-shadow:0 20px 54px #0007}
+.memory-dialog::backdrop{background:#030309bf;backdrop-filter:blur(3px)}
+.memory-panel-header{background:#0b0a12b3;border-color:#cabaff2e;padding-top:max(8px,env(safe-area-inset-top));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+.memory-panel-header h2{font:500 20px/1.2 "Century Gothic",Futura,"Segoe UI",sans-serif;letter-spacing:.035em}
+.memory-dialog :is(button,select,input,textarea){border-color:#cabaff2e;border-radius:10px;background-color:#0b0a12bf;color:var(--memory-ink)}
+.memory-panel-header button{font-size:12px;min-width:44px}
+#memory-expand{width:44px;padding:0;font:24px/1 "Segoe UI Symbol",sans-serif}
+.memory-panel-body{padding-bottom:max(16px,env(safe-area-inset-bottom));background:linear-gradient(90deg,#ffffff02 1px,transparent 1px);background-size:5px 100%}
+.memory-search-form{padding:5px;border:1px solid #cabaff26;border-radius:13px;background:#0b0a128c}
+.memory-dialog .memory-search-form :is(input,select){background:#0b0a1266}
+.memory-scope-legend span:before{box-shadow:0 0 8px currentColor}
+.memory-graph{background:radial-gradient(ellipse at center,transparent 24%,#03030945 95%)}
+.memory-graph[data-presentation=spatial][data-renderer=tsl] .memory-map-node::before{content:"";position:absolute;left:50%;top:50%;width:30px;height:30px;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,transparent 24%,color-mix(in srgb,var(--memory-node-color,#a78bfa) 18%,transparent) 38%,transparent 72%);box-shadow:0 0 16px -4px color-mix(in srgb,var(--memory-node-color,#a78bfa) 42%,transparent);pointer-events:none;opacity:.7}
+.memory-graph[data-presentation=spatial][data-renderer=tsl] .memory-map-node:is([aria-pressed=true],[data-matched=true])::before{opacity:1;box-shadow:0 0 20px -3px color-mix(in srgb,var(--memory-node-color,#a78bfa) 65%,transparent)}
+.memory-graph.has-query .memory-map-node[data-matched=false]::before{opacity:.12}
+.memory-dialog .memory-map-node{background:transparent;border-radius:50%}
+.memory-node-label{text-shadow:0 1px 4px #07070d,0 -1px 4px #07070d}
+.memory-detail{background:#0b0a12ed;border:1px solid #cabaff2e;border-radius:12px;box-shadow:0 12px 32px #0007}
+.memory-dialog.is-expanded{width:100vw;max-width:100vw;height:var(--memory-viewport-height,100dvh);max-height:var(--memory-viewport-height,100dvh);min-width:0;min-height:0;margin:0;border-radius:0;border-width:0}
+@media(max-width:600px){.memory-panel-header{padding-inline:max(8px,env(safe-area-inset-left));gap:5px}.memory-panel-header h2{font-size:19px}.memory-panel-header button{padding-inline:8px}.memory-panel-body{padding-inline:max(10px,env(safe-area-inset-left))}.memory-search-form{padding:4px}.memory-search-form.has-pockets #memory-pocket{grid-column:1;grid-row:1;width:112px;padding-inline:6px;font-size:12px}.memory-search-form.has-pockets #memory-query{grid-column:1/-1;grid-row:2}.memory-search-form.has-pockets #memory-query-clear{grid-column:2;grid-row:1}.memory-search-form.has-pockets #memory-recall{grid-column:3;grid-row:1}.memory-search-form.has-pockets #memory-query-clear[hidden]+#memory-recall{grid-column:3}}
+@media(forced-colors:active){.memory-dialog,.memory-graph,.memory-panel-body{background:Canvas}.memory-search-form{background:Canvas;border-color:CanvasText}.memory-graph .memory-map-node::before{display:none}}
+
+.memory-map-node[data-memory-highlight=search]::before{animation:memory-search-match 900ms ease-out both}
+@keyframes memory-search-match{0%{transform:translate(-50%,-50%) scale(.8)}40%{transform:translate(-50%,-50%) scale(1.25)}100%{transform:translate(-50%,-50%) scale(1)}}
+
+.memory-graph-view{display:flex;flex:1;flex-direction:column;gap:12px;min-width:0;min-height:0}
+.memory-view-tabs{display:flex;gap:4px;flex:none;align-items:center;border-bottom:1px solid #cabaff26;padding-bottom:6px}
+.memory-view-tabs [role=tab]{min-width:72px;min-height:40px;padding:8px 14px;background:transparent;border-color:transparent;font-size:12px}
+.memory-view-tabs [role=tab][aria-selected=true]{color:#f4f0ff;background:#a78bfa16;border-color:#a78bfa55}
+.memory-context-panel{flex:1;min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;scroll-padding:12px;font:13px/1.6 "Segoe UI",sans-serif;color:#d4cfe1}
+.memory-context-panel :is(pre,code){font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace}
+.memory-context-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#07070dc7;border:1px solid #cabaff26;border-radius:10px;padding:12px;max-width:100%;margin:8px 0 16px}
+.memory-context-panel :is(h3,h4){font:500 15px/1.4 "Century Gothic",sans-serif;color:#f4f0ff;margin:14px 0 6px}
+.memory-context-panel :is(p,ul,ol){margin:6px 0 12px;overflow-wrap:anywhere}
+.memory-context-panel details{border-top:1px solid #cabaff26;padding-block:10px}
+.memory-context-panel summary{cursor:pointer;min-height:36px;color:#c8baf4}
+.memory-context-panel select{max-width:100%;min-height:44px;margin-block:8px}
+.memory-graph[data-presentation=spatial] .memory-node-label{visibility:visible;top:auto;bottom:40px;left:50%;width:max-content;max-width:124px;padding:4px 7px;border:1px solid color-mix(in srgb,var(--memory-node-color,#a78bfa) 16%,transparent);border-radius:8px;background:#07070dc7;font:500 10px/1.3 "Segoe UI",sans-serif;color:#ded7eb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:none}
+.memory-graph[data-presentation=spatial][data-renderer=tsl] .memory-map-node::before{width:54px;height:54px;background:radial-gradient(circle,transparent 22%,#08091222 30%,color-mix(in srgb,var(--memory-node-color,#a78bfa) 8%,#08091266) 52%,color-mix(in srgb,var(--memory-node-color,#a78bfa) 12%,transparent) 63%,transparent 70%);box-shadow:0 0 16px -3px color-mix(in srgb,var(--memory-node-color,#a78bfa) 16%,transparent)}
+.memory-graph::before{content:"";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(circle at 13px 29px,#c8b6ed66 0 .6px,transparent 1px),radial-gradient(circle at 69px 71px,#86acba66 0 .5px,transparent 1px);background-size:173px 211px,251px 167px;opacity:.48}
+@media(max-height:480px){.memory-graph-view{flex:none;min-height:300px}.memory-context-panel{flex:none;min-height:180px;overflow:visible}}
+@media(forced-colors:active){.memory-graph::before{display:none}.memory-context-panel pre,.memory-view-tabs [role=tab][aria-selected=true]{background:Canvas;border-color:CanvasText;color:CanvasText}}
+
+.memory-context-panel dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:3px 12px;min-width:0;margin-block:8px}.memory-context-panel dt{color:#aaa2b9}.memory-context-panel dd{margin:0;overflow-wrap:anywhere}.memory-context-panel li{margin-block:12px;padding-bottom:8px;border-bottom:1px solid #cabaff20}.memory-context-request-choice{display:grid;gap:4px;font-size:12px}.memory-context-panel .memory-error{color:#f0bca2}
+
+@media(max-width:600px){.memory-panel-header{padding-left:max(8px,env(safe-area-inset-left));padding-right:max(8px,env(safe-area-inset-right))}.memory-panel-body{padding-left:max(10px,env(safe-area-inset-left));padding-right:max(10px,env(safe-area-inset-right))}}
+
+.memory-view-tabs [role=tab]{min-height:44px}.memory-context-panel summary{min-height:44px;display:flex;align-items:center}
+
+/* Keep the graph inside short app viewports; details remain scrollable. */
+@media(max-height:480px){.memory-panel-body{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden}.memory-graph-view{flex:1;min-height:0;gap:8px}.memory-map{flex:1;min-height:80px}.memory-context-panel{flex:1;min-height:0;overflow:auto}}

@@ -4,8 +4,8 @@ An optional, separate browser entry point for one pinned local model and a bound
 
 Live static preview: **https://shoozes.github.io/rag-method-alpha/model-chat/**.
 The approved experimental [memory preview](https://shoozes.github.io/rag-method-alpha/model-chat/?memory=1)
-adds automatic conversation indexing, scoped keyword retrieval and a small TSL
-graph with compact search. Source for this update is curated on
+adds automatic conversation indexing, scoped keyword retrieval, an orbitable 3D
+TSL graph, expanded view and bounded Context inspection. Source is curated on
 `workspace/model-loading-onboarding`; private development history, the private
 launch wrapper and machine paths are excluded. The source-bound delivery receipt
 identifies the revision actually verified on Pages. Context selection is lossy,
@@ -120,7 +120,7 @@ node examples/browser-model-chat/stage-static.mjs --memory-preview --output .art
 
 The builder verifies prepared package bytes and emits one self-contained
 `.artifacts/memory/graph-renderer.mjs`, plus complete graph/Three MIT texts.
-The explicit memory export contains **43 payload files plus its manifest**.
+The explicit memory export contains **44 payload files plus its manifest**.
 Automatic memory adds `memory/automatic-memory.mjs`, `memory/conversation-index.mjs`,
 `memory/scoped-pockets.mjs` and `memory/starter-facts.mjs`. The existing graph
 bundle and `LICENSES/forcegraph-tsl.txt` / `LICENSES/three.txt` remain included. Preserve those full notices
@@ -129,6 +129,10 @@ alongside the first-party/runtime MIT texts and separate LFM model license.
 it does not introduce another graph runtime.
 `memory/compaction-cue.mjs` displays committed source-linked compaction activity;
 it does not add a retained summary node or change memory ownership.
+`memory/context-panel.mjs` distinguishes actual returned candidates, admitted
+sources, prepared requests and the last submitted request. Exact bounded text
+is session-only; hidden reasoning, native template expansion and KV state are
+unavailable. See the memory guide for the inspection bounds.
 Prepared dependencies and build scripts are source/setup inputs, not browser files.
 These commands reuse prepared inputs; they do not constitute a fresh-host install proof.
 

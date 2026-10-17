@@ -9,6 +9,8 @@ export const GRAPH_LAYOUT_BATCH_STEPS = 8;
 export interface PositionedGraphNode extends RagGraphNode {
   readonly x: number;
   readonly y: number;
+  /** Optional host-owned depth; the existing atlas layouts remain two-dimensional. */
+  readonly z?: number;
 }
 export interface PositionedGraph {
   readonly view: RagGraphView;

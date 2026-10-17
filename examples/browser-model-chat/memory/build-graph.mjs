@@ -21,6 +21,7 @@ const threeFiles = Object.freeze({
 const entry = [
   "export { createTslRagGraphRenderer } from './modules/browser-rag-ts/src/application/graphRenderer.ts';",
   "export { layoutRagGraph } from './modules/browser-rag-ts/src/application/layoutGraph.ts';",
+  "export { layoutMemoryGraph } from './modules/browser-rag-ts/src/application/memoryGraphLayout.ts';",
 ].join('\n');
 const digest = (bytes, algorithm = 'sha256', encoding = 'hex') => createHash(algorithm).update(bytes).digest(encoding);
 const portable = value => value.split(sep).join('/');
@@ -114,7 +115,7 @@ export async function buildGraph({
     licenses.push(await writeArtifact(join(artifactRoot, 'LICENSES', name), await ordinary(input)));
   }
   return { graphPath, ...artifact, esbuildVersion: esbuild.version, entrySha256: digest(entry),
-    exports: ['createTslRagGraphRenderer', 'layoutRagGraph'], sources, licenses, dormantWorkerUrls,
+    exports: ['createTslRagGraphRenderer', 'layoutRagGraph', 'layoutMemoryGraph'], sources, licenses, dormantWorkerUrls,
     dependencies: { graph: { version: graphPackage.version, archiveSha256: graphArchiveSha256, verifiedFiles: graphFileCount },
       three: { version: threePackage.version, files: Object.keys(threeFiles) } },
     scope: 'existing renderer/layout assembly; local layout; no install, network, model or donor edits' };

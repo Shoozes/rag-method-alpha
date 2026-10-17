@@ -16,7 +16,7 @@ const browserFiles = Object.freeze([
   'capabilities.mjs', 'bootstrap.mjs',
 ]);
 const memoryFiles = Object.freeze([
-  'memory/workspace.mjs', 'memory/store.mjs', 'memory/events.mjs', 'memory/context.mjs',
+  'memory/workspace.mjs', 'memory/store.mjs', 'memory/events.mjs', 'memory/context.mjs', 'memory/context-panel.mjs',
   'memory/structured-context.mjs', 'memory/automatic-context.mjs', 'memory/rag-adapter.mjs',
   'memory/restore-events.mjs', 'memory/citations.mjs', 'memory/panel.mjs', 'memory/panel.css', 'memory/navigation.mjs', 'memory/compaction-cue.mjs',
   'memory/rag-core.mjs', 'memory/graph-renderer.mjs',
@@ -26,7 +26,7 @@ const memoryFiles = Object.freeze([
 const automaticMemoryFiles = new Set(['memory/automatic-memory.mjs', 'memory/conversation-index.mjs',
   'memory/scoped-pockets.mjs', 'memory/starter-facts.mjs']);
 const memoryCoreSha256 = 'c282ebb3965c4a25b48fb66082ce18c72184449f2123633a901ffceb9939ace6';
-const graphRendererSha256 = '90783080f8ce7849f5d0544864c7ac7bfb7875c689aecf1fa7951204b4112b3a';
+const graphRendererSha256 = '611341828e66e710497d8b0025947e9efb9ae2b268828c812856d230d614ea7a';
 const graphLicenses = Object.freeze({
   'LICENSES/forcegraph-tsl.txt': '1a897e0ee6f1fc65889976eadb848acefac9db7f9c97274a6c490f52390cd474',
   'LICENSES/three.txt': '8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc',
@@ -41,11 +41,12 @@ const payloadPaths = Object.freeze([...browserFiles, 'theme/aurel-gold.css',
 const preMemoryPayloadPaths = payloadPaths.filter(name => !['wasm-memory.mjs', 'runtime-profile.mjs'].includes(name));
 const priorPayloadPaths = preMemoryPayloadPaths.filter(name => name !== 'runtime-errors.mjs');
 const legacyPayloadPaths = priorPayloadPaths.filter(name => !name.startsWith('runtime/compat/'));
-const previousMemoryFiles = memoryFiles.filter(name => !['memory/navigation.mjs', 'memory/compaction-cue.mjs'].includes(name));
+const previousMemoryFiles = memoryFiles.filter(name => !['memory/navigation.mjs', 'memory/compaction-cue.mjs', 'memory/context-panel.mjs'].includes(name));
 const previousMemoryPayloadPaths = Object.freeze([...payloadPaths, ...previousMemoryFiles.filter(name => name !== 'memory/graph-renderer.mjs' && !automaticMemoryFiles.has(name)), modelLicensePath].sort());
 const previousGraphMemoryPayloadPaths = Object.freeze([...payloadPaths, ...previousMemoryFiles.filter(name => !automaticMemoryFiles.has(name)), modelLicensePath, ...Object.keys(graphLicenses)].sort());
 const previousAutomaticMemoryPayloadPaths = Object.freeze([...payloadPaths, ...previousMemoryFiles, modelLicensePath, ...Object.keys(graphLicenses)].sort());
-const previousNavigationMemoryPayloadPaths = Object.freeze([...payloadPaths, ...memoryFiles.filter(name => name !== 'memory/compaction-cue.mjs'), modelLicensePath, ...Object.keys(graphLicenses)].sort());
+const previousNavigationMemoryPayloadPaths = Object.freeze([...payloadPaths, ...memoryFiles.filter(name => !['memory/compaction-cue.mjs', 'memory/context-panel.mjs'].includes(name)), modelLicensePath, ...Object.keys(graphLicenses)].sort());
+const previousCompactionMemoryPayloadPaths = Object.freeze([...payloadPaths, ...memoryFiles.filter(name => name !== 'memory/context-panel.mjs'), modelLicensePath, ...Object.keys(graphLicenses)].sort());
 const memoryPayloadPaths = Object.freeze([...payloadPaths, ...memoryFiles, modelLicensePath, ...Object.keys(graphLicenses)].sort());
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const portable = value => value.split(sep).join('/');
@@ -107,7 +108,7 @@ async function managedOutput(destination, memoryPreview) {
   const previousPaths = previous.files?.map(file => file.path).sort();
   if (previous.schema !== schema || previous.managedBy !== managedBy || identitySha256 !== identity(body)
       || previous.publicReleaseQualified !== false || !Array.isArray(previous.files)
-      || ![...(memoryPreview ? [memoryPayloadPaths, previousNavigationMemoryPayloadPaths, previousAutomaticMemoryPayloadPaths, previousGraphMemoryPayloadPaths, previousMemoryPayloadPaths] : []), payloadPaths, preMemoryPayloadPaths, priorPayloadPaths, legacyPayloadPaths]
+      || ![...(memoryPreview ? [memoryPayloadPaths, previousCompactionMemoryPayloadPaths, previousNavigationMemoryPayloadPaths, previousAutomaticMemoryPayloadPaths, previousGraphMemoryPayloadPaths, previousMemoryPayloadPaths] : []), payloadPaths, preMemoryPayloadPaths, priorPayloadPaths, legacyPayloadPaths]
         .some(paths => JSON.stringify(previousPaths) === JSON.stringify(paths))) {
     throw new Error('Refusing output with a foreign or changed managed manifest.');
   }
@@ -182,6 +183,7 @@ export async function stageStatic({ output = join(workspace, '.artifacts/model-c
     }
     for (const path of ['examples/browser-model-chat/memory/build-graph.mjs',
       'modules/browser-rag-ts/src/application/graphRenderer.ts', 'modules/browser-rag-ts/src/application/layoutGraph.ts',
+      'modules/browser-rag-ts/src/application/memoryGraphLayout.ts',
       'modules/browser-rag-ts/src/application/graphPalette.ts', 'modules/browser-rag-ts/src/presentation/nodeSpawnMotion.js',
       'modules/browser-rag-ts/vendor/graph-package.json', 'modules/browser-rag-ts/vendor/ours-forcegraph-tsl-0.3.0-alpha.1.tgz',
       'modules/browser-rag-ts/package-lock.json']) source.set(path, await ordinaryBytes(join(workspace, path), path));
@@ -236,12 +238,18 @@ export async function stageStatic({ output = join(workspace, '.artifacts/model-c
       'Open ?memory=1 for this one-chat memory preview; add &graph=0 for its searchable HTML memory list without the optional TSL graph.',
       'The pinned TSL renderer uses Three WebGPU with a WebGL2 backend fallback; unavailable graphics retain accessible memory controls.',
       'Graph startup or device loss is not a guarantee of mobile GPU support. No new iOS qualification follows from this package.',
+      'Graph supports orbit, expanded view and read-only Context inspection. Visual selection grants no additional permissions.',
+      'Three 0.185.0 retains an internal frame clock while Graph is visible; the strict visible zero-RAF criterion remains unmet.',
+      'Physical iOS, new native inference and full installed dependency parity remain unqualified; the source guide records the missing vite/client declaration limit.',
       'Older context is selected automatically as source-linked exact passages; no special markup is required.',
       'Each accepted message creates a canonical Conversation node. Generated-assistant text remains labeled and is excluded from retrieved user evidence.',
       'The pocket filter changes real retrieval: Global public Space starters, explicit Persona user excerpts, current Conversation, or All pockets.',
       'Scope bindings include actor, persona and conversation identities; visual selection grants no permissions.',
       'Space starters cite https://science.nasa.gov/earth/facts/, https://science.nasa.gov/moon/facts/ and https://science.nasa.gov/mars/moons/.',
       'Search highlights actual matches. Last-used nodes light only after dispatch. No automatic fact promotion or agent orchestration is included.',
+      'The Context tab distinguishes latest prepared from last submitted requests; submission does not prove model use or answer truth.',
+      'Exact memory/request text is session-only and unavailable when its inspection bound is exceeded; retained rows report supplied totals and omissions.',
+      'Retrieval candidates are the supplied core-returned stage, not all indexed documents. Scores and reasons appear only when actually supplied.',
       'Automatic passage selection is lossy extractive context, not general semantic summarization or verified fact admission.',
       'Explicit Save stores selected exact user words separately for keyword retrieval; Forget does not erase the transcript.',
       'Remember for persona retains exact user-source proof. Forget/version exclusions persist when saving succeeds; quota failures report session-only state.',

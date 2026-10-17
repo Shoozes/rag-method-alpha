@@ -32,15 +32,16 @@ autonomous agent. TulpaWeaver's current-companion allow-list informed the scope
 boundary; Conversation is this preview's adaptation, not an identical donor
 pocket. No private donor code was copied.
 
-Drag the graph background or a node to pan, pinch or wheel to zoom, and use
+Drag the graph background or a node to orbit. Use two contacts to pan and pinch,
+or the wheel to zoom, and use
 **Fit** to recover the view. A tap or keyboard activation opens the real source;
 dragging does not select it. Only the graph captures navigation gestures.
 Details and the graph-disabled list retain native scrolling and selection;
 page zoom is left unrestricted outside the graph. Reduced motion disables graph
-animation. Conversation is sky blue, Persona violet and Global amber,
+animation. Conversation is sky blue, Persona pink and Global amber,
 with scope labels and base colors retained during search/selection. The memory
-view opts into flat colored node bodies and a quiet selection halo to avoid the
-metallic shader's white washout; other renderer consumers keep their defaults. Colors do not
+view uses shaded scope-colored cores and restrained matching auras; other
+renderer consumers keep their defaults. Colors do not
 change memory ownership, access or compaction policy.
 
 ### Prompt context indicator
@@ -132,7 +133,7 @@ licenses are unchanged; these citations do not turn starter knowledge into user
 facts or establish NASA endorsement.
 
 Use Node 22.12+ and the main example's [runtime preparation](../README.md#run-locally).
-Set `BROWSER_MEMORY_ESBUILD_MODULE` to an already prepared esbuild 0.21.5 module,
+Set `BROWSER_MEMORY_ESBUILD_MODULE` to an already prepared esbuild 0.28.2 module,
 and follow the [offline graph setup](../README.md#prepare-the-optional-tsl-graph-offline)
 for the pinned graph/Three inputs. From this public repository root:
 
@@ -162,3 +163,17 @@ The server mounts only the named generated core and graph files, with ordinary
 module MIME and real missing-file 404s. These commands reuse prepared inputs;
 fresh-host installation, model/cache recovery and physical-device qualification
 remain separate. No private local launcher or sibling-checkout path is required.
+
+## Experimental spatial Graph and Context
+
+This presentation uses HAIO 1.5-wip as a visual reference: cosmic graphite/violet atmosphere, saturated shaded scope cores, restrained matching auras, stable real 3D positions and damped orbit. Existing blue/pink/gold scope meanings remain authoritative. Static atmosphere and demand-driven motion replace the donor's perpetual star/nebula loop; no decorative nodes are added.
+
+The Expand/Collapse control fills the app viewport without the browser Fullscreen API; Chat returns to the conversation. Native taps and keyboard controls remain available, two contacts pan/pinch, and Fit restores framing. This experimental publication changes presentation and read-only request inspection; it does not grant new retrieval, storage or model permissions. Private development history and its local marker are excluded from public source.
+
+Mirrorlight RAG is a read-only historical donor for visible source IDs, pocket labels and score-linked match emphasis. Its chat injection, memory assignment UI and automatic writing were future work; no legacy subsystem is imported here.
+
+Search glows identify actual matches. A finite last-dispatch emphasis reads the existing authoritative automatic used-node set, updated only after successful Worker postMessage; it means “Sent in last model request,” never model use or a completed answer. Reload does not replay it. The current dispatch event omits automatic IDs and their request-hash association, so this remains session-only visual evidence; no durable per-request automatic provenance is invented.
+
+The Graph tab remains the default. Context adapts Mirrorlight’s query/source-text/ID inspection pattern to the real modern request lifecycle: actual returned candidates (already core top-k/token filtered), final admitted sources, literal supplied scores, bounded verbatim leading system/memory messages and optionally full request messages. Prepared and submitted records are distinct, submitted records bind the actual accepted reply when available, and failed/stale/cancelled preparation cannot be promoted. Only the latest prepared and last submitted snapshots are retained in session memory (96 KiB each); reload clears them. Older reply contexts, hidden model reasoning, native chat-template expansion and KV state are not retained or represented. Unavailable/oversize fields are explicit, with no clipped text presented as exact.
+
+Idle limitation: pinned Three 0.185.0 starts its internal node-frame clock even with a null user animation callback. Application motion and graph redraws settle, including under reduced motion, but zero idle RAF callbacks is not achieved while Graph is visible. The renderer is disposed while Context is shown, on document-hidden events, or when Memory is closed. Graph return recreates it and restores the camera for the same current node/scope identity; closing retains the existing Fit-on-reopen behavior. No private Three fields are modified. Callback activity and actual scene/GPU work must be reported separately; the strict visible zero-RAF criterion remains unmet. Actual hidden-state behavior, physical iOS and new native-inference qualification remain unproved. All three canonical TypeScript checks pass with cached 5.9.3, but unavailable vite/client declarations and unchanged skipLibCheck leave full installed dependency parity unproved. The delivery receipt identifies the exact source and live verification scope; deployment does not qualify a broader product release.

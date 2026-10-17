@@ -1,27 +1,33 @@
 #!/usr/bin/env node
-// Explicit experimental Pages smoke check. Never loads a model, invokes a
+// Explicit experimental Pages or reviewed loopback-static smoke check. Never loads a model, invokes a
 // provider, replaces bootstrap, or executes runtime WASM. Viewport is emulation.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, lstat, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const output = join(root, '.artifacts/proof/model-chat');
+const proofParent = join(root, '.artifacts/proof');
+const output = resolve(process.env.BROWSER_MEMORY_PROOF_ROOT || join(proofParent, 'memory-spatial-live'));
+const stdoutOnly = process.env.BROWSER_MEMORY_LIVE_STDOUT === '1';
+const localStaticUrl = process.env.BROWSER_MEMORY_LOCAL_STATIC_URL;
+const deliveryLabel = localStaticUrl ? 'loopback static' : 'HTTPS';
 const resultPath = join(output, 'memory-live-result.json');
 const screenshotName = 'live-memory-mobile.png';
 const profilePrefix = 'rag-memory-live-';
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const checks = [], assets = [], privatePaths = [], forbiddenRequests = [], pageErrors = [], failedResponses = [], browserPaths = [], observations = [];
-const automaticFixtureCheck = 'labeled synthetic messages exercise the production HTTPS automatic TSL graph and real search';
+const automaticFixtureCheck = `labeled synthetic messages exercise the production ${deliveryLabel} automatic TSL graph and real search`;
+const spatialFixtureCheck = 'live spatial Graph expansion and honest empty Context navigation preserve canonical state';
 const fixtureScopes = new Map([
   ['real panel binding and graph-disabled assembly work without loading a model', 'Binding-only presentation fixture: exposes the existing Memory entry while the model controller stays idle.'],
   [automaticFixtureCheck, 'Synthetic conversation fixture only: canonical user/generated turns and public Global starters, actual production bootstrap/storage/renderer/retrieval; no model loaded.'],
+  [spatialFixtureCheck, 'Synthetic canonical conversation from the preceding fixture; real production spatial renderer and empty request inspector, no prepare/dispatch/provider calls.'],
 ]);
 const cleanup = { browserContextClosed: false, ownedTemporaryProfileRemoved: false };
-const memoryFiles = ['workspace', 'store', 'events', 'context', 'structured-context', 'automatic-context', 'automatic-memory',
+const memoryFiles = ['workspace', 'store', 'events', 'context', 'context-panel', 'structured-context', 'automatic-context', 'automatic-memory',
   'conversation-index', 'scoped-pockets', 'starter-facts', 'rag-adapter',
   'restore-events', 'citations', 'panel', 'navigation', 'compaction-cue', 'rag-core', 'graph-renderer'].map(name => `memory/${name}.mjs`).concat('memory/panel.css');
 const payloadPaths = ['index.html', 'style.css', 'app.mjs', 'loader-controller.mjs', 'model-contract.mjs',
@@ -29,7 +35,8 @@ const payloadPaths = ['index.html', 'style.css', 'app.mjs', 'loader-controller.m
   'capabilities.mjs', 'bootstrap.mjs', 'theme/aurel-gold.css', 'runtime/index.js', 'runtime/wllama.wasm',
   'runtime/LICENSE', 'runtime/compat/wllama.js', 'runtime/compat/wllama.wasm', 'LICENSES/rag-method.txt',
   'LICENSES/lfm-open-license-1.0.txt', 'LICENSES/forcegraph-tsl.txt', 'LICENSES/three.txt', 'NOTICE.txt', 'README.txt', ...memoryFiles].sort();
-const graphPins = { 'memory/graph-renderer.mjs': '90783080f8ce7849f5d0544864c7ac7bfb7875c689aecf1fa7951204b4112b3a',
+const graphPins = { 'memory/graph-renderer.mjs': '611341828e66e710497d8b0025947e9efb9ae2b268828c812856d230d614ea7a',
+  'memory/rag-core.mjs': 'c282ebb3965c4a25b48fb66082ce18c72184449f2123633a901ffceb9939ace6',
   'LICENSES/forcegraph-tsl.txt': '1a897e0ee6f1fc65889976eadb848acefac9db7f9c97274a6c490f52390cd474',
   'LICENSES/three.txt': '8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc' };
 const expectedPaths = [...payloadPaths, 'site-manifest.json'].sort();
@@ -48,7 +55,7 @@ async function check(name, run) {
   catch (error) { checks.push({ name, status: 'fail', durationMs: Date.now() - at, message: error.message, ...evidence }); throw error; }
 }
 async function request(path, method = 'GET', limit = 128 * 1024) {
-  // 44 GET/HEAD pairs + initial/final manifest + 15 private-route probes: 105 requests.
+  // 45 GET/HEAD pairs + initial/final manifest + 18 private-route probes: 110 requests.
   if (++httpRequests > 112) throw new Error('Finite 112-request HTTP proof budget exceeded.');
   const target = new URL(path, base);
   assert.equal(target.origin, base.origin); assert.ok(target.pathname.startsWith(base.pathname));
@@ -78,6 +85,22 @@ function correctMime(path, type) {
   return ['text/plain', 'application/octet-stream'].includes(type);
 }
 async function settle() { await page.evaluate(() => new Promise(accept => requestAnimationFrame(() => requestAnimationFrame(accept)))); }
+async function safeProofRoot() {
+  const suffix = relative(proofParent, output);
+  assert.ok(suffix && suffix !== '..' && !suffix.startsWith('..' + sep) && !isAbsolute(suffix), 'Proof output stays under .artifacts/proof');
+  const historical = relative(resolve(proofParent, 'model-chat'), output);
+  assert.ok(historical && (historical === '..' || historical.startsWith('..' + sep) || isAbsolute(historical)), 'Historical model-chat proof cannot be overwritten');
+  let cursor = root;
+  for (const part of relative(root, output).split(sep)) {
+    cursor = join(cursor, part);
+    const info = await lstat(cursor).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+    if (info) assert.ok(info.isDirectory() && !info.isSymbolicLink(), 'Proof output uses ordinary directories without linked ancestors');
+  }
+}
+async function graphReady() {
+  await page.waitForFunction(() => document.getElementById('memory-graph').dataset.renderer === 'tsl', null, { timeout: 20_000 });
+  await settle();
+}
 async function productionPage(query) {
   await page.goto(new URL(query, base).href, { waitUntil: 'networkidle', timeout: 30_000 });
   await page.waitForFunction(() => window.localMemoryPreview?.workspace && document.getElementById('memory-dialog'));
@@ -99,14 +122,18 @@ async function productionPage(query) {
 }
 
 try {
+  await safeProofRoot();
   const expectedManifest = required('BROWSER_MEMORY_EXPECTED_MANIFEST_SHA256', /^[a-f0-9]{64}$/);
   const expectedHead = required('BROWSER_MEMORY_EXPECTED_SOURCE_HEAD', /^[a-f0-9]{40}$/);
   const expectedFingerprint = required('BROWSER_MEMORY_EXPECTED_SOURCE_FINGERPRINT', /^[a-f0-9]{64}$/);
   const playwright = required('BROWSER_MODEL_PLAYWRIGHT_MODULE');
   const chrome = required('MODEL_CHAT_BROWSER');
-  base = new URL(process.env.BROWSER_MEMORY_PREVIEW_URL || 'https://shoozes.github.io/rag-method-alpha/model-chat/');
-  assert.equal(base.href, 'https://shoozes.github.io/rag-method-alpha/model-chat/', 'explicitly reviewed experimental Pages destination');
-  await check('reviewed HTTPS manifest binds the exact public source and 43-file payload', async () => {
+  base = new URL(localStaticUrl || process.env.BROWSER_MEMORY_PREVIEW_URL || 'https://shoozes.github.io/rag-method-alpha/model-chat/');
+  if (localStaticUrl) {
+    assert.equal(base.protocol, 'http:'); assert.equal(base.hostname, '127.0.0.1'); assert.ok(base.port);
+    assert.equal(base.username + base.password + base.search + base.hash, ''); assert.ok(base.pathname.endsWith('/'));
+  } else assert.equal(base.href, 'https://shoozes.github.io/rag-method-alpha/model-chat/', 'explicitly reviewed experimental Pages destination');
+  await check(`reviewed ${deliveryLabel} manifest binds the exact public source and 44-file payload`, async () => {
     const { response, bytes } = await request('site-manifest.json');
     assert.equal(response.status, 200); assert.ok(correctMime('site-manifest.json', response.headers.get('content-type')?.split(';')[0]));
     manifestSha256 = digest(bytes); assert.equal(manifestSha256, expectedManifest);
@@ -118,15 +145,15 @@ try {
     assert.equal(manifest.source.head, expectedHead); assert.equal(manifest.source.dirty, false);
     assert.equal(manifest.source.fingerprintSha256, digest(JSON.stringify(manifest.source.files)));
     assert.equal(manifest.source.fingerprintSha256, expectedFingerprint);
-    assert.deepEqual(manifest.files.map(file => file.path).sort(), payloadPaths); assert.equal(manifest.files.length, 43);
-    assert.equal(expectedPaths.length, 44); assert.equal(manifest.graph.bundleSha256, graphPins['memory/graph-renderer.mjs']);
+    assert.deepEqual(manifest.files.map(file => file.path).sort(), payloadPaths); assert.equal(manifest.files.length, 44);
+    assert.equal(expectedPaths.length, 45); assert.equal(manifest.graph.bundleSha256, graphPins['memory/graph-renderer.mjs']);
     assert.equal(manifest.graph.layoutBackend, 'local');
     for (const [path, hash] of Object.entries(graphPins)) assert.equal(manifest.files.find(file => file.path === path)?.sha256, hash, path);
     assert.equal(manifest.model.licensePath, 'LICENSES/lfm-open-license-1.0.txt');
     assert.equal(manifest.model.licenseSha256, '30adf9d6478191fb87f2424f63ba0728598335aaf99cd2848ef17e8e545fe94b');
     assert.equal(manifest.files.find(file => file.path === manifest.model.licensePath)?.sha256, manifest.model.licenseSha256);
   });
-  await check('all 44 HTTPS files match reviewed GET bytes and GET/HEAD MIME', async () => {
+  await check(`all 45 ${deliveryLabel} files match reviewed GET bytes and GET/HEAD MIME`, async () => {
     for (let offset = 0; offset < expectedPaths.length; offset += 4) {
       const settled = await Promise.allSettled(expectedPaths.slice(offset, offset + 4).map(async path => {
         const expected = path === 'site-manifest.json' ? { sha256: expectedManifest, bytes: 128 * 1024 } : manifest.files.find(file => file.path === path);
@@ -146,7 +173,8 @@ try {
     for (const path of ['memory/PRIVATE_LOCAL_ONLY', 'memory/README.md', 'memory/PREVIEW_READINESS.md', 'memory/build-core.mjs',
       'memory/build-graph.mjs', 'worker/force-worker-entry.js',
       'memory/serve-local.mjs', 'memory-proof/runtime-probe.mjs', '.artifacts/proof/local-memory/receipt.json', '.git/config', '.env',
-      'tests/model-chat-memory-live.mjs', 'node_modules/playwright/index.mjs', 'source/workspace.html', 'modules/browser-rag-ts/src/core/index.ts']) {
+      'tests/model-chat-memory-live.mjs', 'node_modules/playwright/index.mjs', 'source/workspace.html', 'modules/browser-rag-ts/src/core/index.ts',
+      'memory/context-inspection.json', 'memory/context-panel.mjs.map', 'unknown.mjs']) {
       const { response, bytes } = await request(path, 'HEAD', 0);
       assert.equal(response.status, 404, path); assert.equal(bytes.length, 0);
       privatePaths.push({ path, status: 404 });
@@ -204,13 +232,13 @@ try {
     assert.equal(await page.locator('#memory-graph [data-memory-kind="message"]').count(), 0);
     observations.push({ panelOpenedProgrammaticallyWhileModelUnloaded: true, graphDisabledAssemblyVerified: true });
   });
-  await check('essential screenshot shows actual idle HTTPS preview and its visible experimental notice', async () => {
+  await check(`essential screenshot shows actual idle ${deliveryLabel} preview and its visible experimental notice`, async () => {
     await productionPage('?memory=1'); await settle();
     await page.evaluate(() => scrollTo(0, 0));
     const bounds = await page.locator('.introduction .lede').boundingBox(); assert.ok(bounds && bounds.y >= 0 && bounds.y + bounds.height <= 844);
-    await mkdir(output, { recursive: true }); const target = join(output, screenshotName);
-    await page.screenshot({ path: target, fullPage: false, animations: 'disabled' });
-    const bytes = await readFile(target); screenshot = { path: '.artifacts/proof/model-chat/' + screenshotName, bytes: bytes.length, sha256: digest(bytes), evidence: 'actual live idle UI; no fixture or model loaded' };
+    if (!stdoutOnly) await mkdir(output, { recursive: true });
+    const bytes = await page.screenshot({ ...(stdoutOnly ? {} : { path: join(output, screenshotName) }), fullPage: false, animations: 'disabled' });
+    screenshot = { ...(stdoutOnly ? { retained: false } : { path: relative(root, join(output, screenshotName)).split(sep).join('/') }), bytes: bytes.length, sha256: digest(bytes), evidence: `actual ${deliveryLabel} idle UI; no fixture or model loaded` };
   });
   await check('no native, runtime, model or outside-scope browser requests occurred and manifest stayed fixed', async () => {
     assert.deepEqual(forbiddenRequests, []); assert.deepEqual(pageErrors, []); assert.deepEqual(failedResponses, []); assert.equal(workers, 0);
@@ -262,6 +290,64 @@ try {
       assert.equal(await page.locator('[data-memory-kind="global"]').count(), 3);
       assert.equal(await page.locator('[data-memory-kind="record"]').count(), 0);
       assert.equal(seeded.automaticNodes.filter(node => node.role === 'assistant').length, 1);
+      await check(spatialFixtureCheck, async () => {
+        const readSpatial = () => page.evaluate(() => {
+          const canvas = document.querySelector('#memory-graph canvas'), dialog = document.getElementById('memory-dialog');
+          const rect = dialog.getBoundingClientRect();
+          return { presentation: canvas.dataset.presentation, positions: JSON.parse(canvas.dataset.nodePositions),
+            pose: JSON.parse(canvas.dataset.cameraPose), expanded: dialog.classList.contains('is-expanded'),
+            rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+            viewport: { width: innerWidth, height: visualViewport?.height ?? innerHeight },
+            documentWidth: document.documentElement.scrollWidth, fullscreen: Boolean(document.fullscreenElement) };
+        });
+        const contained = state => {
+          assert.ok(state.rect.x >= -1 && state.rect.y >= -1);
+          assert.ok(state.rect.x + state.rect.width <= state.viewport.width + 1 && state.rect.y + state.rect.height <= state.viewport.height + 1);
+          assert.ok(state.documentWidth <= state.viewport.width + 1); assert.equal(state.fullscreen, false);
+        };
+        const initial = await readSpatial(); contained(initial);
+        assert.equal(initial.presentation, 'memory-spatial');
+        assert.equal(initial.positions.length, 6);
+        assert.ok(initial.positions.every(node => ['x', 'y', 'z'].every(key => Number.isFinite(node[key]))));
+        const z = initial.positions.map(node => node.z); assert.ok(Math.max(...z) - Math.min(...z) > 1, 'Actual nodes retain spatial depth');
+        assert.equal(await page.locator('#memory-graph-tab').getAttribute('aria-selected'), 'true');
+        await page.locator('#memory-expand').focus(); await page.keyboard.press('Enter'); await settle();
+        assert.equal(await page.locator('#memory-expand').getAttribute('aria-expanded'), 'true');
+        const expanded = await readSpatial(); contained(expanded); assert.equal(expanded.expanded, true);
+        assert.ok(Math.abs(expanded.rect.width - expanded.viewport.width) <= 2 && Math.abs(expanded.rect.height - expanded.viewport.height) <= 2);
+        await page.locator('#memory-graph-tab').focus(); await page.keyboard.press('ArrowRight'); await settle();
+        assert.equal(await page.locator('#memory-context-tab').getAttribute('aria-selected'), 'true');
+        assert.equal(await page.locator('#memory-context-tab').evaluate(node => document.activeElement === node), true);
+        assert.equal(await page.locator('#memory-graph-view').isVisible(), false);
+        assert.equal(await page.locator('#memory-context-view').isVisible(), true);
+        assert.match(await page.locator('#memory-context-view').textContent(), /No inspected request in this session\./);
+        const inspection = await page.evaluate(() => window.localMemoryPreview.workspace.context.inspectionSnapshot());
+        assert.equal(inspection.latestPrepared, null); assert.equal(inspection.lastSubmitted, null);
+        await page.waitForFunction(() => document.getElementById('memory-graph').dataset.renderer === 'suspended');
+        assert.equal(await page.locator('#memory-graph canvas').isVisible(), false);
+        await page.keyboard.press('Home'); await graphReady();
+        assert.equal(await page.locator('#memory-graph-tab').getAttribute('aria-selected'), 'true');
+        assert.equal(await page.locator('#memory-graph-tab').evaluate(node => document.activeElement === node), true);
+        const restored = await readSpatial(); contained(restored);
+        for (const vector of ['position', 'target']) for (const axis of ['x', 'y', 'z']) {
+          assert.ok(Math.abs(restored.pose[vector][axis] - expanded.pose[vector][axis]) < 1e-5, 'Graph return restores public camera pose');
+        }
+        assert.deepEqual(restored.positions, expanded.positions, 'Tab changes preserve actual node positions');
+        await page.locator('#memory-expand').click(); await settle();
+        assert.equal(await page.locator('#memory-expand').getAttribute('aria-expanded'), 'false');
+        assert.equal(await page.locator('#memory-close').textContent(), 'Chat');
+        await page.locator('#memory-close').click(); await settle();
+        assert.equal(await page.locator('#memory-dialog').evaluate(dialog => dialog.open), false);
+        assert.equal(await page.locator('#memory-open').evaluate(node => document.activeElement === node), true);
+        assert.equal(await page.evaluate(() => window.localMemoryPreview.workspace.conversation.exportState()), seeded.conversation);
+        assert.equal(await page.locator('#app').getAttribute('data-phase'), 'idle');
+        await page.locator('#memory-open').evaluate(button => button.click()); await graphReady();
+        assert.equal(await page.locator('#memory-graph-tab').getAttribute('aria-selected'), 'true');
+        observations.push({ liveSpatialNavigation: { actualNodes: 6, zRange: Math.max(...z) - Math.min(...z),
+          appViewportExpansion: true, browserFullscreenUsed: false, graphContextKeyboardNavigation: true,
+          emptyInspectionHonest: true, graphDisposedInContext: true, graphCameraRestored: true,
+          chatReturnAndReopen: true, canonicalTranscriptUnchanged: true, strictZeroIdleRafQualified: false } });
+      });
       const selected = () => page.locator('[data-memory-node][data-matched="true"]').evaluateAll(nodes => nodes.map(node => node.dataset.memoryNode).sort());
       await page.locator('#memory-query').fill('harbor access code'); await page.locator('#memory-query').press('Enter');
       await page.waitForFunction(() => !document.getElementById('memory-query').disabled && document.getElementById('memory-status').textContent === 'Matching memories are lit up.');
@@ -328,22 +414,34 @@ finally {
     if (profile) { assert.equal(resolve(dirname(profile)), resolve(tmpdir())); assert.ok(basename(profile).startsWith(profilePrefix));
       await rm(profile, { recursive: true, force: true }); cleanup.ownedTemporaryProfileRemoved = true; }
   } catch (error) { failure ||= error; }
-  await mkdir(output, { recursive: true });
-  await writeFile(resultPath, JSON.stringify({ schema: 'rag-method.memory-live-preview/v1', status: failure ? 'fail' : 'pass',
+  const result = { schema: 'rag-method.memory-live-preview/v1', status: failure ? 'fail' : 'pass',
     startedAt: new Date(started).toISOString(), durationMs: Date.now() - started, node: process.version, browser: browserVersion,
-    url: base?.href, verifierSha256: digest(await readFile(fileURLToPath(import.meta.url))),
+    url: base?.href, deliveryMode: localStaticUrl ? 'loopback-static' : 'live-https', verifierSha256: digest(await readFile(fileURLToPath(import.meta.url))),
     manifest: manifest && { sha256: manifestSha256, identitySha256: manifest.identitySha256, sourceHead: manifest.source.head,
-      sourceFingerprintSha256: manifest.source.fingerprintSha256, filesIncludingManifest: 44 },
+      sourceFingerprintSha256: manifest.source.fingerprintSha256, filesIncludingManifest: 45 },
     checks, assets: assets.sort((left, right) => left.path.localeCompare(right.path)), privatePaths, observations, screenshot,
     boundary: { fixture: checks.some(check => check.fixture), fixtureCases: checks.filter(check => check.fixture).map(({ name, fixtureScope }) => ({ name, fixtureScope })),
       productionBootstrapReplaced: false, providerCalls: 0, actualNativeCalls: 0, modelDownloads: 0,
       runtimeWorkersCreated: workers, forbiddenRequests, pageErrors, failedResponses, browserPaths: [...new Set(browserPaths)].sort(),
       httpRequests, decodedStaticBytes: decodedBytes, localServerStarted: false, packageCopies: 0 }, cleanup,
     limitations: ['Mobile viewport/reduced-motion emulation in configured desktop Chromium, not physical iOS.',
-      'Production idle checks plus two explicitly scoped presentation/automatic-memory fixtures; no model loading, inference, cache or answer-quality proof.',
+      'Production idle checks plus explicitly scoped presentation/automatic-memory fixtures; no model loading, inference, cache or answer-quality proof.',
       'Synthetic source anchors are verified while unloaded; actual ready-chat source focus is covered by the separate local fixture suite.',
+      'Context navigation verifies an honest empty request view; submitted-request inspection and gestures remain covered by the separate local fixture suite.',
+      'Strict zero visible idle RAF remains unqualified; pinned Three clock callbacks are not waived or treated as proof of scene/GPU work.',
+      ...(localStaticUrl ? ['Explicit loopback-static mode is not live HTTPS delivery proof.'] : []),
       'Finite path probes do not prove arbitrary unknown paths or Git-history disclosure boundaries.'],
-    ...(failure ? { error: failure.message } : {}) }, null, 2) + '\n');
+    ...(failure ? { error: failure.message } : {}) };
+  if (stdoutOnly) {
+    const { assets: _assets, privatePaths: _privatePaths, ...compact } = result;
+    const bytes = JSON.stringify({ ...compact, assetsVerified: assets.length, assetsIdentitySha256: digest(JSON.stringify(result.assets)),
+      privatePathsVerified: privatePaths.length, privatePathsIdentitySha256: digest(JSON.stringify(privatePaths)) });
+    assert.ok(Buffer.byteLength(bytes) <= 16 * 1024, 'Live stdout proof remains bounded');
+    console.log('MEMORY_LIVE_PROOF_JSON ' + bytes);
+  } else {
+    await safeProofRoot(); await mkdir(output, { recursive: true });
+    await writeFile(resultPath, JSON.stringify(result, null, 2) + '\n');
+  }
 }
 if (failure) { console.error('FAIL experimental memory live: ' + failure.stack); process.exitCode = 1; }
-else console.log(`PASS: ${checks.length} experimental Pages smoke checks; no model/native execution.`);
+else console.log(`PASS: ${checks.length} experimental ${deliveryLabel} smoke checks; no model/native execution.`);

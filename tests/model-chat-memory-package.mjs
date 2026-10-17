@@ -12,12 +12,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const packageRoot = resolve(process.env.BROWSER_MEMORY_PREVIEW_SITE || join(root, '.artifacts/model-chat/memory-preview-site'));
 const resultPath = join(root, '.artifacts/proof/local-memory/package-result.json');
+const stdoutOnly = process.env.BROWSER_MEMORY_PACKAGE_STDOUT === '1';
 const profilePrefix = 'rag-memory-package-';
 const chrome = process.env.BROWSER_RAG_CHROMIUM_PATH || process.env.MODEL_CHAT_BROWSER || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const playwright = process.env.BROWSER_MODEL_PLAYWRIGHT_MODULE?.trim() || process.env.PLAYWRIGHT_MODULE?.trim();
 if (!playwright) throw new Error('Set BROWSER_MODEL_PLAYWRIGHT_MODULE (or PLAYWRIGHT_MODULE) to an already-installed Playwright module file. Automatic installation is disabled.');
 const prefix = '/portable/preview/';
-const memoryAssets = ['workspace', 'store', 'events', 'context', 'structured-context', 'automatic-context', 'automatic-memory',
+const memoryAssets = ['workspace', 'store', 'events', 'context', 'context-panel', 'structured-context', 'automatic-context', 'automatic-memory',
   'conversation-index', 'scoped-pockets', 'starter-facts', 'rag-adapter',
   'restore-events', 'citations', 'panel', 'navigation', 'compaction-cue', 'rag-core', 'graph-renderer'].map(name => `memory/${name}.mjs`).concat('memory/panel.css');
 const payloadPaths = ['index.html', 'style.css', 'app.mjs', 'loader-controller.mjs', 'model-contract.mjs',
@@ -27,7 +28,8 @@ const payloadPaths = ['index.html', 'style.css', 'app.mjs', 'loader-controller.m
   'LICENSES/lfm-open-license-1.0.txt', 'LICENSES/forcegraph-tsl.txt', 'LICENSES/three.txt', 'NOTICE.txt', 'README.txt', ...memoryAssets].sort();
 const expectedFiles = [...payloadPaths, 'site-manifest.json'].sort();
 const pinned = {
-  'memory/graph-renderer.mjs': '90783080f8ce7849f5d0544864c7ac7bfb7875c689aecf1fa7951204b4112b3a',
+  'memory/graph-renderer.mjs': '611341828e66e710497d8b0025947e9efb9ae2b268828c812856d230d614ea7a',
+  'memory/rag-core.mjs': 'c282ebb3965c4a25b48fb66082ce18c72184449f2123633a901ffceb9939ace6',
   'LICENSES/forcegraph-tsl.txt': '1a897e0ee6f1fc65889976eadb848acefac9db7f9c97274a6c490f52390cd474',
   'LICENSES/three.txt': '8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc',
   'LICENSES/lfm-open-license-1.0.txt': '30adf9d6478191fb87f2424f63ba0728598335aaf99cd2848ef17e8e545fe94b',
@@ -106,7 +108,7 @@ try {
   const expectedFingerprint = required('BROWSER_MEMORY_EXPECTED_SOURCE_FINGERPRINT', /^[a-f0-9]{64}$/);
   // Keep bounded failed verifier attempts when correcting proof-only defects.
   // This never treats an earlier attempt as evidence for the current package.
-  const previous = await readFile(resultPath, 'utf8').then(text => {
+  const previous = stdoutOnly ? null : await readFile(resultPath, 'utf8').then(text => {
     assert.ok(text.length <= 128 * 1024, 'prior package proof remains compact'); return JSON.parse(text);
   }).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
   if (previous?.schema === 'local-memory-curated-package-proof/v1' && previous.status === 'fail') {
@@ -119,11 +121,11 @@ try {
       boundary: { actualNativeCalls: previous.boundary?.actualNativeCalls, runtimeWorkersCreated: previous.boundary?.runtimeWorkersCreated,
         externalRequestCount: previous.boundary?.externalRequests?.length, pageErrorCount: previous.boundary?.pageErrors?.length } });
   }
-  await check('exact 43-file payload, complete license pins, source and manifest identities', async () => {
+  await check('exact 44-file payload, complete license pins, source and manifest identities', async () => {
     assert.ok(inside(resolve(root, '.artifacts/model-chat'), packageRoot), 'package stays in its explicitly owned artifact parent');
     assert.equal(await realpath(packageRoot), packageRoot, 'package root has no linked ancestor');
     assert.deepEqual(await filesBelow(packageRoot), expectedFiles);
-    assert.equal(payloadPaths.length, 43); assert.equal(expectedFiles.length, 44);
+    assert.equal(payloadPaths.length, 44); assert.equal(expectedFiles.length, 45);
     const manifestBytes = await readFile(join(packageRoot, 'site-manifest.json'));
     assert.equal(digest(manifestBytes), expectedManifest, 'expected reviewed manifest bytes');
     manifest = JSON.parse(manifestBytes);
@@ -164,7 +166,22 @@ try {
     const readme = await readFile(join(packageRoot, 'README.txt'), 'utf8');
     assert.match(readme, /no special markup is required/); assert.match(readme, /lossy extractive context, not general semantic summarization/);
     assert.match(readme, /not full product-release or iOS qualification/);
-    observations.push({ packagePath: portable(relative(root, packageRoot)), filesIncludingManifest: 44,
+    const graph = await import(pathToFileURL(join(packageRoot, 'memory/graph-renderer.mjs')).href);
+    assert.deepEqual(Object.keys(graph).sort(), ['createTslRagGraphRenderer', 'layoutMemoryGraph', 'layoutRagGraph']);
+    const previousWorker = globalThis.Worker; let layoutWorkers = 0;
+    globalThis.Worker = class { constructor() { layoutWorkers++; throw new Error('Packaged local layout must not start a Worker.'); } };
+    try {
+      const projection = { view: 'evidence', nodes: ['conversation', 'persona', 'global'].map(id => ({ id,
+        kind: id === 'global' ? 'source' : 'chunk', path: 'fixture/' + id, source_id: id, record_id: null })),
+        links: [], total_nodes: 3, total_links: 0, omitted_nodes: 0, omitted_links: 0 };
+      const spatial = graph.layoutMemoryGraph(projection, [], { aspect: 320 / 568 });
+      assert.deepEqual(spatial.nodes.map(node => node.id).sort(), ['conversation', 'global', 'persona']);
+      assert.ok(spatial.nodes.every(node => [node.x, node.y, node.z].every(Number.isFinite)));
+      assert.ok(new Set(spatial.nodes.map(node => node.z)).size > 1, 'packaged layout preserves actual depth');
+      assert.equal(graph.layoutRagGraph({ ...projection, nodes: projection.nodes.slice(0, 1), total_nodes: 1 }).nodes.length, 1);
+      assert.equal(layoutWorkers, 0);
+    } finally { if (previousWorker === undefined) delete globalThis.Worker; else globalThis.Worker = previousWorker; }
+    observations.push({ packagePath: portable(relative(root, packageRoot)), filesIncludingManifest: 45,
       manifestSha256: digest(manifestBytes), manifestIdentitySha256: identitySha256, sourceHead: manifest.source.head,
       sourceDirtyAtStage: manifest.source.dirty, sourceFingerprintSha256: manifest.source.fingerprintSha256,
       packageBytes: packageIdentity.reduce((sum, file) => sum + file.bytes, 0) + manifestBytes.length });
@@ -335,8 +352,7 @@ finally {
       await rm(profile, { recursive: true, force: true }); cleanup.ownedTemporaryProfileRemoved = true;
     }
   } catch (error) { failure ||= error; }
-  await mkdir(dirname(resultPath), { recursive: true });
-  await writeFile(resultPath, JSON.stringify({ schema: 'local-memory-curated-package-proof/v1', status: failure ? 'fail' : 'pass',
+  const result = { schema: 'local-memory-curated-package-proof/v1', status: failure ? 'fail' : 'pass',
     startedAt: new Date(started).toISOString(), durationMs: Date.now() - started, node: process.version, browser: browserVersion,
     verifierSha256: digest(await readFile(fileURLToPath(import.meta.url))), sourceIdentity, checks, observations, priorAttempts,
     boundary: { externalRequests, pageErrors, failedResponses, runtimeWorkersCreated: workers, actualNativeCalls: 0,
@@ -345,7 +361,16 @@ finally {
     limitations: ['Fresh profile and source-free browser package proof, not fresh OS/npm installation.',
       'Fixture provider and token meter are labeled; no native inference or model quality proof.',
       'Loopback static route proof is not live HTTPS, physical iOS, network recovery or model-loading qualification.'],
-    cleanup, ...(failure ? { error: failure.message } : {}) }, null, 2) + '\n');
+    cleanup, ...(failure ? { error: failure.message } : {}) };
+  if (stdoutOnly) {
+    const { sourceIdentity: _sourceIdentity, ...compact } = result;
+    const bytes = JSON.stringify({ ...compact, sourceIdentitySha256: digest(JSON.stringify(sourceIdentity ?? null)), sourceFiles: sourceIdentity?.length });
+    assert.ok(Buffer.byteLength(bytes) <= 16 * 1024, 'Package stdout result remains bounded');
+    console.log('PACKAGE_PROOF_JSON ' + bytes);
+  } else {
+    await mkdir(dirname(resultPath), { recursive: true });
+    await writeFile(resultPath, JSON.stringify(result, null, 2) + '\n');
+  }
 }
 if (failure) { console.error('FAIL curated memory package: ' + failure.stack); process.exitCode = 1; }
 else console.log(`PASS: ${checks.length} curated-package checks; no model calls or package copies.`);

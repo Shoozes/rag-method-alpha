@@ -4,7 +4,7 @@ import { createForceGraph3D, createThreePlatform, NodeFlags } from "@ours/forceg
 import { createNodeSpawnMotion } from "../presentation/nodeSpawnMotion.js";
 import { sampleCameraPoseTween } from "@ours/forcegraph-tsl/camera";
 import { planPerspectiveCameraFrame } from "@ours/forcegraph-tsl/camera";
-import type { CameraPose, ForceGraph, RendererBackend } from "@ours/forcegraph-tsl";
+import type { CameraPose, ForceGraph, NodeSurfaceOptions, RendererBackend } from "@ours/forcegraph-tsl";
 import type { PositionedGraph, PositionedGraphNode } from "./layoutGraph.js";
 import { graphColorNumber, graphFamilyColorNumber } from "./graphPalette.js";
 
@@ -44,6 +44,8 @@ export interface RagGraphRendererDiagnostics {
   readonly viewport: RagGraphViewportDiagnostics;
   readonly camera_pose: CameraPose | null;
   readonly node_colors: readonly { readonly node_id: string; readonly base_color: number }[];
+  readonly presentation?: "memory-spatial";
+  readonly node_positions?: readonly { readonly node_id: string; readonly x: number; readonly y: number; readonly z: number }[];
 }
 
 export interface RagGraphRuntimeDiagnostics {
@@ -84,12 +86,31 @@ export interface CreateRagGraphRendererOptions {
   readonly preserveNodeColors?: boolean;
   /** Flat scope colors for memory maps; other consumers retain the metallic surface. */
   readonly nodeSurface?: "default" | "scope-colored";
+  /** Preserve host-supplied XYZ and use the memory-only spatial camera and surface. */
+  readonly presentation?: "memory-spatial";
   readonly onNodeActivate: (nodeId: string) => void;
   readonly onTerminalFailure: (message: string) => void;
 }
 
 function nodeRadius(node: { readonly data?: RenderNodeData }): number {
   return node.data?.kind === "source" ? 3.8 : node.data?.kind === "folder" ? 6.5 : 1.9;
+}
+
+function memoryNodeRadius(node: { readonly data?: RenderNodeData }): number {
+  return node.data?.kind === "source" ? 7.5 : node.data?.kind === "folder" ? 8.5 : 6;
+}
+
+function memoryMinimumPixels(kind: RenderNodeData["kind"] | undefined): number {
+  return kind === "source" ? 9 : kind === "folder" ? 10 : 8;
+}
+
+/** The engine packs RGB bytes directly into linear shader attributes. */
+function memoryLinearColor(srgb: number): number {
+  const channel = (shift: number): number => {
+    const value = ((srgb >>> shift) & 255) / 255;
+    return Math.round((value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4) * 255);
+  };
+  return (channel(16) << 16) | (channel(8) << 8) | channel(0);
 }
 
 function nodeColor(node: { readonly data?: RenderNodeData }): number {
@@ -131,8 +152,68 @@ function frameVisibleGraph(
   return frame;
 }
 
+/** Fit actual nodes in the current camera basis, rather than empty AABB corners. */
+function frameSpatialMemory(
+  graph: ForceGraph<RenderNodeData, { readonly kind: string }>,
+  canvas: HTMLCanvasElement,
+  nodeIds: readonly string[],
+): CameraPose | null {
+  const width = canvas.clientWidth, height = canvas.clientHeight;
+  const view = graph.getGraphView();
+  const nodes = nodeIds.flatMap(id => {
+    const point = graph.getNodePosition(id), node = view.getNode(id);
+    return point && node ? [{ point, node }] : [];
+  });
+  if (!nodes.length || width <= 0 || height <= 0) return null;
+  const pose = graph.getCameraPose();
+  const direction = pose ? { x: pose.position.x - pose.target.x, y: pose.position.y - pose.target.y, z: pose.position.z - pose.target.z }
+    : { x: 0.32, y: 0.20, z: 1 };
+  const length = Math.hypot(direction.x, direction.y, direction.z);
+  const normal = { x: direction.x / length, y: direction.y / length, z: direction.z / length };
+  const sideLength = Math.hypot(normal.x, normal.z);
+  const right = sideLength > 0.000001 ? { x: normal.z / sideLength, y: 0, z: -normal.x / sideLength } : { x: 1, y: 0, z: 0 };
+  const up = { x: normal.y * right.z, y: normal.z * right.x - normal.x * right.z, z: -normal.y * right.x };
+  const dot = (point: { x: number; y: number; z: number }, axis: typeof normal): number => point.x * axis.x + point.y * axis.y + point.z * axis.z;
+  const projected = nodes.map(({ point, node }) => ({ x: dot(point, right), y: dot(point, up), z: dot(point, normal), node }));
+  const center = {
+    x: (Math.min(...projected.map(point => point.x)) + Math.max(...projected.map(point => point.x))) / 2,
+    y: (Math.min(...projected.map(point => point.y)) + Math.max(...projected.map(point => point.y))) / 2,
+    z: (Math.min(...projected.map(point => point.z)) + Math.max(...projected.map(point => point.z))) / 2,
+  };
+  const verticalTangent = Math.tan(25 * Math.PI / 180), horizontalTangent = verticalTangent * width / height;
+  // Use 82% of each dimension, then retain a small fixed label margin.
+  const horizontalLimit = horizontalTangent * Math.max(0.35, 0.82 - 24 / width);
+  const verticalLimit = verticalTangent * Math.max(0.35, 0.82 - 24 / height);
+  let distance = 32;
+  for (const point of projected) {
+    const x = Math.abs(point.x - center.x), y = Math.abs(point.y - center.y), depth = point.z - center.z;
+    const radius = memoryNodeRadius(point.node), pixelSlope = memoryMinimumPixels(point.node.data?.kind) * 2 * verticalTangent / height;
+    distance = Math.max(distance, depth + radius + 1,
+      depth + (x + radius) / horizontalLimit, depth + (y + radius) / verticalLimit,
+      depth + x / Math.max(horizontalLimit - pixelSlope, horizontalLimit * 0.2),
+      depth + y / Math.max(verticalLimit - pixelSlope, verticalLimit * 0.2));
+  }
+  const target = {
+    x: right.x * center.x + up.x * center.y + normal.x * center.z,
+    y: right.y * center.x + up.y * center.y + normal.y * center.z,
+    z: right.z * center.x + up.z * center.y + normal.z * center.z,
+  };
+  const frame = { target, position: { x: target.x + normal.x * distance, y: target.y + normal.y * distance, z: target.z + normal.z * distance } };
+  graph.setCameraPose(frame);
+  return frame;
+}
+
 export async function createTslRagGraphRenderer(options: CreateRagGraphRendererOptions): Promise<RagGraphRenderer> {
+  const memorySpatial = options.presentation === "memory-spatial";
   const scopeColoredSurface = options.nodeSurface === "scope-colored";
+  const preserveNodeColors = memorySpatial || options.preserveNodeColors;
+  // The pinned native "metallic" profile supplies sphere-impostor shading.
+  // Zero metalness removes its additive white highlight and retains scope hues.
+  const memorySurface = (color: number): NodeSurfaceOptions => ({
+    profile: "metallic", metalness: 0, roughness: 0.82, emissive: 0.04,
+    selectionEffect: { enabled: true, bubbleScale: 1.5, intensity: 0.22, color: memoryLinearColor(color), breathAmount: 0 },
+  });
+  let selectionSurfaceColor = 0x0ea5ff;
   const baseColors = new Map<string, number>();
   const resolvedNodeColor = (node: { readonly id: string | number; readonly data?: RenderNodeData }): number => {
     const id = String(node.id), supplied = options.nodeColor?.(id);
@@ -141,7 +222,7 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
     }
     const color = supplied ?? nodeColor(node);
     baseColors.set(id, color);
-    return color;
+    return memorySpatial ? memoryLinearColor(color) : color;
   };
   let graph: ForceGraph<RenderNodeData, { readonly kind: string }> | null = await createForceGraph3D<RenderNodeData, { readonly kind: string }>({
     platform: createThreePlatform({ THREE, TSL }),
@@ -151,7 +232,7 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
       frameLoop: "demand",
       linkWidthUnit: "pixel",
       pixelRatio: { minimum: 1, maximum: 2 },
-      nodeSurface: {
+      nodeSurface: memorySpatial ? memorySurface(selectionSurfaceColor) : {
         profile: scopeColoredSurface ? "flat" : "metallic",
         metalness: 0.88,
         roughness: 0.2,
@@ -168,10 +249,10 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
         color: graphColorNumber("selected"),
         nodeReaction: { enabled: true, scale: 1.2, intensity: 0.58, color: graphColorNumber("selected") },
       },
-      cameraPose: { position: { x: 0, y: 0, z: 120 }, target: { x: 0, y: 0, z: 0 } },
+      cameraPose: { position: { x: memorySpatial ? 38.4 : 0, y: memorySpatial ? 24 : 0, z: 120 }, target: { x: 0, y: 0, z: 0 } },
     },
-    layout: { backend: "local", autoStart: false, dimensions: 2, seed: 20260919 },
-    nodes: { radius: nodeRadius, color: resolvedNodeColor },
+    layout: { backend: "local", autoStart: false, dimensions: memorySpatial ? 3 : 2, seed: 20260919 },
+    nodes: { radius: memorySpatial ? memoryNodeRadius : nodeRadius, color: resolvedNodeColor },
     links: {
       width: (link) => link.data?.kind === "reference" ? 1.6 : 1.05,
       color: (link) => link.data?.kind === "reference" ? graphColorNumber("reference") : graphColorNumber("link"),
@@ -179,9 +260,9 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
     },
     interaction: { hover: true, dragNodes: false, selection: "single", navigation: true },
     stateTheme: {
-      selected: { color: graphColorNumber("selected"), colorMix: options.preserveNodeColors ? 0 : 0.98, scale: 1.42 },
-      focused: { color: graphColorNumber("hit"), colorMix: options.preserveNodeColors ? 0 : 0.82, scale: 1.2 },
-      ...(scopeColoredSurface ? { hovered: { colorMix: 0 } } : {}),
+      selected: { color: graphColorNumber("selected"), colorMix: preserveNodeColors ? 0 : 0.98, scale: memorySpatial ? 1.22 : 1.42 },
+      focused: { color: graphColorNumber("hit"), colorMix: preserveNodeColors ? 0 : 0.82, scale: memorySpatial ? 1.12 : 1.2 },
+      ...(memorySpatial ? { hovered: { colorMix: 0, scale: 1.06 } } : scopeColoredSurface ? { hovered: { colorMix: 0 } } : {}),
     },
   });
 
@@ -214,7 +295,21 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
     refreshNodeStyles:(ids)=>{ for(const id of ids)dirtyMotionIds.add(id);if(!motionStyleFrame)motionStyleFrame=requestAnimationFrame(()=>{motionStyleFrame=0;if(graph){graph.refreshNodeStyles(dirtyMotionIds);graph.render();options.canvas.dataset.spawnActive=String(nodeMotion.activeCount);}dirtyMotionIds.clear();}); },
     onError:(error)=>options.onTerminalFailure(error instanceof Error?error.message:String(error)),
   });
-  const styledRadius = (node:{readonly id:string|number;readonly data?:RenderNodeData}):number => Math.max(nodeRadius(node),unitsPerPixel*(node.data?.kind==="folder"?2.8:node.data?.kind==="source"?1.8:1))*nodeMotion.scale(String(node.id));
+  const styledRadius = (node:{readonly id:string|number;readonly data?:RenderNodeData}):number => {
+    const minimumPixels = memorySpatial ? memoryMinimumPixels(node.data?.kind)
+      : (node.data?.kind === "folder" ? 2.8 : node.data?.kind === "source" ? 1.8 : 1);
+    let nodeUnitsPerPixel = unitsPerPixel;
+    if (memorySpatial && graph) {
+      const pose = graph.getCameraPose(), point = graph.getNodePosition(String(node.id));
+      if (pose && point) {
+        const x = pose.position.x - pose.target.x, y = pose.position.y - pose.target.y, z = pose.position.z - pose.target.z;
+        const distance = Math.hypot(x, y, z);
+        const depth = ((pose.position.x - point.x) * x + (pose.position.y - point.y) * y + (pose.position.z - point.z) * z) / distance;
+        nodeUnitsPerPixel *= Math.max(0.1, depth) / distance;
+      }
+    }
+    return Math.max(memorySpatial ? memoryNodeRadius(node) : nodeRadius(node), nodeUnitsPerPixel * minimumPixels) * nodeMotion.scale(String(node.id));
+  };
   const fly = (from:CameraPose,to:CameraPose,durationMs:number):void => {
     stopCamera();if(!graph||!motionEnabled||userAdjusted)return;let start:number|null=null;
     const tick=(time:number):void=>{cameraFrame=0;if(!graph)return;start??=time;const pose=sampleCameraPoseTween({from,to,durationMs,easing:"cubic-in-out",path:{type:"direct"}},Math.max(0,time-start));graph.setCameraPose(pose);graph.render();publishDiagnostics();if(!pose.complete)cameraFrame=requestAnimationFrame(tick);};cameraFrame=requestAnimationFrame(tick);
@@ -271,6 +366,11 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
     return projectedTargets(hitNodeIds).filter((target) => target.visible).map(({ node_id, x, y }) => ({ node_id, x, y }));
   };
 
+  const nodePositions = (): NonNullable<RagGraphRendererDiagnostics["node_positions"]> => visibleNodeIds.flatMap(nodeId => {
+    const point = graph?.getNodePosition(nodeId);
+    return point ? [Object.freeze({ node_id: nodeId, x: point.x, y: point.y, z: point.z })] : [];
+  });
+
   const viewportDiagnostics = (): RagGraphViewportDiagnostics => {
     const measured = viewport();
     return Object.freeze({
@@ -308,6 +408,10 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
     options.canvas.dataset.cameraPose = JSON.stringify(currentCameraPose());
     options.canvas.dataset.nodeColors = JSON.stringify(visibleNodeIds.flatMap(id => baseColors.has(id)
       ? [{ node_id: id, base_color: baseColors.get(id)! }] : []));
+    if (memorySpatial) {
+      options.canvas.dataset.presentation = "memory-spatial";
+      options.canvas.dataset.nodePositions = JSON.stringify(nodePositions());
+    }
     options.canvas.dispatchEvent(new Event("rag-camera-frame"));
     options.canvas.dataset.rendererDiagnostics = JSON.stringify(runtimeDiagnostics());
   };
@@ -323,7 +427,8 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
     }
     const sizeChanged = !lastViewport || measured.width !== lastViewport.width || measured.height !== lastViewport.height;
     if (hasGraphData && (framePending || (sizeChanged && !userAdjusted))) {
-      if (frameVisibleGraph(graph, options.canvas)) automaticFrameCount += 1;
+      const frame = memorySpatial ? frameSpatialMemory(graph, options.canvas, visibleNodeIds) : frameVisibleGraph(graph, options.canvas);
+      if (frame) automaticFrameCount += 1;
       framePending = false;
     }
     lastViewport = measured;
@@ -367,6 +472,13 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
     graph.setNodeFlagsMany(hitNodeIds, NodeFlags.Focused);
     if (selectedNodeId && view.hasNode(selectedNodeId)) graph.setSelection([selectedNodeId]);
     else graph.clearSelection();
+    if (memorySpatial && selectedNodeId) {
+      const color = baseColors.get(selectedNodeId);
+      if (color !== undefined && color !== selectionSurfaceColor) {
+        selectionSurfaceColor = color;
+        graph.setNodeSurface(memorySurface(color));
+      }
+    }
     graph.setLinkStyle({
       width: (link) => hitNodeIds.has(String(link.source)) && hitNodeIds.has(String(link.target))
         ? (link.data?.kind === "reference" ? 3.4 : 2.5)
@@ -386,18 +498,21 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
     backend: startup.renderer.selected,
     render(positioned: PositionedGraph): void {
       if (!graph) return;
+      if (memorySpatial && positioned.nodes.some(node => ![node.x, node.y, node.z].every(Number.isFinite))) {
+        throw new Error("Spatial memory nodes require finite host-supplied X, Y and Z coordinates.");
+      }
       graphRevision += 1;
       stopCamera();nodeMotion.cancelAll(false);dirtyMotionIds.clear();
       const priorIds = new Set(visibleNodeIds);
       const measured = viewport();
       const viewportAspect = measured ? measured.width / measured.height : 1;
-      const horizontalScale = Math.min(1.3, Math.max(1, Math.sqrt(viewportAspect)));
+      const horizontalScale = memorySpatial ? 1 : Math.min(1.3, Math.max(1, Math.sqrt(viewportAspect)));
       graph.setData({
         nodes: positioned.nodes.map((node) => ({
           id: node.id,
           data: { kind: node.kind, record_id: node.record_id, source_id: node.source_id, path: node.path },
-          initialPosition: { x: node.x * horizontalScale, y: node.y, z: node.kind === "source" ? 2 : node.kind === "folder" ? 1 : 0 },
-          fixed: { x: node.x * horizontalScale, y: node.y, z: node.kind === "source" ? 2 : node.kind === "folder" ? 1 : 0 },
+          initialPosition: { x: node.x * horizontalScale, y: node.y, z: memorySpatial ? node.z! : node.kind === "source" ? 2 : node.kind === "folder" ? 1 : 0 },
+          fixed: { x: node.x * horizontalScale, y: node.y, z: memorySpatial ? node.z! : node.kind === "source" ? 2 : node.kind === "folder" ? 1 : 0 },
         })),
         links: positioned.links.map((link) => ({ id: link.id, source: link.source, target: link.target, data: { kind: link.kind } })),
       });
@@ -415,7 +530,7 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
       }
     },
     setMotionEnabled(enabled:boolean):void { motionEnabled=enabled;if(!enabled){stopCamera();nodeMotion.cancelAll(true);}options.canvas.dataset.motionEnabled=String(enabled); },
-    replaySpawn():void { if(!motionEnabled)return;spawn(visibleNodeIds);if(graph&&!userAdjusted){const to=graph.getCameraPose();if(to){const from={position:{x:to.position.x,y:to.position.y,z:to.position.z*1.12},target:to.target};graph.setCameraPose(from);fly(from,to,1200);}} },
+    replaySpawn():void { if(!motionEnabled)return;spawn(visibleNodeIds);if(graph&&!userAdjusted){const to=graph.getCameraPose();if(to){const from={position:memorySpatial?{x:to.target.x+(to.position.x-to.target.x)*1.12,y:to.target.y+(to.position.y-to.target.y)*1.12,z:to.target.z+(to.position.z-to.target.z)*1.12}:{x:to.position.x,y:to.position.y,z:to.position.z*1.12},target:to.target};graph.setCameraPose(from);fly(from,to,1200);}} },
     stopMotion():void {stopCamera();nodeMotion.cancelAll(true);},
     refreshViewport(): void {
       scheduleViewportUpdate();
@@ -460,6 +575,7 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
         camera_pose: currentCameraPose(),
         node_colors: Object.freeze(visibleNodeIds.flatMap(id => baseColors.has(id)
           ? [Object.freeze({ node_id: id, base_color: baseColors.get(id)! })] : [])),
+        ...(memorySpatial ? { presentation: "memory-spatial" as const, node_positions: Object.freeze(nodePositions()) } : {}),
       });
     },
     clear(): void {

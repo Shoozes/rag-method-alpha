@@ -22,6 +22,25 @@ const sameScope = (left, right) => left?.actorId === right.actorId && left?.conv
 const hashText = async text => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))]
   .map(byte => byte.toString(16).padStart(2, '0')).join('');
 
+const componentNames = Object.freeze(['exact_micro', 'semantic_micro', 'keyword_micro', 'scope_micro',
+  'provenance_micro', 'authority_micro', 'priority_micro', 'aspect_coverage_micro', 'cross_reference_micro']);
+/** Read-only metadata for the existing returned ranking, never prompt evidence or a new search. */
+export function inspectRetrievalResults(results, describe, limit = 24) {
+  const candidates = results.slice(0, limit).map(result => {
+    const components = Object.fromEntries(componentNames.filter(name => Number.isFinite(result[name])).map(name => [name, result[name]]));
+    const descriptor = describe(result);
+    return Object.freeze({ ...descriptor, sourceTurnIds: Object.freeze([...(descriptor.sourceTurnIds ?? [])]),
+      score_micro: Number.isFinite(result.score_micro) ? result.score_micro : null,
+      keyword_micro: Number.isFinite(result.keyword_micro) ? result.keyword_micro : null,
+      components: Object.keys(components).length ? Object.freeze(components) : null, reasons: Object.freeze([]) });
+  });
+  const count = candidates.reduce((total, row) => total + Number(row.score_micro !== null) + Number(row.keyword_micro !== null), 0);
+  return Object.freeze({ candidates: Object.freeze(candidates),
+    coverage: 'Returned core hits after top-k, core token selection and local gates; not exhaustive scanned candidates.',
+    availability: Object.freeze({ scores: count && count === candidates.length * 2 ? 'available' : count ? 'partial' : 'unavailable',
+      reasons: 'unavailable', reason: !candidates.length ? 'No ranked core hits were returned.' : count === candidates.length * 2 ? null : 'Numeric core score fields were not returned for every candidate.' }) });
+}
+
 function snapshotLatest(records) {
   if (!Array.isArray(records)) throw invalid('records');
   const latest = new Map();
@@ -103,7 +122,12 @@ export function createRetrieval({ core, onEvent } = {}) {
         const observed = onEvent?.(structuredClone(event));
         if (observed && typeof observed.then === 'function') Promise.resolve(observed).catch(() => {});
       } catch { /* Observers cannot change retrieval. */ }
-      return { queryId, hits, contextPacket, contextText: core.formatContextPacket(contextPacket), term_gate: TERM_GATE };
+      const inspection = inspectRetrievalResults(selected, ({ record }) => {
+        const original = origins.get(record.id);
+        return { nodeId: 'record:' + original.id, recordId: original.id, version: original.version,
+          kind: 'saved', scope: 'conversation', sourceTurnIds: original.sourceTurnIds };
+      }, MAX_HITS);
+      return { queryId, hits, contextPacket, contextText: core.formatContextPacket(contextPacket), term_gate: TERM_GATE, inspection };
     },
   };
 }
