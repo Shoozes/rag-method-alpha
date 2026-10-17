@@ -1,5 +1,9 @@
 # Development and verification
 
+The optional browser model-chat example's prompt/lifecycle regression lessons
+are owned by [Model-chat pitfalls](dev/MODEL_CHAT_PITFALLS.md). Prompt-assembly
+fixtures and real model inference are separate evidence scopes.
+
 Verification runs locally while this project is in progress. Use `node run.mjs --list` to inspect the app-focused task declarations in `project.tasks.json`. `--dry-run` prints exact command arguments without executing them. The menu dispatches the existing Python scripts and package commands from one portable catalog. Setup is explicit; missing dependencies are reported.
 
 | Task | Purpose | Prerequisites |

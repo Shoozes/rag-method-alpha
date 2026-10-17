@@ -45,7 +45,10 @@ test('prepare and validation do not mark sources; a stale request cannot dispatc
   const { workspace } = await fixture(t);
   const source = append(workspace, 'Fred owns a copper compass.'); append(workspace, 'What does Fred own?');
   const prepared = await workspace.prepare();
-  assert.ok(sourceIds(prepared).includes('turn:' + source.id));
+  assert.equal(sourceIds(prepared).includes('turn:' + source.id), false, 'A directly present recent turn is not duplicate automatic recall');
+  assert.equal(prepared.messages.filter(message => message.role === 'user' && message.content === source.content).length, 1);
+  assert.equal(prepared.extractiveSources.some(item => item.turnId === source.id), false);
+  assert.equal(prepared.measurement.requestSha256, digest(JSON.stringify(prepared.messages)));
   assert.deepEqual(used(workspace), []); assert.deepEqual(dispatches(workspace), []);
   workspace.context.validateDispatch(prepared.messages);
   assert.deepEqual(used(workspace), []); assert.deepEqual(dispatches(workspace), []);

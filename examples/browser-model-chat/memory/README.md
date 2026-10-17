@@ -1,12 +1,35 @@
 # Experimental automatic chat memory
 
+For the ordinary-chat prompt and fresh-start regression guards, see
+[Model-chat pitfalls](../../../docs/dev/MODEL_CHAT_PITFALLS.md).
+
 Open the [HTTPS preview](https://shoozes.github.io/rag-method-alpha/model-chat/?memory=1).
-This approved experiment's public source is curated on
-`workspace/model-loading-onboarding`; the delivery receipt identifies the exact
-revision verified on Pages. Private development history, the private launch
+The delivery receipt identifies the exact source branch and revision verified
+on Pages. A local repair candidate is not published merely because its checks
+pass. Private development history, the private launch
 wrapper and machine paths are excluded from that source and the static payload.
 No memory parameter or `?memory=0` retains basic chat without memory stores.
 Add `&graph=0` for searchable HTML controls. Model loading is always explicit.
+
+### Ordinary chat and fresh starts
+
+Memory augments ordinary conversation; an empty search is not an instruction to
+answer only from evidence. Under-budget recent messages keep their original
+roles and appear once in the request. All and Conversation filter changes gate
+memory visibility and invalidate stale requests without discarding that recent
+dialogue. Save, Pin, Forget and correction safety remain separate content-policy
+changes. Inspect Context's full request to distinguish raw chat from cited memory.
+
+Settings is available before loading a model. **Reset settings** restores Ambient
+light and the All memory filter. It preserves chat, memories and downloaded
+models; no runtime tuning is persisted by this example. **Clear chat & memory**
+requires confirmation, stops pending work and resets this demo's conversation,
+saved/Persona memory, derived summaries, indexes and memory exclusions. Reload
+returns to the unloaded setup with an empty chat/Persona and the three labeled
+public Space starter facts. Downloaded model cache and unrelated origin data stay.
+A text-free reset marker prevents older tabs or queued saves from restoring the
+cleared chat. Clear failures are explicit and retryable; they never claim a
+durable reset when storage refuses the operation.
 
 Each accepted user or assistant message automatically becomes a source-linked
 Conversation node. Canonical turn IDs preserve originals; these nodes are not
@@ -132,6 +155,12 @@ Compact now control can receive pointer/keyboard focus and explain why nothing
 changed; it does not start a model or meter. Active operations remain blocked.
 After memory rules change, the conservative policy-refresh gate requires a new
 ordinary checked request before another manual compaction.
+Eligibility means the action can check older context, not that a smaller prompt
+is guaranteed. A short chat or unrelated latest message may select no older
+excerpt, or a summary's provenance may cost more tokens than the originals.
+These results say **Nothing changed** and **Context unchanged**, preserving the
+current context and transcript. Measured before/after counts appear only when
+both were actually checked. No success event, pocket or particles are invented.
 Cancel stops an in-flight attempt. A success needs a real committed compaction
 event, lower measured prompt count and final fit; it sends no reply request and
 does not save facts or promote Persona memory. Its actual source nodes receive

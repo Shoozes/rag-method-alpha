@@ -34,7 +34,7 @@ test('initial and empty context are unmeasured without making calls; snapshots a
   const { context, conversation, calls } = setup();
   try {
     assert.deepEqual(context.usageSnapshot(), { phase: 'unmeasured', capacity: 2048, reserve: 160, usablePromptTokens: 1888,
-      measurement: null, conversationVersion: null, compaction: null, error: null });
+      measurement: null, conversationVersion: null, compaction: null, error: null, errorCode: null });
     assert.throws(() => { context.usageSnapshot().capacity = 1; }, TypeError);
     assert.throws(() => context.subscribeUsage(null), /observer/);
     const seen = [], off = context.subscribeUsage(value => { seen.push(value); throw Error('Optional view failed.'); });
@@ -83,7 +83,10 @@ test('the actual 1888-token prompt boundary includes system/retrieval overhead a
     assert.equal(usage.measurement.requestSha256, digest(prepared.messages));
     assert.equal(usage.measurement.quality, 'fixture');
     assert.equal(calls[0].messages[0].role, 'system');
-    assert.match(calls[0].messages[0].content, /No saved evidence matched/);
+    assert.match(calls[0].messages[0].content, /Continue the conversation/);
+    assert.doesNotMatch(calls[0].messages[0].content, /No saved evidence matched|No older user passage selected/);
+    assert.deepEqual(calls[0].messages, prepared.messages);
+    assert.equal(calls[0].messages.at(-1).role, 'user');
     assert.deepEqual(operations(events), []); assert.equal(usage.compaction, null);
   } finally { context.dispose(); }
 });

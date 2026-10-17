@@ -44,29 +44,43 @@ function sourceProof(hit, workspace) {
   assert.equal(hit.turnHash, sha(turn.content)); assert.equal(hit.text, turn.content.slice(hit.offsets.start, hit.offsets.end));
   assert.equal(hit.lineHash, sha(hit.text)); assert.equal(hit.offsets.unit, 'utf16');
 }
+async function directHistoryProof(workspace, calls, prepared) {
+  assert.deepEqual(prepared.messages.filter(message => message.role !== 'system'),
+    workspace.conversation.snapshot().turns.map(({ role, content }) => ({ role, content })));
+  assert.equal(prepared.messages.at(-1).role, 'user');
+  assert.deepEqual(prepared.memorySources, []); assert.deepEqual(prepared.extractiveSources, []);
+  assert.equal(prepared.measurement.requestSha256, sha(JSON.stringify(prepared.messages)));
+  const answer = await workspace.provider.reply(prepared.messages), accepted = append(workspace, answer, 'assistant');
+  await workspace.captureAnswerSources({ answerTurnId: accepted.id, requestSha256: prepared.measurement.requestSha256 });
+  assert.deepEqual(calls.sends.at(-1), prepared.messages);
+  assert.deepEqual(workspace.sourcesForAnswer(accepted.id), [], 'Direct dialogue does not claim a recalled source citation');
+  assert.deepEqual(workspace.automaticMemory.snapshot().usedNodeIds, [], 'Direct dialogue does not claim automatic recall highlighting');
+}
 
-test('unmarked older Fred is retrieved with exact sources before any capacity crossing', async t => {
+test('recent unmarked Fred stays exact in direct history without duplicate automatic recall', async t => {
   const { workspace, calls } = await fixture(t);
   const authored = append(workspace, 'My name is Fred.');
   append(workspace, 'Acknowledged.', 'assistant'); append(workspace, 'What is my name?');
   const prepared = await workspace.prepare();
   assert.equal(prepared.compaction, null); assert.equal(calls.measures.length, 1); assert.equal(calls.sends.length, 0);
-  const hit = prepared.memorySources.find(hit => hit.turnId === authored.id);
-  assert.ok(hit); sourceProof(hit, workspace); assert.match(hit.text, /Fred/);
-  assert.match(prepared.messages[0].content, /Source-linked memory excerpts/);
-  assert.match(prepared.messages[0].content, /quoted user words/); assert.match(prepared.messages[0].content, /Fred/);
+  assert.equal(prepared.messages.filter(message => message.content === authored.content).length, 1);
+  assert.doesNotMatch(prepared.messages[0].content, /Source-linked memory excerpts|Fred/);
+  await directHistoryProof(workspace, calls, prepared);
   assert.equal(workspace.memory.snapshot().records.length, 0, 'automatic retrieval does not admit a saved fact');
 });
 
-test('a late unmarked fact remains in the selected prompt excerpt instead of an unrelated prefix', async t => {
-  const { workspace } = await fixture(t);
+test('a late unmarked fact remains whole in raw history and remains exactly searchable when explicitly retrieved', async t => {
+  const { workspace, calls } = await fixture(t);
   const authored = append(workspace, 'Ordinary notebook entry. '.repeat(80) + '\nMy name is Fred.');
   append(workspace, 'What is my name?');
   assert.equal(conversationNodes(workspace).find(node => node.turnId === authored.id).text, authored.content, 'contextual details expose the full canonical message');
-  const prepared = await workspace.prepare();
-  const hit = prepared.memorySources.find(hit => hit.turnId === authored.id);
+  const searched = await workspace.automaticMemory.prepareContext({ query: 'What is my name?', excludeTurnId: workspace.conversation.snapshot().turns.at(-1).id });
+  const hit = searched.hits.find(hit => hit.turnId === authored.id);
   assert.ok(hit); sourceProof(hit, workspace); assert.match(hit.text, /My name is Fred\./);
-  assert.match(prepared.messages[0].content, /Fred/); assert.equal(prepared.compaction, null);
+  const prepared = await workspace.prepare();
+  assert.equal(prepared.messages.filter(message => message.content === authored.content).length, 1);
+  assert.doesNotMatch(prepared.messages[0].content, /Fred/); assert.equal(prepared.compaction, null);
+  await directHistoryProof(workspace, calls, prepared);
 });
 
 test('assistant messages are display-searchable and role labelled but never automatic prompt evidence', async t => {
@@ -81,8 +95,8 @@ test('assistant messages are display-searchable and role labelled but never auto
   assert.ok(prepared.messages.some(message => message.role === 'assistant' && /violetcapybara/.test(message.content)), 'ordinary recent transcript retains its assistant role');
 });
 
-test('graph nodes and links derive only from accepted messages; prompt query is excluded from retrieval', async t => {
-  const { workspace } = await fixture(t);
+test('graph nodes and links derive only from accepted messages; raw prompt turns are excluded from duplicate retrieval', async t => {
+  const { workspace, calls } = await fixture(t);
   const first = append(workspace, 'Fred collects copper compasses.');
   const second = append(workspace, 'Understood.', 'assistant');
   const query = append(workspace, 'What does Fred collect?');
@@ -90,9 +104,11 @@ test('graph nodes and links derive only from accepted messages; prompt query is 
   assert.deepEqual(new Set(conversationNodes(workspace).map(node => node.turnId)), new Set(canonical.map(turn => turn.id)));
   assert.ok(view.links.every(link => [first.id, second.id, query.id].includes(link.source.slice(5)) && canonical.some(turn => 'turn:' + turn.id === link.target)));
   const prepared = await workspace.prepare();
-  assert.ok(prepared.memorySources.some(hit => hit.turnId === first.id));
+  assert.equal(prepared.memorySources.some(hit => hit.turnId === first.id), false);
   assert.equal(prepared.memorySources.some(hit => hit.turnId === query.id), false);
   assert.deepEqual(workspace.automaticMemory.snapshot().usedNodeIds, []);
+  assert.equal(prepared.messages.filter(message => message.content === first.content).length, 1);
+  await directHistoryProof(workspace, calls, prepared);
 });
 
 test('Global starts with exactly three sourced NASA facts and inserts no conversation turns', async t => {

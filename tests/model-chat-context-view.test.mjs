@@ -46,6 +46,21 @@ test('explicit estimates and fixture counts never acquire native measurement cla
   assert.match(contextUsageView(estimate).detail, /^Fixture measurement, not native tokens:/);
 });
 
+test('only recognized manual no-change codes show a neutral unchanged result with actual before occupancy', () => {
+  for (const errorCode of ['MANUAL_COMPACTION_NO_SOURCE_CONTEXT', 'MANUAL_COMPACTION_NO_REDUCTION']) {
+    const view = contextUsageView(usage('error', 700, { errorCode }));
+    assert.equal(view.phase, 'error'); assert.equal(view.label, 'Context unchanged'); assert.equal(view.unchanged, true);
+    assert.equal(view.value, 700); assert.equal(view.busy, false);
+    assert.match(view.detail, /Check completed without changing context; prior context and originals kept/);
+    assert.doesNotMatch(view.detail, /preparation failed|successful compacted/);
+  }
+  for (const errorCode of [undefined, 'RUNTIME_FAILED', 'MANUAL_COMPACTION_NO_SOURCE_CONTEXT extra']) {
+    const view = contextUsageView(usage('error', 700, { errorCode, error: 'Nothing changed' }));
+    assert.equal(view.label, 'Check failed'); assert.equal(view.unchanged, false); assert.match(view.detail, /preparation failed/);
+  }
+  assert.equal(contextUsageView(usage('measuring', 700, { errorCode: 'MANUAL_COMPACTION_NO_REDUCTION' })).label, 'Checking context');
+});
+
 test('malformed or mismatched counters remain unknown rather than rendering invalid meter values', () => {
   for (const state of [undefined, usage('ready', -1), usage('ready', 500, { usablePromptTokens: 2048 }),
     { ...usage('ready', 500), measurement: { promptTokens: 500, contextTokens: 4096, overflow: false } }]) {

@@ -13,7 +13,7 @@ const manifestName = 'site-manifest.json';
 const browserFiles = Object.freeze([
   'index.html', 'style.css', 'app.mjs', 'loader-controller.mjs', 'model-contract.mjs',
   'runtime-adapter.mjs', 'engine-worker.mjs', 'runtime-errors.mjs', 'wasm-memory.mjs', 'runtime-profile.mjs',
-  'capabilities.mjs', 'bootstrap.mjs',
+  'capabilities.mjs', 'bootstrap.mjs', 'session-storage.mjs',
 ]);
 const memoryFiles = Object.freeze([
   'memory/workspace.mjs', 'memory/store.mjs', 'memory/events.mjs', 'memory/context.mjs', 'memory/context-panel.mjs',
@@ -40,17 +40,19 @@ const runtimeIdentities = Object.freeze({ ...RUNTIME.files, ...COMPAT.files });
 const runtimeFiles = Object.freeze(Object.keys(runtimeIdentities));
 const payloadPaths = Object.freeze([...browserFiles, 'theme/aurel-gold.css',
   ...runtimeFiles.map(name => 'runtime/' + name), 'LICENSES/rag-method.txt', 'NOTICE.txt', 'README.txt'].sort());
-const preMemoryPayloadPaths = payloadPaths.filter(name => !['wasm-memory.mjs', 'runtime-profile.mjs'].includes(name));
+const previousSessionPayloadPaths = payloadPaths.filter(name => name !== 'session-storage.mjs');
+const preMemoryPayloadPaths = previousSessionPayloadPaths.filter(name => !['wasm-memory.mjs', 'runtime-profile.mjs'].includes(name));
 const priorPayloadPaths = preMemoryPayloadPaths.filter(name => name !== 'runtime-errors.mjs');
 const legacyPayloadPaths = priorPayloadPaths.filter(name => !name.startsWith('runtime/compat/'));
 const previousContextMemoryFiles = memoryFiles.filter(name => !summaryMemoryFiles.has(name));
 const previousMemoryFiles = previousContextMemoryFiles.filter(name => !['memory/navigation.mjs', 'memory/compaction-cue.mjs', 'memory/context-panel.mjs'].includes(name));
-const previousMemoryPayloadPaths = Object.freeze([...payloadPaths, ...previousMemoryFiles.filter(name => name !== 'memory/graph-renderer.mjs' && !automaticMemoryFiles.has(name)), modelLicensePath].sort());
-const previousGraphMemoryPayloadPaths = Object.freeze([...payloadPaths, ...previousMemoryFiles.filter(name => !automaticMemoryFiles.has(name)), modelLicensePath, ...Object.keys(graphLicenses)].sort());
-const previousAutomaticMemoryPayloadPaths = Object.freeze([...payloadPaths, ...previousMemoryFiles, modelLicensePath, ...Object.keys(graphLicenses)].sort());
-const previousNavigationMemoryPayloadPaths = Object.freeze([...payloadPaths, ...previousContextMemoryFiles.filter(name => !['memory/compaction-cue.mjs', 'memory/context-panel.mjs'].includes(name)), modelLicensePath, ...Object.keys(graphLicenses)].sort());
-const previousCompactionMemoryPayloadPaths = Object.freeze([...payloadPaths, ...previousContextMemoryFiles.filter(name => name !== 'memory/context-panel.mjs'), modelLicensePath, ...Object.keys(graphLicenses)].sort());
-const previousContextMemoryPayloadPaths = Object.freeze([...payloadPaths, ...previousContextMemoryFiles, modelLicensePath, ...Object.keys(graphLicenses)].sort());
+const previousMemoryPayloadPaths = Object.freeze([...previousSessionPayloadPaths, ...previousMemoryFiles.filter(name => name !== 'memory/graph-renderer.mjs' && !automaticMemoryFiles.has(name)), modelLicensePath].sort());
+const previousGraphMemoryPayloadPaths = Object.freeze([...previousSessionPayloadPaths, ...previousMemoryFiles.filter(name => !automaticMemoryFiles.has(name)), modelLicensePath, ...Object.keys(graphLicenses)].sort());
+const previousAutomaticMemoryPayloadPaths = Object.freeze([...previousSessionPayloadPaths, ...previousMemoryFiles, modelLicensePath, ...Object.keys(graphLicenses)].sort());
+const previousNavigationMemoryPayloadPaths = Object.freeze([...previousSessionPayloadPaths, ...previousContextMemoryFiles.filter(name => !['memory/compaction-cue.mjs', 'memory/context-panel.mjs'].includes(name)), modelLicensePath, ...Object.keys(graphLicenses)].sort());
+const previousCompactionMemoryPayloadPaths = Object.freeze([...previousSessionPayloadPaths, ...previousContextMemoryFiles.filter(name => name !== 'memory/context-panel.mjs'), modelLicensePath, ...Object.keys(graphLicenses)].sort());
+const previousContextMemoryPayloadPaths = Object.freeze([...previousSessionPayloadPaths, ...previousContextMemoryFiles, modelLicensePath, ...Object.keys(graphLicenses)].sort());
+const previousSummaryMemoryPayloadPaths = Object.freeze([...previousSessionPayloadPaths, ...memoryFiles, modelLicensePath, ...Object.keys(graphLicenses)].sort());
 const memoryPayloadPaths = Object.freeze([...payloadPaths, ...memoryFiles, modelLicensePath, ...Object.keys(graphLicenses)].sort());
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const portable = value => value.split(sep).join('/');
@@ -112,7 +114,7 @@ async function managedOutput(destination, memoryPreview) {
   const previousPaths = previous.files?.map(file => file.path).sort();
   if (previous.schema !== schema || previous.managedBy !== managedBy || identitySha256 !== identity(body)
       || previous.publicReleaseQualified !== false || !Array.isArray(previous.files)
-      || ![...(memoryPreview ? [memoryPayloadPaths, previousContextMemoryPayloadPaths, previousCompactionMemoryPayloadPaths, previousNavigationMemoryPayloadPaths, previousAutomaticMemoryPayloadPaths, previousGraphMemoryPayloadPaths, previousMemoryPayloadPaths] : []), payloadPaths, preMemoryPayloadPaths, priorPayloadPaths, legacyPayloadPaths]
+      || ![...(memoryPreview ? [memoryPayloadPaths, previousSummaryMemoryPayloadPaths, previousContextMemoryPayloadPaths, previousCompactionMemoryPayloadPaths, previousNavigationMemoryPayloadPaths, previousAutomaticMemoryPayloadPaths, previousGraphMemoryPayloadPaths, previousMemoryPayloadPaths] : []), payloadPaths, previousSessionPayloadPaths, preMemoryPayloadPaths, priorPayloadPaths, legacyPayloadPaths]
         .some(paths => JSON.stringify(previousPaths) === JSON.stringify(paths))) {
     throw new Error('Refusing output with a foreign or changed managed manifest.');
   }

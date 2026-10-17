@@ -14,22 +14,25 @@ export function contextUsageView(state) {
     && measured.contextTokens === capacity && typeof measured.overflow === 'boolean';
   const labels = { unmeasured: 'Not measured', measuring: 'Checking context', compacting: 'Compacting context',
     ready: state?.compaction ? 'Context compacted' : 'Last prompt', stale: 'Last prompt', error: 'Check failed', cancelled: 'Check stopped' };
-  const label = labels[phase] || 'Not measured';
+  const unchanged = phase === 'error' && ['MANUAL_COMPACTION_NO_SOURCE_CONTEXT', 'MANUAL_COMPACTION_NO_REDUCTION'].includes(state?.errorCode);
+  const label = unchanged ? 'Context unchanged' : labels[phase] || 'Not measured';
   const quality = measured?.quality === 'estimate' ? 'Estimated' : measured?.quality === 'fixture' ? 'Fixture measurement, not native tokens' : 'Measured';
   const budgetText = validBudget ? `${budget.toLocaleString('en-US')} prompt tokens; ${reserve.toLocaleString('en-US')} reserved for the reply (${capacity.toLocaleString('en-US')} total).` : 'Context budget unavailable.';
   const count = known ? `${quality}: ${measured.promptTokens.toLocaleString('en-US')} of ${budget.toLocaleString('en-US')} usable prompt tokens.` : 'Prompt occupancy is not measured.';
   const status = phase === 'compacting' ? 'Compacting; the bar still shows the before count, not percentage completion.'
     : phase === 'measuring' ? 'Checking the next prompt; previous counts stay visible until a new measurement is available.'
-      : phase === 'error' ? 'Context preparation failed; no successful compacted prompt is claimed.'
+      : unchanged ? 'Check completed without changing context; prior context and originals kept.'
+        : phase === 'error' ? 'Context preparation failed; no successful compacted prompt is claimed.'
         : phase === 'cancelled' ? 'Context preparation stopped; no later result is applied.'
           : 'Last checked prompt; the current draft and subsequent reply are not remeasured.';
-  return { phase, label, busy: phase === 'measuring' || phase === 'compacting',
+  return { phase, label, unchanged, busy: phase === 'measuring' || phase === 'compacting',
     max: validBudget ? budget : null, value: known ? Math.min(measured.promptTokens, budget) : null,
     fraction: known ? Math.min(measured.promptTokens / budget, 1) : null,
     detail: `${count} ${budgetText} System instructions and retrieved text are included, not subtracted again. ${status} The bar endpoint is the prompt limit; compaction selects context and keeps the original transcript.` };
 }
 
-export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, workspace } = {}) {
+export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, workspace, clearStoredMemory,
+  reload = () => location.reload() } = {}) {
   const $ = id => document.getElementById(id);
   const app = $('app');
   const busyPhases = new Set(['checking', 'downloading', 'verifying', 'initializing']);
@@ -45,11 +48,13 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
   };
   let previousPhase = '', messages = [], pendingMessage, latestReport = '';
   let preparingContext = false, preparationController, unsubscribeUsage = () => {};
+  let sessionEpoch = 0, resettingMemory = false;
   function showContextUsage(state) {
     const node = $('context-usage');
     if (!node) return;
     const view = contextUsageView(state);
     node.hidden = false; node.dataset.phase = view.phase;
+    node.dataset.unchanged = String(view.unchanged);
     node.dataset.measured = String(view.value !== null);
     node.setAttribute('role', view.value === null ? 'group' : 'meter');
     node.setAttribute('aria-label', 'Prompt context'); node.setAttribute('aria-busy', String(view.busy));
@@ -70,8 +75,10 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
     preparationController?.abort();
     workspace?.context?.invalidateUsage?.();
   }
-  async function persistWorkspace() {
+  async function persistWorkspace(epoch = sessionEpoch) {
+    if (epoch !== sessionEpoch || resettingMemory) return { stale: true };
     const result = await workspace.persist();
+    if (epoch !== sessionEpoch || resettingMemory) return { stale: true };
     if (result.error) { $('chat-error').hidden = false; $('chat-error').textContent = 'Memory changed in this session, but saving failed: ' + result.error; }
     return result;
   }
@@ -141,10 +148,10 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
     app.classList.toggle('is-loading', busy);
     $('loading-stage').hidden = inChat;
     $('chat-stage').hidden = !inChat;
-    $('chat-options').hidden = !inChat;
-    $('download').disabled = busy || unsupported;
+    $('chat-options').hidden = false;
+    $('download').disabled = busy || unsupported || resettingMemory;
     $('download').hidden = unsupported;
-    $('local-file').disabled = busy || unsupported;
+    $('local-file').disabled = busy || unsupported || resettingMemory;
     $('local-file').closest('.file-choice').hidden = unsupported;
     $('unsupported-hint').hidden = !unsupported;
     if (unsupported) $('error').setAttribute('aria-describedby', 'unsupported-hint');
@@ -171,10 +178,12 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
       errorCode: state.errorCode, errorDetail: reportText(state.error), browser: reportText(navigator.userAgent), pageVisible: !document.hidden,
     }, null, 2);
     if (document.activeElement !== $('diagnostic-report')) $('diagnostic-report').value = latestReport;
-    $('send').disabled = state.phase !== 'ready' || preparingContext || workspace?.context.manualCompactionStatus?.().busy === true;
+    $('send').disabled = resettingMemory || state.phase !== 'ready' || preparingContext || workspace?.context.manualCompactionStatus?.().busy === true;
     $('stop').hidden = state.phase !== 'generating' && !preparingContext;
     $('unload').disabled = state.phase === 'generating';
-    $('clear').disabled = state.phase === 'generating';
+    $('clear').disabled = resettingMemory;
+    $('reset-settings').disabled = resettingMemory;
+    $('unload').hidden = !inChat;
     $('download').textContent = ['error', 'cancelled'].includes(state.phase) ? 'Retry cached load' : 'Load model';
     $('error').hidden = !state.error;
     $('error').textContent = state.error || '';
@@ -280,27 +289,73 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
   document.addEventListener('visibilitychange', visibility); visibility();
   $('unload').addEventListener('click', async () => { $('draft').value = $('prompt').value; stopContextPreparation(); await controller.cancel(); });
   $('stop').addEventListener('click', () => { stopContextPreparation(); void controller.cancel(); });
+  $('reset-settings').addEventListener('click', async () => {
+    if (resettingMemory) return;
+    const epoch = sessionEpoch;
+    $('effects').checked = true; app.classList.remove('quiet');
+    try {
+      const result = workspace?.automaticMemory && workspace.automaticMemory.getScope() !== 'all'
+        ? await workspace.automaticMemory.setScope('all') : undefined;
+      if (epoch !== sessionEpoch) return;
+      $('settings-status').textContent = result?.error
+        ? 'Settings reset in this session, but saving failed: ' + result.error
+        : 'Settings reset. Chat, memories and downloaded models are unchanged.';
+    } catch (error) {
+      if (epoch === sessionEpoch) $('settings-status').textContent = 'Ambient light reset. The memory filter could not be reset: ' + error.message;
+    }
+  });
+  const confirmation = $('clear-confirmation');
   $('clear').addEventListener('click', () => {
-    if (workspace) return; // Canonical preview history stays intact; no silent reset.
-    options.open = false;
-    messages = [];
-    $('chat-error').hidden = true;
-    for (const node of $('messages').querySelectorAll('.message')) node.remove();
-    $('chat-empty').hidden = false;
-    scrollLatest(true);
-    $('prompt').focus({ preventScroll: true });
+    if (resettingMemory) return;
+    options.open = false; $('clear-error').hidden = true;
+    confirmation.showModal();
+  });
+  $('clear-cancel').addEventListener('click', () => confirmation.close());
+  confirmation.addEventListener('close', () => {
+    if (!resettingMemory) { options.open = true; $('clear').focus({ preventScroll: true }); }
+  });
+  confirmation.addEventListener('cancel', event => { if (resettingMemory) event.preventDefault(); });
+  $('clear-confirm').addEventListener('click', async () => {
+    if ($('clear-confirm').disabled) return;
+    ++sessionEpoch; resettingMemory = true;
+    $('clear-confirm').disabled = true; $('clear-cancel').disabled = true;
+    $('clear-error').hidden = true;
+    stopContextPreparation(); unsubscribeUsage();
+    // Invalidate workspace saves synchronously, before controller cleanup can
+    // yield to an old reply, meter, citation or queued persistence continuation.
+    const clearing = workspace ? workspace.clear() : Promise.resolve().then(() => clearStoredMemory?.() ?? { cleared: true, durable: false });
+    messages = []; pendingMessage = null; preparingContext = false;
+    $('prompt').value = ''; $('draft').value = ''; $('chat-error').hidden = true;
+    for (const node of log.querySelectorAll('.message')) node.remove();
+    $('chat-empty').hidden = false; $('context-usage').hidden = true; scrollLatest(true); render(controller.getState());
+    const [cleared, stopped] = await Promise.allSettled([clearing, controller.cancel()]);
+    const result = cleared.status === 'fulfilled' ? cleared.value : { cleared: false, error: cleared.reason?.message || 'Local storage could not be cleared.' };
+    if (!result.cleared) {
+      $('clear-error').hidden = false;
+      $('clear-error').textContent = 'Clear did not finish. Chat is stopped in this tab. Retry clearing before continuing: ' + result.error;
+      $('clear-confirm').disabled = false;
+      return;
+    }
+    if (stopped.status === 'rejected') {
+      $('clear-error').hidden = false;
+      $('clear-error').textContent = 'Local chat and memory were cleared. Runtime cleanup did not finish; reload this page before continuing. Downloaded models are preserved.';
+      return;
+    }
+    $('settings-status').textContent = 'Chat and memory cleared. Public Space starter facts will be restored. Downloaded models are preserved.';
+    reload();
   });
   $('composer').addEventListener('submit', async event => {
     event.preventDefault();
-    if (controller.getState().phase !== 'ready' || preparingContext || workspace?.context.manualCompactionStatus?.().busy === true) return;
+    if (resettingMemory || controller.getState().phase !== 'ready' || preparingContext || workspace?.context.manualCompactionStatus?.().busy === true) return;
     const text = $('prompt').value.trim();
     if (!text) { $('prompt').focus(); return; }
     // Keep this preview bounded; no attachment/context injection or tool execution.
     if (!workspace && (messages.length >= 12 || messages.reduce((sum, item) => sum + item.content.length, text.length) > 6000)) {
-      $('chat-error').hidden = false; $('chat-error').textContent = 'This preview has reached its conversation limit. Clear the conversation to start fresh.'; return;
+      $('chat-error').hidden = false; $('chat-error').textContent = 'This preview has reached its conversation limit. Use Settings, then Clear chat & memory, to start fresh.'; return;
     }
     preparingContext = Boolean(workspace); // Reserve before persistence can yield.
     preparationController = workspace ? new AbortController() : undefined;
+    const epoch = sessionEpoch;
     render(controller.getState());
     $('chat-error').hidden = true;
     const userTurn = workspace?.conversation.append({ role: 'user', content: text });
@@ -308,32 +363,38 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
     $('prompt').value = ''; $('draft').value = '';
     resizePrompt();
     $('prompt').focus({ preventScroll: true });
-    pendingMessage = message('assistant', '', true);
+    const replyNode = message('assistant', '', true);
+    pendingMessage = replyNode;
     try {
-      if (workspace) await persistWorkspace();
+      if (workspace) await persistWorkspace(epoch);
+      if (epoch !== sessionEpoch) return;
       if (workspace) { $('send').disabled = true; $('session-status').textContent = 'Preparing context'; }
       preparationController?.signal.throwIfAborted();
       const prepared = workspace ? await workspace.prepare({ signal: preparationController.signal }) : null;
       preparationController?.signal.throwIfAborted();
       const answer = await controller.send(prepared?.messages || [{ role: 'system', content: 'You are a concise, helpful assistant. Answer in plain text.' }, ...messages]);
-      pendingMessage.querySelector('.content').textContent = answer;
-      pendingMessage.classList.remove('pending');
+      if (epoch !== sessionEpoch) return;
+      replyNode.querySelector('.content').textContent = answer;
+      replyNode.classList.remove('pending');
       if (workspace) {
         const accepted = workspace.conversation.append({ role: 'assistant', content: answer });
-        pendingMessage.id = 'turn-' + accepted.id; pendingMessage.tabIndex = -1;
+        replyNode.id = 'turn-' + accepted.id; replyNode.tabIndex = -1;
         await workspace.captureAnswerSources({ answerTurnId: accepted.id, requestSha256: prepared.measurement.requestSha256 });
-        answerSources(pendingMessage, accepted.id);
-        await persistWorkspace();
+        if (epoch !== sessionEpoch) return;
+        answerSources(replyNode, accepted.id);
+        await persistWorkspace(epoch);
       }
+      if (epoch !== sessionEpoch) return;
       scrollLatest();
       messages.push({ role: 'assistant', content: answer });
     } catch (error) {
-      pendingMessage.classList.remove('pending'); pendingMessage.classList.add('interrupted');
-      if (!pendingMessage.querySelector('.content').textContent) pendingMessage.querySelector('.content').textContent = 'No completed answer.';
+      if (epoch !== sessionEpoch) return;
+      replyNode.classList.remove('pending'); replyNode.classList.add('interrupted');
+      if (!replyNode.querySelector('.content').textContent) replyNode.querySelector('.content').textContent = 'No completed answer.';
       // Incomplete attempts remain visible, but are not silently sent as accepted history.
-      if (workspace) { $('chat-error').hidden = false; $('chat-error').textContent = error.message; await persistWorkspace(); }
+      if (workspace) { $('chat-error').hidden = false; $('chat-error').textContent = error.message; await persistWorkspace(epoch); }
       else messages.pop();
-    } finally { pendingMessage = null; preparingContext = false; preparationController = undefined; render(controller.getState()); }
+    } finally { if (epoch === sessionEpoch) { pendingMessage = null; preparingContext = false; preparationController = undefined; render(controller.getState()); } }
   });
   window.addEventListener('pagehide', () => {
     stopContextPreparation(); unsubscribeUsage();
@@ -358,7 +419,6 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
       const node = message(turn.role, turn.content, false, turn.id);
       if (turn.role === 'assistant') answerSources(node, turn.id);
     }
-    $('clear').hidden = true;
   }
   render(controller.getState());
   return { controller, getMessages: () => structuredClone(messages) };

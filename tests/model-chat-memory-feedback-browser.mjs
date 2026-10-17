@@ -16,7 +16,7 @@ let noScreenshots=false,proofName='memory-feedback',resultName;
 for(let index=0;index<options.length;index++){
   const option=options[index];
   if(option==='--no-screenshots')noScreenshots=true;
-  else if(option==='--proof-root'){proofName=options[++index];assert.equal(proofName,'summary-pocket','Alternate evidence belongs in the owned summary-pocket proof root.');}
+  else if(option==='--proof-root'){proofName=options[++index];assert.ok(['summary-pocket','conversation-repair'].includes(proofName),'Alternate evidence belongs in an explicitly owned candidate proof root.');}
   else if(option==='--result'){resultName=options[++index];assert.match(resultName||'',/^[a-z0-9-]+\.tmp$/,'Choose a compact temporary result basename.');}
   else assert.fail('Unknown verifier option: '+option);
 }
@@ -116,15 +116,18 @@ async function afterProof(){
     assert.deepEqual((await state()).calls,['prepare']);observations.push({staleSearch:'same-event-loop submit then later input over real retrieval; no search replacement',scopeFiltered:true});
   });
   await check('actual composer fixture dispatch binds admitted sources and exact submitted system text',async()=>{
-    await fresh();await page.evaluate(async()=>{const w=window.localMemoryPreview.workspace;w.conversation.append({role:'user',content:'The meeting greeting is hello.'});w.conversation.append({role:'assistant',content:'Generated acknowledgement, not user evidence.'});await w.persist();});
+    // Raw recent turns already travel in the conversation; positive memory
+    // admission needs a real, explicitly selected independent pocket source.
+    await fresh();const source=await page.evaluate(async()=>{const w=window.localMemoryPreview.workspace,turn=w.conversation.append({role:'user',content:'The meeting greeting is hello.'});w.conversation.append({role:'assistant',content:'Generated acknowledgement, not user evidence.'});await w.automaticMemory.pinPersona({turnId:turn.id,text:turn.content});await w.persist();const record=JSON.parse(w.automaticMemory.exportPersona()).records.at(-1);return{turn,record,owner:w.automaticMemory.ownerScope};});
     await plans({promptTokens:400});await page.locator('#prompt').fill('What is the meeting greeting?');await page.locator('#send').click();await waitReady();
     const sent=await page.evaluate(()=>{const w=window.localMemoryPreview.workspace,record=w.context.inspectionSnapshot().lastSubmitted;return{record,used:w.automaticMemory.snapshot().usedNodeIds,reply:window.__feedbackFixture.calls.find(call=>call.kind==='reply'),dispatchEvents:w.events.list().filter(event=>event.type==='context-dispatched').length};});
     assert.ok(sent.record?.admittedCount>0);assert.ok(sent.record.admitted.some(row=>row.text?.includes('hello')));assert.ok(sent.record.admitted.every(row=>row.role!=='assistant'));
+    const admitted=sent.record.admitted.find(row=>row.nodeId==='persona:'+source.record.id);assert.ok(admitted,'The actual explicitly pinned Persona source must be admitted');assert.equal(admitted.scope,'persona');assert.equal(admitted.text,source.turn.content);assert.equal(admitted.turnId,source.turn.id);assert.equal(admitted.contentHash,digest(source.turn.content));assert.equal(admitted.provenance.origin.turnHash,digest(source.turn.content));assert.equal(admitted.provenance.origin.lineHash,digest(admitted.text));for(const field of['actorId','personaId','conversationId'])assert.equal(admitted.provenance.origin[field],source.owner[field]);assert.equal(sent.record.scope.actorId,source.owner.actorId);assert.equal(sent.record.scope.conversationId,source.owner.conversationId);assert.equal(sent.reply.messages.reduce((count,message)=>count+message.content.split(source.turn.content).length-1,0),1,'The source appears exactly once in the submitted request');
     assert.equal(sent.record.requestSha256,digest(JSON.stringify(sent.reply.messages)));assert.equal(sent.record.exactMemoryContext,JSON.stringify(sent.reply.messages.filter(message=>message.role==='system')));assert.ok(sent.record.replyTurnId);
     assert.ok(sent.used.length>0&&sent.used.every(id=>sent.record.admitted.some(row=>row.nodeId===id)));assert.equal(sent.dispatchEvents,1);
     await openMemory();await page.locator('#memory-context-tab').click();assert.match(await page.locator('#memory-context-summary').textContent(),/included in this submitted request/);
     assert.equal(await page.locator('pre[aria-label="Exact memory context"]').textContent(),sent.record.exactMemoryContext);
-    observations.push({composerFixtureDispatch:{requestSha256:sent.record.requestSha256,admitted:sent.record.admittedCount,usedNodeIds:sent.used,submittedReplyBound:true,exactPrefix:true,nativeExecution:false}});
+    observations.push({composerFixtureDispatch:{requestSha256:sent.record.requestSha256,admitted:sent.record.admittedCount,usedNodeIds:sent.used,explicitPersonaSource:admitted.nodeId,sourceAndOwnerHashesBound:true,submittedSourceOccurrences:1,submittedReplyBound:true,exactPrefix:true,nativeExecution:false},priorFixtureFailure:{cause:'The old positive fixture expected admission of a source still included as recent raw history.',observedAdmittedCount:0,correction:'Explicitly pin the actual authored source to Persona; retain positive admission, exact quote, owner, hash, and request assertions.'}});
   });
   await check('external shared-memory freshness failure clears prior graph hits and asks for reload without dispatch',async()=>{
     await fresh();await seedSavedHello();await openMemory();await page.locator('#memory-query').fill('hello');await page.locator('#memory-query').press('Enter');await page.waitForFunction(()=>document.querySelector('[data-memory-node][data-matched="true"]'));
