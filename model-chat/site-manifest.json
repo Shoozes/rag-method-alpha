@@ -4,11 +4,11 @@
   "publicReleaseQualified": false,
   "memoryPreview": true,
   "source": {
-    "head": "0225e4b5575e1d639abdf344b92d4fe0b98ec0f5",
+    "head": "1586445d54540671bb249b9e9823163109b3bf58",
     "dirty": false,
     "reviewStatus": "unreviewed",
     "fingerprintScope": "allowlisted browser sources, generated memory core, build source, theme, licenses and packager",
-    "fingerprintSha256": "f7c0dbadf86ab60f0a60eb4c987a9b815c06b4b293f1e55152db82b3037fccde",
+    "fingerprintSha256": "bffceeddc1bd29a052c99dd8aec23ca68398005373c7e76009b369dc2028a805",
     "files": [
       {
         "path": ".artifacts/memory/graph-renderer.mjs",
@@ -32,8 +32,8 @@
       },
       {
         "path": "examples/browser-model-chat/app.mjs",
-        "bytes": 23190,
-        "sha256": "de7cdc1c76b29609234f4b2cb7d550ac50c5f3ad409f092f16f2a16359030102"
+        "bytes": 23198,
+        "sha256": "8245f1d156f23a760e85764845e9be9f571c371aee88f79fb3fbd75bda081eb0"
       },
       {
         "path": "examples/browser-model-chat/bootstrap.mjs",
@@ -72,8 +72,8 @@
       },
       {
         "path": "examples/browser-model-chat/memory/automatic-memory.mjs",
-        "bytes": 11626,
-        "sha256": "efe6573fdd179ac37792471b5a5f373f56d0ad6fb67184fa40d4f89007dfd572"
+        "bytes": 12027,
+        "sha256": "90be8bf723881be0f6e7e514567ce48a1c46c7c847d63acd3ce5a2cb89a1053a"
       },
       {
         "path": "examples/browser-model-chat/memory/build-core.mjs",
@@ -102,8 +102,8 @@
       },
       {
         "path": "examples/browser-model-chat/memory/context.mjs",
-        "bytes": 36567,
-        "sha256": "4bae557cc8f5fe31a9bec99ab376e607a842d7b53585978519548c4a61bad826"
+        "bytes": 40694,
+        "sha256": "094f50f93c37f0680966d76bd58d7c194dc4a2d55d68e44a29611cf3f7f888ad"
       },
       {
         "path": "examples/browser-model-chat/memory/conversation-index.mjs",
@@ -122,13 +122,13 @@
       },
       {
         "path": "examples/browser-model-chat/memory/panel.css",
-        "bytes": 23489,
-        "sha256": "24885fe4c86b9b7488abdc17078bf0ba26a11bbccbf8547a088c82c0ff3f40f1"
+        "bytes": 25254,
+        "sha256": "7acb7f9485297d99a39fca538509d9985e545b55c14db14495694715088f5e76"
       },
       {
         "path": "examples/browser-model-chat/memory/panel.mjs",
-        "bytes": 50776,
-        "sha256": "f2467f5bd0a624f8e8daeb3d31fd2ec9232c85357976bcb9945e0f304c1ccbec"
+        "bytes": 58928,
+        "sha256": "44b16394916a7c3b82dc5c7ad03a263231cdc32aa009806dc132a20b9d3517ab"
       },
       {
         "path": "examples/browser-model-chat/memory/rag-adapter.mjs",
@@ -139,6 +139,11 @@
         "path": "examples/browser-model-chat/memory/restore-events.mjs",
         "bytes": 6661,
         "sha256": "0fa12ae417fe7235995418b27aa24ef25eeb7177081e6fb00b41f8415fa525d9"
+      },
+      {
+        "path": "examples/browser-model-chat/memory/retained-compaction.mjs",
+        "bytes": 10038,
+        "sha256": "4633d16d713292729e276c3aa7d392f490cb088383d6098cd6140c8ef6571758"
       },
       {
         "path": "examples/browser-model-chat/memory/scoped-pockets.mjs",
@@ -161,9 +166,14 @@
         "sha256": "a1242ebb149397b00e351724c49e21f8704c4f588ebf71f3ee5c082ee5e9abaa"
       },
       {
+        "path": "examples/browser-model-chat/memory/summary-effects.mjs",
+        "bytes": 10598,
+        "sha256": "3211c1550308b4283a5724beed3f95f52ccbb236f9e5642ee5979f469d790bd9"
+      },
+      {
         "path": "examples/browser-model-chat/memory/workspace.mjs",
-        "bytes": 7433,
-        "sha256": "7c9f1bdddfa5457a76f1203f2803e13a0c65d80e03a9b3d01cc90eae02b6588c"
+        "bytes": 8072,
+        "sha256": "2eda889aa591a0425f139e728b2a3324325771b3af724e56345bf1cdf2323a25"
       },
       {
         "path": "examples/browser-model-chat/model-contract.mjs",
@@ -187,8 +197,8 @@
       },
       {
         "path": "examples/browser-model-chat/stage-static.mjs",
-        "bytes": 24714,
-        "sha256": "f8bc3505993719d51cd5ffb19f523b599f21b6b8fe8d515941e4bc4cf55c19c7"
+        "bytes": 25219,
+        "sha256": "0ab6106138c0cfc4b0c03516aa9ef9d95c94d4fd2a906df95790f3992bfd0009"
       },
       {
         "path": "examples/browser-model-chat/style.css",
@@ -294,8 +304,8 @@
   "files": [
     {
       "path": "app.mjs",
-      "bytes": 23190,
-      "sha256": "de7cdc1c76b29609234f4b2cb7d550ac50c5f3ad409f092f16f2a16359030102"
+      "bytes": 23198,
+      "sha256": "8245f1d156f23a760e85764845e9be9f571c371aee88f79fb3fbd75bda081eb0"
     },
     {
       "path": "bootstrap.mjs",
@@ -349,8 +359,8 @@
     },
     {
       "path": "memory/automatic-memory.mjs",
-      "bytes": 11626,
-      "sha256": "efe6573fdd179ac37792471b5a5f373f56d0ad6fb67184fa40d4f89007dfd572"
+      "bytes": 12027,
+      "sha256": "90be8bf723881be0f6e7e514567ce48a1c46c7c847d63acd3ce5a2cb89a1053a"
     },
     {
       "path": "memory/citations.mjs",
@@ -369,8 +379,8 @@
     },
     {
       "path": "memory/context.mjs",
-      "bytes": 36567,
-      "sha256": "4bae557cc8f5fe31a9bec99ab376e607a842d7b53585978519548c4a61bad826"
+      "bytes": 40694,
+      "sha256": "094f50f93c37f0680966d76bd58d7c194dc4a2d55d68e44a29611cf3f7f888ad"
     },
     {
       "path": "memory/conversation-index.mjs",
@@ -394,13 +404,13 @@
     },
     {
       "path": "memory/panel.css",
-      "bytes": 23489,
-      "sha256": "24885fe4c86b9b7488abdc17078bf0ba26a11bbccbf8547a088c82c0ff3f40f1"
+      "bytes": 25254,
+      "sha256": "7acb7f9485297d99a39fca538509d9985e545b55c14db14495694715088f5e76"
     },
     {
       "path": "memory/panel.mjs",
-      "bytes": 50776,
-      "sha256": "f2467f5bd0a624f8e8daeb3d31fd2ec9232c85357976bcb9945e0f304c1ccbec"
+      "bytes": 58928,
+      "sha256": "44b16394916a7c3b82dc5c7ad03a263231cdc32aa009806dc132a20b9d3517ab"
     },
     {
       "path": "memory/rag-adapter.mjs",
@@ -416,6 +426,11 @@
       "path": "memory/restore-events.mjs",
       "bytes": 6661,
       "sha256": "0fa12ae417fe7235995418b27aa24ef25eeb7177081e6fb00b41f8415fa525d9"
+    },
+    {
+      "path": "memory/retained-compaction.mjs",
+      "bytes": 10038,
+      "sha256": "4633d16d713292729e276c3aa7d392f490cb088383d6098cd6140c8ef6571758"
     },
     {
       "path": "memory/scoped-pockets.mjs",
@@ -438,9 +453,14 @@
       "sha256": "a1242ebb149397b00e351724c49e21f8704c4f588ebf71f3ee5c082ee5e9abaa"
     },
     {
+      "path": "memory/summary-effects.mjs",
+      "bytes": 10598,
+      "sha256": "3211c1550308b4283a5724beed3f95f52ccbb236f9e5642ee5979f469d790bd9"
+    },
+    {
       "path": "memory/workspace.mjs",
-      "bytes": 7433,
-      "sha256": "7c9f1bdddfa5457a76f1203f2803e13a0c65d80e03a9b3d01cc90eae02b6588c"
+      "bytes": 8072,
+      "sha256": "2eda889aa591a0425f139e728b2a3324325771b3af724e56345bf1cdf2323a25"
     },
     {
       "path": "model-contract.mjs",
@@ -513,5 +533,5 @@
       "sha256": "4baf1abc8a47bb8eb7a41fdc1e924cf8ac80f4645f4524611a6d7ecb3712983e"
     }
   ],
-  "identitySha256": "119dc77880499bc8b72b2691b6ef9281421485fa24f4d2031244a490afccecaf"
+  "identitySha256": "d0d557e1e7211b815a2b9a2b792baff55014ccfa889cfe73a737ae0f1fa75b46"
 }

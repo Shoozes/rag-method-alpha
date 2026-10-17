@@ -1,6 +1,7 @@
 // Experimental source-linked extractive compaction, not fact admission.
 import { extractStructuredContext } from './structured-context.mjs';
 import { extractAutomaticContext } from './automatic-context.mjs';
+import { compactionPolicyHash, retainedCompactionData, retainedSourceTurnIds, retainedSummaryNode, validateRetainedCompaction } from './retained-compaction.mjs';
 const clone = value => structuredClone(value);
 const immutable = value => {
   const copy = clone(value);
@@ -120,9 +121,15 @@ function createInspectionRecord({ state, queryId, messages, measurement, automat
   return record;
 }
 
-export function createContextManager({ conversation, memory, retrieval, core, automaticMemory, measure, events, getControllerState, capacity = 2048, reserve = 160 }) {
+export function createContextManager({ conversation, memory, retrieval, core, automaticMemory, measure, events, getControllerState,
+  retainedCompaction = null, ownerScope, capacity = 2048, reserve = 160 }) {
   if (typeof measure !== 'function' || !Number.isSafeInteger(capacity) || !Number.isSafeInteger(reserve) || reserve < 1 || reserve >= capacity) throw Error('Native context meter and valid budget required.');
-  let cutoff = 0, compacted = null, cycle = 0, serial = 0, preparing = false, prepared;
+  let cutoff = retainedCompaction?.cutoff ?? 0, compacted = retainedCompaction?.summary ?? null,
+    cycle = Math.max(0, ...(events?.list?.() || []).filter(event => event.type === 'compacted').map(event => event.cycle || 0)), serial = 0, preparing = false, prepared;
+  let retained = retainedCompaction;
+  const compactionOwner = ownerScope ?? scopeOf(conversation.snapshot());
+  const automaticRetentionIdentity = () => automaticMemory?.retentionIdentity ? automaticMemory.retentionIdentity() : automaticMemory?.identity();
+  let retainedRecordIdentity = JSON.stringify(memory?.snapshot().records || []), retainedAutomaticIdentity = automaticRetentionIdentity();
   let disposed = false, activePreparation, preparedAbortCleanup, usageBinding;
   const manualRequest = Symbol('manual-compaction');
   const usageObservers = new Set();
@@ -134,8 +141,19 @@ export function createContextManager({ conversation, memory, retrieval, core, au
   let usage = { phase: 'unmeasured', capacity, reserve, usablePromptTokens: capacity - reserve,
     measurement: null, conversationVersion: null, compaction: null, error: null };
   // Restored history may contain old model echoes of a forgotten record.
-  let memoryIdentity = memory?.snapshot().records.length ? null : '[]';
-  let automaticIdentity = automaticMemory?.getBlockedTurnIds().length ? null : automaticMemory?.identity();
+  let memoryIdentity = retained ? retainedRecordIdentity : memory?.snapshot().records.length ? null : '[]';
+  let automaticIdentity = retained ? automaticMemory?.identity() : automaticMemory?.getBlockedTurnIds().length ? null : automaticMemory?.identity();
+  function retentionStatus() {
+    if (!retained) return { available: false, reason: 'no-retained-summary' };
+    try {
+      if (JSON.stringify(memory?.snapshot().records || []) !== retainedRecordIdentity || automaticRetentionIdentity() !== retainedAutomaticIdentity) return { available: false, reason: 'policy-changed' };
+    } catch { return { available: false, reason: 'unavailable' }; }
+    return { available: true, reason: 'ready' };
+  }
+  function summaryStatus() {
+    const status = retentionStatus();
+    return status.available && automaticMemory && !automaticMemory.allowConversation() ? { available: false, reason: 'scope-disabled' } : status;
+  }
   const emit = event => { try { events?.append(event); } catch { /* Observation never owns context. */ } };
   const bindingCurrent = binding => {
     try { return binding && binding.conversationVersion === conversation.snapshot().version
@@ -224,6 +242,7 @@ export function createContextManager({ conversation, memory, retrieval, core, au
     disposed: 'Context manager is disposed.', unavailable: 'Manual compaction needs an authoritative model controller and event ledger.',
     'model-not-ready': 'Load the model before compacting context.', busy: 'Wait for the active reply or context operation to finish.',
     empty: 'There is no conversation to compact.', 'insufficient-history': 'There is no eligible older user context outside the protected recent exchange.',
+    'policy-refresh': 'Memory policy changed. Send an ordinary message to refresh checked context before compacting older history.',
     'scope-disabled': 'Conversation context is disabled in the current memory scope.',
   }[reason] || 'Manual compaction is unavailable.');
   function manualReadiness() {
@@ -240,7 +259,9 @@ export function createContextManager({ conversation, memory, retrieval, core, au
     const end = recentCutoff(state.turns, start);
     const protectedIds = new Set([...records.flatMap(record => record.sourceTurnIds), ...(automaticMemory?.getBlockedTurnIds() || [])]);
     const eligibleIds = state.turns.slice(start, end).filter(turn => turn.role === 'user' && !protectedIds.has(turn.id)).map(turn => turn.id);
-    return { start, end, eligibleIds };
+    const previousEnd = recentCutoff(state.turns, cutoff);
+    const refreshEligible = policyRefresh && state.turns.slice(cutoff, previousEnd).some(turn => turn.role === 'user' && !protectedIds.has(turn.id));
+    return { start, end, eligibleIds, refreshEligible };
   }
   function manualCompactionStatus() {
     let reason = disposed ? 'disposed' : preparing ? 'busy' : manualReadiness();
@@ -251,7 +272,7 @@ export function createContextManager({ conversation, memory, retrieval, core, au
         else if (automaticMemory && !automaticMemory.allowConversation()) reason = 'scope-disabled';
         else {
           const plan = manualPlan(state, memory?.snapshot().records || []);
-          if (plan.end <= plan.start || !plan.eligibleIds.length) reason = 'insufficient-history';
+          if (plan.end <= plan.start || !plan.eligibleIds.length) reason = plan.refreshEligible ? 'policy-refresh' : 'insufficient-history';
         }
       } catch { reason = 'unavailable'; }
     }
@@ -259,6 +280,9 @@ export function createContextManager({ conversation, memory, retrieval, core, au
   }
   const manager = Object.freeze({
     snapshot: () => clone({ cutoff, cycle, compacted }),
+    summarySnapshot: () => summaryStatus().available ? retainedSummaryNode(retained) : null,
+    summaryStatus: () => immutable(summaryStatus()),
+    exportCompaction: () => retentionStatus().available ? clone(retained) : null,
     manualCompactionStatus,
     compactNow({ signal } = {}) { return manager.prepare({ signal, [manualRequest]: true }); },
     usageSnapshot,
@@ -309,6 +333,7 @@ export function createContextManager({ conversation, memory, retrieval, core, au
       const records = memory ? memory.snapshot().records : [];
       const recordIdentity = JSON.stringify(records);
       const autoIdentity = automaticMemory?.identity();
+      const autoRetentionIdentity = automaticRetentionIdentity();
       // A correction/forget invalidates previous model answers as well as old
       // excerpts. Reproject from originals so stale derived facts cannot return.
       const policyRefresh = recordIdentity !== memoryIdentity || autoIdentity !== automaticIdentity;
@@ -318,9 +343,10 @@ export function createContextManager({ conversation, memory, retrieval, core, au
       const plan = manual ? manualPlan(state, records) : null;
       const currentSummary = candidateCutoff > 0 ? await abortable(sourceSummary(state.turns.slice(0, candidateCutoff), records, query), signal) : null;
       checkAbort(signal);
-      const automaticResult = automaticMemory ? await abortable(automaticMemory.prepareContext({ query, excludeTurnId: queryTurn.id }), signal) : { hits: [] };
+      const automaticResult = automaticMemory ? await abortable(automaticMemory.prepareContext({ query, excludeTurnId: queryTurn.id,
+        excludeTurnIds: retainedSourceTurnIds(currentSummary) }), signal) : { hits: [] };
       checkAbort(signal);
-      const automaticHits = automaticResult.hits;
+      let automaticHits = automaticResult.hits;
       if (automaticHits.some(hit => !['user', 'source'].includes(hit.role))) throw Error('Generated text cannot become quoted user evidence.');
       const result = memory && retrieval && (!automaticMemory || automaticMemory.allowConversation()) ? await abortable(retrieval.search({ queryId, query, records, scope: scopeOf(state) }), signal) : { queryId, hits: [] };
       checkAbort(signal);
@@ -342,6 +368,8 @@ export function createContextManager({ conversation, memory, retrieval, core, au
         if (manual && (!nextSummary?.items?.some(item => plan.eligibleIds.includes(item.turnId)) || nextSummary.contentHash === currentSummary?.contentHash)) {
           throw new ManualCompactionError('MANUAL_COMPACTION_NO_SOURCE_CONTEXT', 'No new eligible authored passage can be retained by the existing compaction pipeline.');
         }
+        const represented = new Set(retainedSourceTurnIds(nextSummary));
+        automaticHits = automaticHits.filter(hit => hit.kind !== 'conversation' || !represented.has(hit.turnId));
         messages = assemble(state.turns.slice(nextCutoff), evidence, nextSummary, automaticHits);
         checkReady();
         after = await inspect(messages, signal);
@@ -351,14 +379,39 @@ export function createContextManager({ conversation, memory, retrieval, core, au
       if (conversation.snapshot().version !== state.version || (memory && JSON.stringify(memory.snapshot().records) !== JSON.stringify(records))
         || automaticMemory && autoIdentity !== automaticMemory.identity()) throw Error('Conversation or memory changed while preparing context; retry against current state.');
       checkAbort(signal);
-      if (!manual && policyRefresh) { cutoff = candidateCutoff; compacted = currentSummary; memoryIdentity = recordIdentity; automaticIdentity = autoIdentity; }
-      if (!manual && nextSummary) {
-        cutoff = nextCutoff; compacted = nextSummary; cycle++;
-        emit({ type: 'compacted', cycle, strategy: compacted.strategy, sourceTurnIds: compacted.sources.map(source => source.turnId),
-          sourceHashes: compacted.sources.map(source => source.contentHash), summaryHash: compacted.contentHash,
-          beforePromptTokens: before.promptTokens, afterPromptTokens: after.promptTokens, capacity, reserve,
-          requestBeforeSha256: before.requestSha256, requestAfterSha256: after.requestSha256, conversationVersion: state.version });
+      const eventData = nextSummary ? { type: 'compacted', ...(manual ? { trigger: 'manual' } : {}), cycle: cycle + 1, strategy: nextSummary.strategy,
+        sourceTurnIds: nextSummary.sources.map(source => source.turnId), sourceHashes: nextSummary.sources.map(source => source.contentHash),
+        summaryHash: nextSummary.contentHash, beforePromptTokens: before.promptTokens, afterPromptTokens: after.promptTokens, capacity, reserve,
+        requestBeforeSha256: before.requestSha256, requestAfterSha256: after.requestSha256, conversationVersion: state.version } : null;
+      let nextRetained = null;
+      if (nextSummary?.items?.length && events?.list && events?.append) {
+        const policyHash = await abortable(compactionPolicyHash(recordIdentity, autoRetentionIdentity), signal);
+        const candidate = retainedCompactionData({ owner: compactionOwner, eventId: 'pending', cutoff: nextCutoff,
+          cycle: cycle + 1, conversationVersion: state.version, policyHash, summary: nextSummary });
+        nextRetained = await abortable(validateRetainedCompaction({ retained: candidate, conversation: state,
+          events: [{ ...eventData, id: 'pending' }], owner: compactionOwner, policyHash,
+          protectedTurnIds: [...records.flatMap(record => record.sourceTurnIds), ...(automaticMemory?.getBlockedTurnIds() ?? [])] }), signal);
       }
+      const commitCompaction = () => {
+        // Own the output before observers see the actual committed event. A
+        // ledger refusal restores all previous state; observers cannot roll it back.
+        const previous = { cutoff, compacted, cycle, retained, retainedRecordIdentity, retainedAutomaticIdentity };
+        cutoff = nextCutoff; compacted = nextSummary; cycle++;
+        retained = nextRetained ? { ...nextRetained, eventId: 'e-' + (events.list().length + 1) } : null;
+        retainedRecordIdentity = recordIdentity; retainedAutomaticIdentity = autoRetentionIdentity;
+        try {
+          if (events?.append) events.append(eventData);
+        } catch (error) {
+          ({ cutoff, compacted, cycle, retained, retainedRecordIdentity, retainedAutomaticIdentity } = previous); throw error;
+        }
+      };
+      // Hash validation introduced asynchronous work: recheck all canonical
+      // bindings before allowing either automatic or manual commit.
+      if (conversation.snapshot().version !== state.version || JSON.stringify(memory?.snapshot().records || []) !== recordIdentity
+        || automaticMemory && autoIdentity !== automaticMemory.identity()) throw Error('Conversation or memory changed while preparing context; retry against current state.');
+      checkReady();
+      if (!manual && policyRefresh) { cutoff = candidateCutoff; compacted = currentSummary; memoryIdentity = recordIdentity; automaticIdentity = autoIdentity; }
+      if (!manual && nextSummary) commitCompaction();
       checkAbort(signal);
       const summary = nextSummary || currentSummary;
       const quoteSources = summary?.items?.map(item => ({
@@ -372,7 +425,9 @@ export function createContextManager({ conversation, memory, retrieval, core, au
           || source.turnId === hit.turnId && source.offsets.start === hit.offsets.start && source.offsets.end === hit.offsets.end)) continue;
         extractiveSources.push({ key: 'chat.' + hit.turnId, turnId: hit.turnId, turnHash: hit.turnHash, offsets: { ...hit.offsets }, lineHash: hit.lineHash });
       }
-      if (!manual) prepared = { serialized: JSON.stringify(messages), recordIdentity, autoIdentity, automaticHits, conversationVersion: state.version, signal: externalSignal,
+      if (!manual) prepared = { serialized: JSON.stringify(messages), recordIdentity, autoIdentity,
+        usedNodeRefs: [...automaticHits, ...(summary?.items || []).map(item => ({ nodeId: 'turn:' + item.turnId }))],
+        conversationVersion: state.version, signal: externalSignal,
         event: { type: 'context-dispatched', queryId, recordIds: evidence.map(hit => hit.recordId), versions: evidence.map(hit => hit.version),
           sourceTurnIds: [...new Set(evidence.flatMap(hit => hit.sourceTurnIds))], promptTokens: after.promptTokens,
           requestSha256: after.requestSha256, conversationVersion: state.version, policyRefresh,
@@ -395,11 +450,8 @@ export function createContextManager({ conversation, memory, retrieval, core, au
           || automaticMemory && autoIdentity !== automaticMemory.identity()) throw Error('Conversation or memory changed while preparing context; retry against current state.');
         // No async work or cancellation boundary follows this atomic commit. A
         // manual preview never creates a provider-dispatch authorization.
-        events.append({ type: 'compacted', trigger: 'manual', cycle: cycle + 1, strategy: nextSummary.strategy,
-          sourceTurnIds: nextSummary.sources.map(source => source.turnId), sourceHashes: nextSummary.sources.map(source => source.contentHash),
-          summaryHash: nextSummary.contentHash, beforePromptTokens: before.promptTokens, afterPromptTokens: after.promptTokens, capacity, reserve,
-          requestBeforeSha256: before.requestSha256, requestAfterSha256: after.requestSha256, conversationVersion: state.version });
-        cutoff = nextCutoff; compacted = nextSummary; cycle++; memoryIdentity = recordIdentity; automaticIdentity = autoIdentity;
+        commitCompaction();
+        memoryIdentity = recordIdentity; automaticIdentity = autoIdentity;
         usageBinding = { recordIdentity, autoIdentity, conversationVersion: state.version }; committed = true;
         if (record) record.purpose = 'manual-compaction';
       }
@@ -435,7 +487,7 @@ export function createContextManager({ conversation, memory, retrieval, core, au
       this.validateDispatch(messages);
       const submitted = inspection.latestPrepared?.requestSha256 === prepared.event.requestSha256 ? inspection.latestPrepared : null;
       preparedAbortCleanup?.(); preparedAbortCleanup = undefined;
-      emit(prepared.event); automaticMemory?.markUsed(prepared.automaticHits); prepared = undefined;
+      emit(prepared.event); automaticMemory?.markUsed(prepared.usedNodeRefs); prepared = undefined;
       publishInspection({ phase: 'submitted', latestPrepared: null, lastSubmitted: submitted ? { ...submitted, phase: 'submitted' } : null,
         error: submitted ? null : 'The request was submitted, but its bounded local inspection is unavailable.' });
     },

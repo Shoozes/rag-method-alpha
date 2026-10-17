@@ -5,6 +5,7 @@ import { createContextManager } from './context.mjs';
 import { validateRetainedEvents } from './restore-events.mjs';
 import { captureAnswerCitation, validateAnswerCitations } from './citations.mjs';
 import { createAutomaticMemory } from './automatic-memory.mjs';
+import { compactionPolicyHash, validateRetainedCompaction } from './retained-compaction.mjs';
 
 export const storageKey = 'private-one-chat-memory-v1';
 const defaultOwner = { actorId: 'local-user', personaId: 'local-assistant', conversationId: 'local-chat' };
@@ -56,6 +57,7 @@ export async function createWorkspace({ adapter, core, storage, graphEnabled = t
         if (automaticMemory) ensureSharedFresh();
         const value = JSON.stringify({ schema: 'private-one-chat-memory/v1', owner: ownerScope,
           conversation: conversation.exportState(), memory: memory.exportState(), events: events.list(), answerCitations,
+          contextCompaction: context.exportCompaction(),
           ...(automaticMemory ? { automaticMemoryPolicy: automaticMemory.exportPolicy() } : {}) });
         if (value.length > 2_000_000) throw Error('Local preview storage limit reached.');
         storage.setItem(ownStorageKey, value);
@@ -80,7 +82,11 @@ export async function createWorkspace({ adapter, core, storage, graphEnabled = t
     globalState: globalBaseline ?? undefined, ensureSharedFresh, persist });
   const unsubscribeConversation = conversation.subscribe(() => automaticMemory?.notify());
   const retrieval = createRetrieval({ core, onEvent: event => events.append(event) });
-  const context = createContextManager({ conversation, memory, retrieval, core, automaticMemory, measure: (messages, options) => adapter.measure(messages, options), events, getControllerState });
+  const retainedCompaction = await validateRetainedCompaction({ retained: saved?.contextCompaction, conversation: conversation.snapshot(),
+    events: events.list(), owner: ownerScope, policyHash: await compactionPolicyHash(JSON.stringify(memory.snapshot().records), automaticMemory?.retentionIdentity()),
+    protectedTurnIds: [...memory.snapshot().records.flatMap(record => record.sourceTurnIds), ...(automaticMemory?.getBlockedTurnIds() ?? [])] });
+  const context = createContextManager({ conversation, memory, retrieval, core, automaticMemory, retainedCompaction, ownerScope,
+    measure: (messages, options) => adapter.measure(messages, options), events, getControllerState });
   const graph = graphEnabled ? createMemoryGraph(events) : undefined;
   const workspace = {
     conversation, memory, retrieval, context, events, graph, automaticMemory, ownerScope,
