@@ -5,10 +5,10 @@ An optional, separate browser entry point for one pinned local model and a bound
 Live static preview: **https://shoozes.github.io/rag-method-alpha/model-chat/**.
 The approved experimental [memory preview](https://shoozes.github.io/rag-method-alpha/model-chat/?memory=1)
 adds automatic conversation indexing, scoped keyword retrieval, an orbitable 3D
-TSL graph, expanded view and bounded Context inspection. Source is curated on
-`workspace/model-loading-onboarding`; private development history, the private
-launch wrapper and machine paths are excluded. The source-bound delivery receipt
-identifies the revision actually verified on Pages. Context selection is lossy,
+TSL graph, expanded view and bounded Context inspection. The deployed
+`site-manifest.json` identifies the exact reviewed public source revision;
+private development history, launch wrappers and machine paths are excluded.
+Context selection is lossy,
 and the 230M model can omit or invent details. See [memory setup and limits](./memory/README.md).
 The runtime automatically selects a pinned Memory32 compatibility build when
 Memory64 or JSPI is unavailable. OPFS remains required. The user reported a
@@ -16,6 +16,30 @@ successful iPhone conversation after the resource-binding fix; exact device/iOS
 and broader acceptance remain unrecorded. Use the [mobile checklist](./MOBILE.md).
 
 ## Current memory experiment
+
+### Local Markdown and message-copy candidate
+
+This branch adds a locally verified candidate; publication is a separate step.
+The deployed site's manifest remains the authority for its current contents.
+Assistant messages support a bounded Markdown subset: paragraphs, emphasis,
+flat ordered/unordered lists, inline and fenced code, and explicit absolute
+HTTP/HTTPS links. User messages remain literal. Raw HTML, images, headings,
+tables and other unsupported syntax are text, not executable content. This is
+not a full CommonMark implementation. Rendering uses DOM/text nodes; link
+schemes, credentials and control characters are checked before assigning href.
+
+The same renderer handles streaming and completed replies. Active text
+selection defers replacement until selection ends. Copy on either message role
+uses the exact original text, including Markdown; clipboard denial exposes a
+read-only manual-copy field. Neither rendering nor copying changes stored
+conversation text, prompts, source IDs or citation hashes.
+
+An explicit native `finish_reason:length` displays the unchanged 160-token
+reply limit. Missing or unrecognized reasons stay unknown, without guessing
+from text length. Completion metadata is session UI state; reloaded messages
+do not invent an earlier completion reason. Stop still unloads the model and
+requires a cache-first reload. No model or training configuration changes are
+included in this candidate.
 
 Open `?memory=1` to index accepted user and assistant messages as Conversation
 nodes. Generated assistant text is available for inspection and search, but
@@ -215,7 +239,7 @@ viewport offsets; they do not establish physical Safari keyboard behavior.
 - Cancel, stop, unload, and page teardown terminate the owned model worker. Loading can be retried with a fresh worker; cancelling a reply unloads the model too.
 - Chat is session-only. Reloading clears the transcript and draft; cached model bytes may persist in the browser. Clearing the conversation does not erase the model cache.
 - The send gate bounds accepted history to six completed turns and checks a 6,000-character history/input budget. Individual input is limited to 4,000 characters, generated replies to 160 tokens, and model context to 2,048 tokens. An interrupted attempt remains visible but is excluded from subsequent accepted history.
-- Messages render as plain text. There is no RAG context, attachment injection, saved conversation, tool execution, agent team, or autonomous orchestration in this example. Existing retrieval and graph behavior retain their own owners and entry points.
+- In this local candidate, assistant messages render the limited safe Markdown subset described above; user text stays literal. The basic mode has no RAG context, attachment injection, saved conversation, tool execution, agent team, or autonomous orchestration. The optional memory mode is described separately above. Existing retrieval and graph behavior retain their own owners and entry points.
 - The loading screen has a static usable state, optional visual effects, and reduced-motion styling. Visual effects pause when the tab is hidden; model work is not paused by visibility. Effects do not drive readiness or progress.
 
 The full-file integrity buffer and model initialization add memory pressure beyond the 153.4 MB file. A passing desktop run does not establish another browser's memory, cache, recovery, or device support.

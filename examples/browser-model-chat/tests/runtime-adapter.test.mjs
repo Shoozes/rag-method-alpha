@@ -40,6 +40,49 @@ test('fixture reply forwards accumulated token text and final result without rei
   worker.emit(request.id, 'result', 'Fixture final reply'); assert.equal(await sending, 'Fixture final reply');
 });
 
+test('reply completion is an allowlisted sidechannel and never replaces the reply string', async t => {
+  const { adapter, workers } = fixture(t);
+  for (const finishReason of ['length', 'stop', 'unknown', '<untrusted>', { reason: 'length' }]) {
+    const completions = [], sending = adapter.reply([], { onCompletion: value => completions.push(value) });
+    const worker = workers[0], request = worker.requests.at(-1);
+    worker.emit(request.id, 'completion', { finishReason, maxTokens: 160, ignored: 'private metadata' });
+    assert.deepEqual(completions, [{ finishReason: ['length', 'stop'].includes(finishReason) ? finishReason : 'unknown', maxTokens: 160 }]);
+    worker.emit(request.id, 'completion', { finishReason: 'stop', maxTokens: 160 });
+    assert.equal(completions.length, 1, 'Only the first completion event belongs to this reply');
+    worker.emit(request.id, 'result', 'Exact fixture **raw** answer');
+    assert.equal(await sending, 'Exact fixture **raw** answer');
+    worker.emit(request.id, 'completion', { finishReason: 'length', maxTokens: 160 });
+    assert.equal(completions.length, 1, 'Completed request IDs cannot emit late metadata');
+  }
+});
+
+test('invalid completion data stays unknown and observer failures do not interrupt transport', async t => {
+  const { adapter, workers } = fixture(t);
+  const hostile = Object.defineProperty({}, 'finishReason', { get() { throw Error('Private getter'); } });
+  for (const value of [null, undefined, hostile, { finishReason: 'length' }, { finishReason: 'length', maxTokens: 999 }, { finishReason: 'stop', maxTokens: '160' }]) {
+    let observed;
+    const sending = adapter.reply([], { onCompletion: completion => { observed = completion; throw Error('Observer failure'); } });
+    const worker = workers[0], id = worker.requests.at(-1).id;
+    assert.doesNotThrow(() => worker.emit(id, 'completion', value));
+    assert.deepEqual(observed, { finishReason: 'unknown', maxTokens: null });
+    worker.emit(id, 'result', 'Raw answer'); assert.equal(await sending, 'Raw answer');
+  }
+});
+
+test('completion events for prepare, aborted and previous Worker requests are ignored', async t => {
+  const { adapter, workers } = fixture(t), observed = [];
+  const loading = adapter.prepare({ source: 'remote', onCompletion: value => observed.push(value) });
+  const old = workers[0], prepareId = old.requests[0].id;
+  old.emit(prepareId, 'completion', { finishReason: 'length', maxTokens: 160 });
+  old.emit(prepareId, 'result', { cached: false, modelId: 'fixture' }); await loading;
+  const stop = new AbortController(), sending = adapter.reply([], { signal: stop.signal, onCompletion: value => observed.push(value) });
+  const oldId = old.requests.at(-1).id, rejected = assert.rejects(sending, aborted); stop.abort(); await rejected;
+  const next = adapter.reply([], { onCompletion: value => observed.push(value) });
+  old.emit(oldId, 'completion', { finishReason: 'length', maxTokens: 160 });
+  const nextWorker = workers[1]; nextWorker.emit(nextWorker.requests[0].id, 'result', 'Next answer');
+  assert.equal(await next, 'Next answer'); assert.deepEqual(observed, []);
+});
+
 test('aborting an owned worker rejects every pending request and removes its active lifetime', async t => {
   const { adapter, workers, active } = fixture(t), stop = new AbortController();
   const loading = adapter.prepare({ source: 'remote', signal: stop.signal });

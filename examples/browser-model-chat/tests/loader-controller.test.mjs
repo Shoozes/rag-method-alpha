@@ -33,6 +33,65 @@ async function loadReady(controller, adapter, result = prepared) {
   await loading;
 }
 
+test('completion metadata is committed only with successful raw reply and reset before the next send', async () => {
+  const adapter = fixtureAdapter(), controller = createLoaderController(adapter);
+  assert.equal(controller.getState().completion, null); await loadReady(controller, adapter);
+  for (const finishReason of ['length', 'stop', 'unknown']) {
+    const sending = controller.send(messages), reply = adapter.replies.at(-1);
+    assert.equal(controller.getState().completion, null);
+    reply.onCompletion({ finishReason, maxTokens: 160 });
+    assert.equal(controller.getState().completion, null, 'In-flight metadata cannot claim a completed reply');
+    reply.onCompletion({ finishReason: 'invented', maxTokens: 160 });
+    reply.resolve('Exact **raw** answer'); assert.equal(await sending, 'Exact **raw** answer');
+    assert.deepEqual(controller.getState().completion, { finishReason, maxTokens: 160 });
+    const snapshot = controller.getState(); snapshot.completion.finishReason = 'mutated';
+    assert.equal(controller.getState().completion.finishReason, finishReason);
+  }
+  const nextLoad = controller.load({ source: 'remote' });
+  assert.equal(controller.getState().completion, null);
+  for (let tries = 0; tries < 10 && adapter.loads.length < 2; tries++) await tick();
+  adapter.loads.at(-1).resolve(prepared); await nextLoad;
+  await controller.dispose(); assert.equal(controller.getState().completion, null);
+});
+
+test('missing or untrusted completion reasons stay unknown without estimating from answer length', async () => {
+  const hostile = Object.defineProperties({}, {
+    finishReason: { get() { throw Error('Private getter'); } }, maxTokens: { get() { throw Error('Private getter'); } },
+  });
+  const adapter = fixtureAdapter(), controller = createLoaderController(adapter); await loadReady(controller, adapter);
+  for (const value of [undefined, null, hostile, { finishReason: '<untrusted>', maxTokens: 160 }, { finishReason: 'length', maxTokens: 1000 }]) {
+    const sending = controller.send(messages), reply = adapter.replies.at(-1);
+    if (value !== undefined) assert.doesNotThrow(() => reply.onCompletion(value));
+    reply.resolve('Long fixture answer '.repeat(1000)); await sending;
+    assert.deepEqual(controller.getState().completion, { finishReason: 'unknown', maxTokens: value !== hostile && value?.maxTokens === 160 ? 160 : null });
+  }
+});
+
+test('cancelled, failed and disposed replies cannot leak completion metadata into another operation', async () => {
+  const adapter = fixtureAdapter(), controller = createLoaderController(adapter); await loadReady(controller, adapter);
+  const first = controller.send(messages), old = adapter.replies[0];
+  old.onCompletion({ finishReason: 'length', maxTokens: 160 });
+  const rejected = assert.rejects(first, cancelled); await controller.cancel(); await rejected;
+  old.onCompletion({ finishReason: 'length', maxTokens: 160 });
+  assert.equal(controller.getState().completion, null);
+  await loadReady(controller, adapter);
+  const next = controller.send(messages), currentReply = adapter.replies[1];
+  old.onCompletion({ finishReason: 'length', maxTokens: 160 });
+  currentReply.resolve('Second answer'); await next;
+  assert.deepEqual(controller.getState().completion, { finishReason: 'unknown', maxTokens: null });
+  const failing = controller.send(messages), failedReply = adapter.replies[2];
+  failedReply.onCompletion({ finishReason: 'length', maxTokens: 160 });
+  failedReply.reject(Error('Fixture generation failed')); await assert.rejects(failing, /Fixture generation failed/);
+  assert.equal(controller.getState().completion, null);
+  failedReply.onCompletion({ finishReason: 'stop', maxTokens: 160 });
+  assert.equal(controller.getState().completion, null);
+  await loadReady(controller, adapter);
+  const last = controller.send(messages), lastReply = adapter.replies[3], disposed = assert.rejects(last, cancelled);
+  await controller.dispose(); await disposed;
+  lastReply.onCompletion({ finishReason: 'length', maxTokens: 160 });
+  assert.equal(controller.getState().completion, null);
+});
+
 test('cold fixture load reports real bytes and becomes ready only after prepare resolves', async () => {
   const adapter = fixtureAdapter(), states = [], controller = createLoaderController(adapter, state => states.push(state));
   assert.equal(controller.getState().phase, 'idle');

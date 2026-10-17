@@ -13,7 +13,7 @@ const manifestName = 'site-manifest.json';
 const browserFiles = Object.freeze([
   'index.html', 'style.css', 'app.mjs', 'loader-controller.mjs', 'model-contract.mjs',
   'runtime-adapter.mjs', 'engine-worker.mjs', 'runtime-errors.mjs', 'wasm-memory.mjs', 'runtime-profile.mjs',
-  'capabilities.mjs', 'bootstrap.mjs', 'session-storage.mjs',
+  'capabilities.mjs', 'bootstrap.mjs', 'session-storage.mjs', 'message-renderer.mjs',
 ]);
 const memoryFiles = Object.freeze([
   'memory/workspace.mjs', 'memory/store.mjs', 'memory/events.mjs', 'memory/context.mjs', 'memory/context-panel.mjs',
@@ -40,7 +40,10 @@ const runtimeIdentities = Object.freeze({ ...RUNTIME.files, ...COMPAT.files });
 const runtimeFiles = Object.freeze(Object.keys(runtimeIdentities));
 const payloadPaths = Object.freeze([...browserFiles, 'theme/aurel-gold.css',
   ...runtimeFiles.map(name => 'runtime/' + name), 'LICENSES/rag-method.txt', 'NOTICE.txt', 'README.txt'].sort());
-const previousSessionPayloadPaths = payloadPaths.filter(name => name !== 'session-storage.mjs');
+// Each historical identity predates message rendering. Keep its exact path set
+// independent of additions to the current browser payload.
+const previousRendererPayloadPaths = payloadPaths.filter(name => name !== 'message-renderer.mjs');
+const previousSessionPayloadPaths = previousRendererPayloadPaths.filter(name => name !== 'session-storage.mjs');
 const preMemoryPayloadPaths = previousSessionPayloadPaths.filter(name => !['wasm-memory.mjs', 'runtime-profile.mjs'].includes(name));
 const priorPayloadPaths = preMemoryPayloadPaths.filter(name => name !== 'runtime-errors.mjs');
 const legacyPayloadPaths = priorPayloadPaths.filter(name => !name.startsWith('runtime/compat/'));
@@ -53,6 +56,7 @@ const previousNavigationMemoryPayloadPaths = Object.freeze([...previousSessionPa
 const previousCompactionMemoryPayloadPaths = Object.freeze([...previousSessionPayloadPaths, ...previousContextMemoryFiles.filter(name => name !== 'memory/context-panel.mjs'), modelLicensePath, ...Object.keys(graphLicenses)].sort());
 const previousContextMemoryPayloadPaths = Object.freeze([...previousSessionPayloadPaths, ...previousContextMemoryFiles, modelLicensePath, ...Object.keys(graphLicenses)].sort());
 const previousSummaryMemoryPayloadPaths = Object.freeze([...previousSessionPayloadPaths, ...memoryFiles, modelLicensePath, ...Object.keys(graphLicenses)].sort());
+const previousRendererMemoryPayloadPaths = Object.freeze([...previousRendererPayloadPaths, ...memoryFiles, modelLicensePath, ...Object.keys(graphLicenses)].sort());
 const memoryPayloadPaths = Object.freeze([...payloadPaths, ...memoryFiles, modelLicensePath, ...Object.keys(graphLicenses)].sort());
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const portable = value => value.split(sep).join('/');
@@ -114,7 +118,7 @@ async function managedOutput(destination, memoryPreview) {
   const previousPaths = previous.files?.map(file => file.path).sort();
   if (previous.schema !== schema || previous.managedBy !== managedBy || identitySha256 !== identity(body)
       || previous.publicReleaseQualified !== false || !Array.isArray(previous.files)
-      || ![...(memoryPreview ? [memoryPayloadPaths, previousSummaryMemoryPayloadPaths, previousContextMemoryPayloadPaths, previousCompactionMemoryPayloadPaths, previousNavigationMemoryPayloadPaths, previousAutomaticMemoryPayloadPaths, previousGraphMemoryPayloadPaths, previousMemoryPayloadPaths] : []), payloadPaths, previousSessionPayloadPaths, preMemoryPayloadPaths, priorPayloadPaths, legacyPayloadPaths]
+      || ![...(memoryPreview ? [memoryPayloadPaths, previousRendererMemoryPayloadPaths, previousSummaryMemoryPayloadPaths, previousContextMemoryPayloadPaths, previousCompactionMemoryPayloadPaths, previousNavigationMemoryPayloadPaths, previousAutomaticMemoryPayloadPaths, previousGraphMemoryPayloadPaths, previousMemoryPayloadPaths] : []), payloadPaths, previousRendererPayloadPaths, previousSessionPayloadPaths, preMemoryPayloadPaths, priorPayloadPaths, legacyPayloadPaths]
         .some(paths => JSON.stringify(previousPaths) === JSON.stringify(paths))) {
     throw new Error('Refusing output with a foreign or changed managed manifest.');
   }

@@ -12,14 +12,15 @@ export function createLoaderController(adapter, onState = () => {}, {
   let state = {
     phase: 'idle', source: null, modelId: null, cached: false, runtimeProfile: null,
     loaded: null, total: null, determinate: false, progress: null,
-    text: '', error: null, errorCode: null, retryable: true, capabilities: [],
+    text: '', completion: null, error: null, errorCode: null, retryable: true, capabilities: [],
     initStage: null, initDetail: null, initElapsedMs: 0, lastProgressAgeMs: 0, initEvents: [],
   };
   let generation = 0, active = null, ready = false, disposed = false, needsCleanup = false;
   let teardown = null, cancelling = null, disposing = null, unsupported = null;
   let initStarted = null, lastProgressAt = null, initTick = null;
 
-  const getState = () => ({ ...state, capabilities: state.capabilities.map(item => ({ ...item })), initEvents: state.initEvents.map(item => ({ ...item })) });
+  const getState = () => ({ ...state, completion: state.completion ? { ...state.completion } : null,
+    capabilities: state.capabilities.map(item => ({ ...item })), initEvents: state.initEvents.map(item => ({ ...item })) });
   const current = operation => !disposed && active === operation && generation === operation.id;
   const clearProgress = { loaded: null, total: null, determinate: false, progress: null };
   const isRuntimeProfile = value => value === 'memory64' || value === 'memory32-asyncify';
@@ -142,7 +143,7 @@ export function createLoaderController(adapter, onState = () => {}, {
       stage: read(event, 'stage'), detail: diagnosticText(read(event, 'detail')),
       atMs: Number.isFinite(event.atMs) && event.atMs >= 0 ? Math.floor(event.atMs) : null,
     })) : [];
-    publish({ phase: blocked ? 'unsupported' : 'error', modelId: null, ...clearProgress,
+    publish({ phase: blocked ? 'unsupported' : 'error', modelId: null, completion: null, ...clearProgress,
       ...(initStarted !== null ? initTiming() : {}),
       ...(stages.has(diagnosticStage) ? { initStage: diagnosticStage } : {}),
       ...(detailText !== null ? { initDetail: detailText } : {}),
@@ -158,7 +159,7 @@ export function createLoaderController(adapter, onState = () => {}, {
     const replaceReadyModel = ready || needsCleanup, operation = begin('load');
     stopInitClock(); initStarted = null; lastProgressAt = null;
     ready = false;
-    publish({ phase: 'checking', source, modelId: null, cached: false, runtimeProfile: null, ...clearProgress, ...clearInit, text: '', error: null, errorCode: null, retryable: true, capabilities: [] });
+    publish({ phase: 'checking', source, modelId: null, cached: false, runtimeProfile: null, ...clearProgress, ...clearInit, text: '', completion: null, error: null, errorCode: null, retryable: true, capabilities: [] });
     let prepared, preparationStarted = false;
     try {
       if (replaceReadyModel) await unload();
@@ -185,18 +186,25 @@ export function createLoaderController(adapter, onState = () => {}, {
     if (!ready) throw error('Load a model successfully before sending a message.', 'NOT_READY');
     if (!Array.isArray(messages)) throw error('Messages must be an array.', 'INVALID_MESSAGES');
     const operation = begin('reply');
-    publish({ phase: 'generating', ...clearProgress, ...clearInit, text: '', error: null });
-    let reply;
+    publish({ phase: 'generating', ...clearProgress, ...clearInit, text: '', completion: null, error: null });
+    let reply, completionSeen = false, completion = { finishReason: 'unknown', maxTokens: null };
     try {
       if (!current(operation)) throw aborted();
       reply = await abortable(adapter.reply(messages, { signal: operation.controller.signal,
         onToken: text => { if (current(operation) && typeof text === 'string') publish({ text }); },
+        onCompletion: value => {
+          if (!current(operation) || completionSeen) return;
+          completionSeen = true;
+          const reason = read(value, 'finishReason'), maxTokens = read(value, 'maxTokens');
+          completion = { finishReason: maxTokens === 160 && (reason === 'length' || reason === 'stop') ? reason : 'unknown',
+            maxTokens: maxTokens === 160 ? 160 : null };
+        },
       }), operation.controller.signal);
       if (!current(operation)) throw aborted();
       if (typeof reply !== 'string') throw new Error('The adapter returned an invalid reply.');
     } catch (cause) { return fail(operation, cause, 'Reply failed'); }
     active = null;
-    publish({ phase: 'ready', text: reply, ...clearProgress, error: null });
+    publish({ phase: 'ready', text: reply, completion, ...clearProgress, error: null });
     return reply;
   }
 
@@ -209,6 +217,7 @@ export function createLoaderController(adapter, onState = () => {}, {
     const operation = active, cancellation = ++generation;
     stopInitClock();
     active = null; ready = false;
+    publish({ completion: null });
     operation?.controller.abort();
     (async () => {
       try { await unload(); }
@@ -234,13 +243,14 @@ export function createLoaderController(adapter, onState = () => {}, {
     disposed = true; ready = false; ++generation;
     stopInitClock();
     const operation = active; active = null; operation?.controller.abort();
+    publish({ completion: null });
     (async () => {
       try { await unload(); }
       catch (cause) {
-        publish({ phase: 'error', source: null, modelId: null, cached: false, ...clearProgress, error: `Model cleanup failed: ${messageOf(cause)}` });
+        publish({ phase: 'error', source: null, modelId: null, cached: false, completion: null, ...clearProgress, error: `Model cleanup failed: ${messageOf(cause)}` });
         throw error(`Model cleanup failed: ${messageOf(cause)}`, 'CLEANUP_FAILED');
       }
-      publish({ phase: 'idle', source: null, modelId: null, cached: false, runtimeProfile: null, ...clearProgress, ...clearInit, text: '', error: null, errorCode: null, retryable: true, capabilities: [] });
+      publish({ phase: 'idle', source: null, modelId: null, cached: false, runtimeProfile: null, ...clearProgress, ...clearInit, text: '', completion: null, error: null, errorCode: null, retryable: true, capabilities: [] });
       return getState();
     })().then(completion.resolve, completion.reject);
     return disposing;

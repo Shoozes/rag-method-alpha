@@ -19,7 +19,7 @@ const hash = value => createHash('sha256').update(value).digest('hex');
 const exists = async path => { try { await lstat(path); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; } };
 const browserFiles = ['index.html', 'style.css', 'app.mjs', 'loader-controller.mjs', 'model-contract.mjs',
   'runtime-adapter.mjs', 'engine-worker.mjs', 'runtime-errors.mjs', 'wasm-memory.mjs', 'runtime-profile.mjs',
-  'capabilities.mjs', 'bootstrap.mjs', 'session-storage.mjs'];
+  'capabilities.mjs', 'bootstrap.mjs', 'session-storage.mjs', 'message-renderer.mjs'];
 const helperFiles = ['runtime-errors.mjs', 'wasm-memory.mjs', 'runtime-profile.mjs'];
 const memoryFiles = ['memory/workspace.mjs', 'memory/store.mjs', 'memory/events.mjs', 'memory/context.mjs', 'memory/context-panel.mjs',
   'memory/structured-context.mjs', 'memory/automatic-context.mjs', 'memory/rag-adapter.mjs', 'memory/restore-events.mjs',
@@ -32,6 +32,7 @@ const compactionAdded = ['memory/compaction-cue.mjs'];
 const contextAdded = ['memory/context-panel.mjs'];
 const summaryAdded = ['memory/retained-compaction.mjs', 'memory/summary-effects.mjs'];
 const sessionAdded = ['session-storage.mjs'];
+const rendererAdded = ['message-renderer.mjs'];
 const modelLicensePath = 'LICENSES/lfm-open-license-1.0.txt';
 const graphAdded = ['memory/graph-renderer.mjs', 'LICENSES/forcegraph-tsl.txt', 'LICENSES/three.txt'];
 const previewAdded = [...memoryFiles, modelLicensePath, ...graphAdded.filter(name => name.startsWith('LICENSES/'))];
@@ -104,7 +105,7 @@ test('missing or wrong pinned runtime bytes fail before creating output', async 
   assert.equal(await exists(output), false);
 });
 
-test('explicit preview export has exactly 47 hashed payload files plus manifest, complete licenses and safe refresh', async t => {
+test('explicit preview export has exactly 48 hashed payload files plus manifest, complete licenses and safe refresh', async t => {
   // The intended delivery site is the sole delivery output. No second runtime tree
   // or model is created; failure cases above use only a few fixture bytes.
   const staged = await stageStatic();
@@ -127,7 +128,7 @@ test('explicit preview export has exactly 47 hashed payload files plus manifest,
     'runtime/LICENSE', 'runtime/compat/wllama.js', 'runtime/compat/wllama.wasm', 'LICENSES/rag-method.txt', 'NOTICE.txt', 'README.txt',
     ...previewAdded].sort();
   assert.deepEqual(manifest.files.map(file => file.path).sort(), expected);
-  assert.equal(manifest.files.length, 47);
+  assert.equal(manifest.files.length, 48);
   const actual = [];
   async function visit(directory, prefix = '') {
     for (const item of await readdir(directory, { withFileTypes: true })) {
@@ -137,7 +138,7 @@ test('explicit preview export has exactly 47 hashed payload files plus manifest,
   }
   await visit(site);
   assert.deepEqual(actual.sort(), [...expected, 'site-manifest.json'].sort());
-  assert.equal(actual.length, 48, 'no additional files, source, models or private products');
+  assert.equal(actual.length, 49, 'no additional files, source, models or private products');
   for (const file of manifest.files) {
     const bytes = await readFile(join(site, file.path));
     assert.equal(bytes.length, file.bytes, file.path);
@@ -147,7 +148,7 @@ test('explicit preview export has exactly 47 hashed payload files plus manifest,
   for (const [name, contract] of Object.entries({ ...RUNTIME.files, ...COMPAT.files })) {
     assert.equal(hash(await readFile(join(site, 'runtime', name))), contract.sha256, 'retained runtime: ' + name);
   }
-  for (const helperPath of [...helperFiles, ...memoryFiles]) {
+  for (const helperPath of [...helperFiles, ...rendererAdded, ...memoryFiles]) {
     const helperSource = await readFile(['memory/rag-core.mjs', 'memory/graph-renderer.mjs'].includes(helperPath)
       ? join(root, '.artifacts', helperPath) : join(root, 'examples/browser-model-chat', helperPath));
     const helperManifest = manifest.files.find(file => file.path === helperPath);
@@ -168,6 +169,7 @@ test('explicit preview export has exactly 47 hashed payload files plus manifest,
   assert.ok(manifest.source.files.some(file => file.path === 'examples/browser-model-chat/memory/build-graph.mjs'));
   assert.ok(manifest.source.files.some(file => file.path === 'modules/browser-rag-ts/src/application/memoryGraphLayout.ts'));
   assert.ok(manifest.source.files.some(file => file.path === 'examples/browser-model-chat/memory/context-panel.mjs'));
+  assert.ok(manifest.source.files.some(file => file.path === 'examples/browser-model-chat/message-renderer.mjs'));
   const notices = await readFile(join(site, 'NOTICE.txt'), 'utf8');
   assert.match(notices, /@wllama\/wllama 3\.5\.1: MIT/);
   assert.match(notices, /@wllama\/wllama-compat 3\.5\.1: MIT/);
@@ -209,27 +211,29 @@ test('explicit preview export has exactly 47 hashed payload files plus manifest,
   assert.equal(await readFile(join(foreign, '.env'), 'utf8'), 'PRIVATE-FIXTURE-KEEP');
 });
 
-test('the sole managed site migrates exact 46-file summary, 44-file Context, 43-file compaction, 42-file navigation, 41-file automatic and older previews; partial summary and memory sets are refused', async () => {
+test('the sole managed site migrates exact 47-file session, 46-file summary, 44-file Context, 43-file compaction, 42-file navigation, 41-file automatic and older previews; mixed historical and partial memory sets are refused', async () => {
   const manifestBytes = await readFile(join(site, 'site-manifest.json'));
   const manifest = JSON.parse(manifestBytes);
   const retained = new Map();
-  for (const name of [...previewAdded, ...sessionAdded, ...helperFiles, 'runtime/compat/wllama.js', 'runtime/compat/wllama.wasm']) {
+  for (const name of [...previewAdded, ...sessionAdded, ...rendererAdded, ...helperFiles, 'runtime/compat/wllama.js', 'runtime/compat/wllama.wasm']) {
     retained.set(name, await readFile(join(site, name)));
   }
   try {
     for (const { absent, previousCount, kind } of [
-      { absent: sessionAdded, previousCount: 46, kind: 'session' },
-      { absent: [...sessionAdded, ...summaryAdded], previousCount: 44, kind: 'summary' },
-      { absent: [...sessionAdded, ...summaryAdded, ...contextAdded], previousCount: 43, kind: 'context' },
-      { absent: [...sessionAdded, ...summaryAdded, ...contextAdded, ...compactionAdded], previousCount: 42, kind: 'compaction' },
-      { absent: [...sessionAdded, ...summaryAdded, ...contextAdded, ...compactionAdded, ...navigationAdded], previousCount: 41 },
-      { absent: [...sessionAdded, ...summaryAdded, ...contextAdded, ...compactionAdded, ...navigationAdded, ...automaticAdded] },
-      { absent: [...sessionAdded, ...summaryAdded, ...contextAdded, ...compactionAdded, ...navigationAdded, ...automaticAdded, ...graphAdded] },
+      { absent: rendererAdded, previousCount: 47, kind: 'renderer' },
+      { absent: [...rendererAdded, ...sessionAdded], previousCount: 46, kind: 'session' },
+      { absent: [...rendererAdded, ...sessionAdded, ...summaryAdded], previousCount: 44, kind: 'summary' },
+      { absent: [...rendererAdded, ...sessionAdded, ...summaryAdded, ...contextAdded], previousCount: 43, kind: 'context' },
+      { absent: [...rendererAdded, ...sessionAdded, ...summaryAdded, ...contextAdded, ...compactionAdded], previousCount: 42, kind: 'compaction' },
+      { absent: [...rendererAdded, ...sessionAdded, ...summaryAdded, ...contextAdded, ...compactionAdded, ...navigationAdded], previousCount: 41 },
+      { absent: [...rendererAdded, ...sessionAdded, ...summaryAdded, ...contextAdded, ...compactionAdded, ...navigationAdded, ...automaticAdded] },
+      { absent: [...rendererAdded, ...sessionAdded, ...summaryAdded, ...contextAdded, ...compactionAdded, ...navigationAdded, ...automaticAdded, ...graphAdded] },
       { absent: previewAdded },
-      { absent: [...sessionAdded, ...previewAdded] },
-      { absent: [...sessionAdded, ...previewAdded, 'wasm-memory.mjs', 'runtime-profile.mjs'] },
-      { absent: [...sessionAdded, ...previewAdded, ...helperFiles] },
-      { absent: [...sessionAdded, ...previewAdded, ...helperFiles, 'runtime/compat/wllama.js', 'runtime/compat/wllama.wasm'] },
+      { absent: [...rendererAdded, ...previewAdded], previousCount: 22, kind: 'base' },
+      { absent: [...rendererAdded, ...sessionAdded, ...previewAdded] },
+      { absent: [...rendererAdded, ...sessionAdded, ...previewAdded, 'wasm-memory.mjs', 'runtime-profile.mjs'] },
+      { absent: [...rendererAdded, ...sessionAdded, ...previewAdded, ...helperFiles] },
+      { absent: [...rendererAdded, ...sessionAdded, ...previewAdded, ...helperFiles, 'runtime/compat/wllama.js', 'runtime/compat/wllama.wasm'] },
     ]) {
       const { identitySha256, ...previous } = structuredClone(manifest);
       previous.files = previous.files.filter(file => !absent.includes(file.path));
@@ -242,20 +246,27 @@ test('the sole managed site migrates exact 46-file summary, 44-file Context, 43-
       const refreshed = await stageStatic();
       assert.deepEqual(refreshed.manifest, manifest, absent.join(', '));
       for (const name of absent) assert.deepEqual(await readFile(join(site, name)), retained.get(name), name);
+      if (kind === 'renderer') {
+        assert.equal(refreshed.manifest.files.length, 48, 'old 47-file managed site adds exactly the message renderer');
+        const app = await readFile(join(site, 'app.mjs'), 'utf8');
+        assert.match(app, /from ['"]\.\/message-renderer\.mjs['"]/);
+        const dependency = await import(pathToFileURL(join(site, 'message-renderer.mjs')).href);
+        assert.ok(Object.keys(dependency).length > 0, 'the shared basic/memory renderer is an executable packaged module');
+      }
       if (kind === 'session') {
-        assert.equal(refreshed.manifest.files.length, 47, 'old 46-file managed site adds exactly the shared session-storage module');
+        assert.equal(refreshed.manifest.files.length, 48, 'old 46-file managed site adds shared session storage and the message renderer');
         const helper = await import(pathToFileURL(join(site, 'session-storage.mjs')).href);
         assert.ok(Object.keys(helper).length > 0, 'the shared basic/memory session dependency is an executable packaged module');
       }
       if (kind === 'summary') {
-        assert.equal(refreshed.manifest.files.length, 47, 'old 44-file managed site adds both summary modules and shared session storage');
+        assert.equal(refreshed.manifest.files.length, 48, 'old 44-file managed site adds summary modules, shared session storage and the message renderer');
         for (const [name, exportName] of [['retained-compaction', 'validateRetainedCompaction'], ['summary-effects', 'createSummaryEffects']]) {
           const dependency = await import(pathToFileURL(join(site, 'memory/' + name + '.mjs')).href);
           assert.equal(typeof dependency[exportName], 'function', 'new summary dependency is an executable packaged module');
         }
       }
       if (kind === 'context') {
-        assert.equal(refreshed.manifest.files.length, 47, 'old 43-file managed site adds Context, both summary modules and shared session storage');
+        assert.equal(refreshed.manifest.files.length, 48, 'old 43-file managed site adds Context, summary modules, shared session storage and the message renderer');
         const inspectorPath = new URL('./context-panel.mjs', pathToFileURL(join(site, 'memory/panel.mjs')));
         assert.match(await readFile(join(site, 'memory/panel.mjs'), 'utf8'), /from ['"]\.\/context-panel\.mjs['"]/);
         const inspector = await import(inspectorPath.href);
@@ -271,6 +282,20 @@ test('the sole managed site migrates exact 46-file summary, 44-file Context, 43-
         const cue = await import(cuePath.href);
         assert.equal(typeof cue.createCompactionCue, 'function', 'new panel dependency is an executable packaged module');
         assert.equal(cue.createCompactionCue().take([]), null, 'module import creates no fabricated compaction activity');
+      }
+      if (absent.includes(rendererAdded[0]) && !['renderer', 'base'].includes(kind)) {
+        // Adding the new renderer to an older incomplete dependency table must
+        // not invent a recognized historical managed-site identity.
+        const hybridAbsent = absent.filter(name => !rendererAdded.includes(name));
+        const { identitySha256, ...hybrid } = structuredClone(manifest);
+        hybrid.files = hybrid.files.filter(file => !hybridAbsent.includes(file.path));
+        hybrid.source.files = hybrid.source.files.filter(file => !hybridAbsent.some(name => file.path === 'examples/browser-model-chat/' + name));
+        hybrid.source.fingerprintSha256 = hash(JSON.stringify(hybrid.source.files));
+        for (const name of hybridAbsent) await rm(join(site, name));
+        await writeFile(join(site, 'site-manifest.json'), JSON.stringify({ ...hybrid, identitySha256: hash(JSON.stringify(hybrid)) }));
+        await assert.rejects(stageStatic(), /foreign or changed/, 'new renderer does not alter the exact historical path set: ' + hybridAbsent.join(', '));
+        for (const name of hybridAbsent) await writeFile(join(site, name), retained.get(name));
+        await writeFile(join(site, 'site-manifest.json'), manifestBytes);
       }
     }
     for (const missing of [...summaryAdded, 'memory/navigation.mjs', 'memory/automatic-context.mjs']) {

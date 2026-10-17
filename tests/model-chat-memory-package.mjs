@@ -23,7 +23,7 @@ const memoryAssets = ['workspace', 'store', 'events', 'context', 'context-panel'
   'restore-events', 'citations', 'panel', 'navigation', 'compaction-cue', 'retained-compaction', 'summary-effects', 'rag-core', 'graph-renderer'].map(name => `memory/${name}.mjs`).concat('memory/panel.css');
 const payloadPaths = ['index.html', 'style.css', 'app.mjs', 'loader-controller.mjs', 'model-contract.mjs',
   'runtime-adapter.mjs', 'engine-worker.mjs', 'runtime-errors.mjs', 'wasm-memory.mjs', 'runtime-profile.mjs',
-  'capabilities.mjs', 'bootstrap.mjs', 'session-storage.mjs', 'theme/aurel-gold.css', 'runtime/index.js', 'runtime/wllama.wasm',
+  'capabilities.mjs', 'bootstrap.mjs', 'session-storage.mjs', 'message-renderer.mjs', 'theme/aurel-gold.css', 'runtime/index.js', 'runtime/wllama.wasm',
   'runtime/LICENSE', 'runtime/compat/wllama.js', 'runtime/compat/wllama.wasm', 'LICENSES/rag-method.txt',
   'LICENSES/lfm-open-license-1.0.txt', 'LICENSES/forcegraph-tsl.txt', 'LICENSES/three.txt', 'NOTICE.txt', 'README.txt', ...memoryAssets].sort();
 const expectedFiles = [...payloadPaths, 'site-manifest.json'].sort();
@@ -121,11 +121,11 @@ try {
       boundary: { actualNativeCalls: previous.boundary?.actualNativeCalls, runtimeWorkersCreated: previous.boundary?.runtimeWorkersCreated,
         externalRequestCount: previous.boundary?.externalRequests?.length, pageErrorCount: previous.boundary?.pageErrors?.length } });
   }
-  await check('exact 47-file payload, complete license pins, source and manifest identities', async () => {
+  await check('exact 48-file payload, complete license pins, source and manifest identities', async () => {
     assert.ok(inside(resolve(root, '.artifacts/model-chat'), packageRoot), 'package stays in its explicitly owned artifact parent');
     assert.equal(await realpath(packageRoot), packageRoot, 'package root has no linked ancestor');
     assert.deepEqual(await filesBelow(packageRoot), expectedFiles);
-    assert.equal(payloadPaths.length, 47); assert.equal(expectedFiles.length, 48);
+    assert.equal(payloadPaths.length, 48); assert.equal(expectedFiles.length, 49);
     const manifestBytes = await readFile(join(packageRoot, 'site-manifest.json'));
     assert.equal(digest(manifestBytes), expectedManifest, 'expected reviewed manifest bytes');
     manifest = JSON.parse(manifestBytes);
@@ -181,7 +181,7 @@ try {
       assert.equal(graph.layoutRagGraph({ ...projection, nodes: projection.nodes.slice(0, 1), total_nodes: 1 }).nodes.length, 1);
       assert.equal(layoutWorkers, 0);
     } finally { if (previousWorker === undefined) delete globalThis.Worker; else globalThis.Worker = previousWorker; }
-    observations.push({ packagePath: portable(relative(root, packageRoot)), filesIncludingManifest: 48,
+    observations.push({ packagePath: portable(relative(root, packageRoot)), filesIncludingManifest: 49,
       manifestSha256: digest(manifestBytes), manifestIdentitySha256: identitySha256, sourceHead: manifest.source.head,
       sourceDirtyAtStage: manifest.source.dirty, sourceFingerprintSha256: manifest.source.fingerprintSha256,
       packageBytes: packageIdentity.reduce((sum, file) => sum + file.bytes, 0) + manifestBytes.length });

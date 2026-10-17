@@ -251,12 +251,19 @@ self.onmessage = async ({ data }) => {
       if (!engine?.isModelLoaded()) throw new Error('Load the model before sending a message.');
       const stream = await engine.createChatCompletion({ messages: payload.messages, stream: true, max_tokens: 160, temperature: 0 });
       let text = '';
+      let finishReason = 'unknown';
       for await (const chunk of stream) {
         const token = chunk.choices?.[0]?.delta?.content || '';
         text += token;
         if (token) post(id, 'token', text);
+        // Pinned wllama forwards decoded native response chunks unchanged.
+        // Null/missing reasons are ordinary streaming chunks, not evidence of
+        // completion. Never infer the cause from output size or punctuation.
+        const reason = errorField(chunk.choices?.[0], 'finish_reason');
+        if (reason !== undefined && reason !== null) finishReason = reason === 'length' || reason === 'stop' ? reason : 'unknown';
       }
       if (!text.trim()) throw new Error('The model returned an empty answer. Try a shorter message.');
+      post(id, 'completion', { finishReason, maxTokens: 160 });
       post(id, 'result', text);
     } else throw new Error('Unknown runtime operation.');
   } catch (error) {

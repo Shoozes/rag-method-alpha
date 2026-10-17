@@ -2,6 +2,7 @@ import { createLoaderController } from './loader-controller.mjs';
 import { createRuntimeAdapter } from './runtime-adapter.mjs';
 import { MODEL, RUNTIME } from './model-contract.mjs';
 import { formatRuntimeError } from './runtime-errors.mjs';
+import { renderMessageContent, flushMessageContent } from './message-renderer.mjs';
 
 // A read-only view of the existing send-time meter, never a token estimator.
 export function contextUsageView(state) {
@@ -48,7 +49,7 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
   };
   let previousPhase = '', messages = [], pendingMessage, latestReport = '';
   let preparingContext = false, preparationController, unsubscribeUsage = () => {};
-  let sessionEpoch = 0, resettingMemory = false;
+  let sessionEpoch = 0, resettingMemory = false, viewActive = true;
   function showContextUsage(state) {
     const node = $('context-usage');
     if (!node) return;
@@ -83,6 +84,21 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
     return result;
   }
   const log = $('messages');
+  const rawMessages = new WeakMap(), copyInFlight = new WeakSet(), deferredContent = new Set();
+  function paintMessage(node, text, streaming = false) {
+    rawMessages.set(node, text);
+    const content = node.querySelector('.content');
+    const result = renderMessageContent(content, text, { markdown: node.classList.contains('assistant'), streaming });
+    if (result.deferred) deferredContent.add(content); else deferredContent.delete(content);
+    const copy = node.querySelector('.copy-message');
+    if (copy) copy.disabled = !text || copyInFlight.has(node);
+  }
+  function flushSelection() {
+    for (const content of deferredContent) {
+      if (!content.isConnected || !flushMessageContent(content).deferred) deferredContent.delete(content);
+    }
+  }
+  document.addEventListener('selectionchange', flushSelection);
   let followTail = true, viewportFrame, documentFrame, loadingScrollY = 0;
   function scrollLatest(force = false) {
     if (force) followTail = true;
@@ -212,7 +228,7 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
       resizePrompt();
     }
     if (state.phase === 'generating' && pendingMessage) {
-      pendingMessage.querySelector('.content').textContent = state.text || '';
+      paintMessage(pendingMessage, state.text || '', true);
       scrollLatest();
     }
     if (inChat && previousPhase !== 'ready' && previousPhase !== 'generating') {
@@ -227,8 +243,41 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
     node.className = `message ${role}${pending ? ' pending' : ''}`;
     if (turnId) { node.id = 'turn-' + turnId; node.tabIndex = -1; }
     const name = document.createElement('p'); name.className = 'speaker'; name.textContent = role === 'user' ? 'You' : 'LFM2.5';
-    const content = document.createElement('p'); content.className = 'content'; content.textContent = text;
-    node.append(name, content); log.append(node); scrollLatest(); return node;
+    const content = document.createElement('div'); content.className = 'content';
+    const actions = document.createElement('div'); actions.className = 'message-actions';
+    const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'secondary copy-message';
+    copy.textContent = 'Copy'; copy.setAttribute('aria-label', role === 'user' ? 'Copy your message' : 'Copy model reply');
+    const status = document.createElement('span'); status.className = 'message-copy-status';
+    status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+    const fallback = document.createElement('div'); fallback.className = 'message-copy-fallback'; fallback.hidden = true;
+    const raw = document.createElement('textarea'); raw.readOnly = true; raw.rows = 4; raw.spellcheck = false;
+    raw.setAttribute('aria-label', 'Original message text to copy');
+    const close = document.createElement('button'); close.type = 'button'; close.className = 'secondary'; close.textContent = 'Close copy text';
+    close.addEventListener('click', () => { fallback.hidden = true; copy.focus({ preventScroll: true }); });
+    fallback.append(raw, close);
+    copy.addEventListener('click', async () => {
+      const value = rawMessages.get(node), epoch = sessionEpoch;
+      if (!value || !viewActive || copyInFlight.has(node)) return;
+      copyInFlight.add(node); copy.disabled = true;
+      try {
+        if (!navigator.clipboard?.writeText) throw Error('Clipboard unavailable');
+        await navigator.clipboard.writeText(value);
+        if (viewActive && epoch === sessionEpoch && node.isConnected) { status.textContent = 'Message copied.'; fallback.hidden = true; }
+      } catch {
+        if (viewActive && epoch === sessionEpoch && node.isConnected) {
+          raw.value = value; fallback.hidden = false;
+          status.textContent = 'Clipboard unavailable. Select and copy the original text below.';
+          raw.focus({ preventScroll: true }); raw.select();
+        }
+      } finally {
+        copyInFlight.delete(node);
+        if (viewActive && epoch === sessionEpoch && node.isConnected) copy.disabled = !rawMessages.get(node);
+      }
+    });
+    const completion = document.createElement('p'); completion.className = 'message-completion'; completion.hidden = true;
+    completion.setAttribute('role', 'status');
+    actions.append(copy, status); node.append(name, content, actions, fallback, completion);
+    paintMessage(node, text, pending); log.append(node); scrollLatest(); return node;
   }
   function answerSources(node, turnId) {
     const references = workspace?.sourcesForAnswer(turnId) || [];
@@ -325,6 +374,7 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
     // yield to an old reply, meter, citation or queued persistence continuation.
     const clearing = workspace ? workspace.clear() : Promise.resolve().then(() => clearStoredMemory?.() ?? { cleared: true, durable: false });
     messages = []; pendingMessage = null; preparingContext = false;
+    deferredContent.clear();
     $('prompt').value = ''; $('draft').value = ''; $('chat-error').hidden = true;
     for (const node of log.querySelectorAll('.message')) node.remove();
     $('chat-empty').hidden = false; $('context-usage').hidden = true; scrollLatest(true); render(controller.getState());
@@ -374,7 +424,13 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
       preparationController?.signal.throwIfAborted();
       const answer = await controller.send(prepared?.messages || [{ role: 'system', content: 'You are a concise, helpful assistant. Answer in plain text.' }, ...messages]);
       if (epoch !== sessionEpoch) return;
-      replyNode.querySelector('.content').textContent = answer;
+      paintMessage(replyNode, answer);
+      const completion = controller.getState().completion;
+      replyNode.dataset.finishReason = completion?.finishReason || 'unknown';
+      if (completion?.finishReason === 'length' && completion.maxTokens === 160) {
+        const status = replyNode.querySelector('.message-completion'); status.hidden = false;
+        status.textContent = 'Reply reached the 160-token limit. You can ask for more.';
+      }
       replyNode.classList.remove('pending');
       if (workspace) {
         const accepted = workspace.conversation.append({ role: 'assistant', content: answer });
@@ -390,15 +446,20 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
     } catch (error) {
       if (epoch !== sessionEpoch) return;
       replyNode.classList.remove('pending'); replyNode.classList.add('interrupted');
-      if (!replyNode.querySelector('.content').textContent) replyNode.querySelector('.content').textContent = 'No completed answer.';
+      if (!rawMessages.get(replyNode)) {
+        // This UI status is not model output and must not be copied or admitted.
+        const status = replyNode.querySelector('.message-completion'); status.hidden = false; status.textContent = 'No completed answer.';
+      }
       // Incomplete attempts remain visible, but are not silently sent as accepted history.
       if (workspace) { $('chat-error').hidden = false; $('chat-error').textContent = error.message; await persistWorkspace(epoch); }
       else messages.pop();
     } finally { if (epoch === sessionEpoch) { pendingMessage = null; preparingContext = false; preparationController = undefined; render(controller.getState()); } }
   });
   window.addEventListener('pagehide', () => {
+    viewActive = false;
     stopContextPreparation(); unsubscribeUsage();
     void controller.dispose(); document.removeEventListener('visibilitychange', visibility);
+    document.removeEventListener('selectionchange', flushSelection); deferredContent.clear();
     workspace?.dispose();
     document.removeEventListener('keydown', closeOptions);
     document.removeEventListener('pointerdown', closeOptions);
