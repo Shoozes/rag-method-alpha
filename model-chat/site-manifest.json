@@ -4,16 +4,16 @@
   "publicReleaseQualified": false,
   "memoryPreview": true,
   "source": {
-    "head": "29dda3d4ce6f6adba125be67bc93e8a321eb19a1",
+    "head": "0119fe1adf0a09a1a78f37d22fe763f960a801c2",
     "dirty": false,
     "reviewStatus": "unreviewed",
     "fingerprintScope": "allowlisted browser sources, generated memory core, build source, theme, licenses and packager",
-    "fingerprintSha256": "0a01dc3f9372c00530c2d20601c72c1776bef1d06ed4743aaf57f435047c29d3",
+    "fingerprintSha256": "f7c0dbadf86ab60f0a60eb4c987a9b815c06b4b293f1e55152db82b3037fccde",
     "files": [
       {
         "path": ".artifacts/memory/graph-renderer.mjs",
-        "bytes": 1321608,
-        "sha256": "611341828e66e710497d8b0025947e9efb9ae2b268828c812856d230d614ea7a"
+        "bytes": 1322308,
+        "sha256": "b4283ce805072898247381732481a47d30ba38d5373e6becda17a7ff0a9c7f13"
       },
       {
         "path": ".artifacts/memory/LICENSES/forcegraph-tsl.txt",
@@ -32,13 +32,13 @@
       },
       {
         "path": "examples/browser-model-chat/app.mjs",
-        "bytes": 22990,
-        "sha256": "3e08016c8e662d41cb4047b08d1732602aded7489bff8b5bf0baa39fe0da9ef5"
+        "bytes": 23190,
+        "sha256": "de7cdc1c76b29609234f4b2cb7d550ac50c5f3ad409f092f16f2a16359030102"
       },
       {
         "path": "examples/browser-model-chat/bootstrap.mjs",
-        "bytes": 1552,
-        "sha256": "61816724d02825def7caeed52d88e4f1ef3a589f0829f6d4bd363eedd9ce3d3a"
+        "bytes": 1612,
+        "sha256": "a632bc49c40e6ffacaefd0ff165dfc32f155697854bc11fcf2f10d6d3b7e39f1"
       },
       {
         "path": "examples/browser-model-chat/capabilities.mjs",
@@ -72,8 +72,8 @@
       },
       {
         "path": "examples/browser-model-chat/memory/automatic-memory.mjs",
-        "bytes": 11474,
-        "sha256": "c19e61feb8012dd3d3ff9dbf25c44152e3ae83dedc7f648cb95a2d3d0244a7e6"
+        "bytes": 11626,
+        "sha256": "efe6573fdd179ac37792471b5a5f373f56d0ad6fb67184fa40d4f89007dfd572"
       },
       {
         "path": "examples/browser-model-chat/memory/build-core.mjs",
@@ -92,28 +92,28 @@
       },
       {
         "path": "examples/browser-model-chat/memory/compaction-cue.mjs",
-        "bytes": 2674,
-        "sha256": "fe7a54213648904ec7c1857709afd4eccfeca6a5a82f1be4dfe744fc2772627c"
+        "bytes": 2726,
+        "sha256": "8091c632052291ee20b52232cae5241d98e9426d201815b8d006456e07338aa4"
       },
       {
         "path": "examples/browser-model-chat/memory/context-panel.mjs",
-        "bytes": 13170,
-        "sha256": "fbcaade294a3a928791a3a5f0b0c491fb080766cf5954008d90e1eecce32d8cc"
+        "bytes": 15501,
+        "sha256": "89eab09d1662182cf3eeb5be02a2b229d1788841475ccccc66477c7bf00d6f6d"
       },
       {
         "path": "examples/browser-model-chat/memory/context.mjs",
-        "bytes": 30820,
-        "sha256": "9483a97479efaa8421a2403ecf425d479a457bd45a3f194f056b05c3b8372ade"
+        "bytes": 36567,
+        "sha256": "4bae557cc8f5fe31a9bec99ab376e607a842d7b53585978519548c4a61bad826"
       },
       {
         "path": "examples/browser-model-chat/memory/conversation-index.mjs",
-        "bytes": 11164,
-        "sha256": "caabc3f547adc465a9a421527fae69dfb2dc582c1557cf7ad93ae96d819a1b9f"
+        "bytes": 11332,
+        "sha256": "dd48f03cd978506afacdc6c1d29ee1dc99b861332547e1ceedf62a531f721b19"
       },
       {
         "path": "examples/browser-model-chat/memory/events.mjs",
-        "bytes": 6987,
-        "sha256": "201d9cf92c7e8c0bb1f0b0d6a3ab60c787531f99c202125938e0dcc0d2a775f3"
+        "bytes": 7126,
+        "sha256": "1b266f1dd2da58e847500cf7fd67e5f8e4b9562dff1b0331104c428c0e021fcc"
       },
       {
         "path": "examples/browser-model-chat/memory/navigation.mjs",
@@ -122,13 +122,13 @@
       },
       {
         "path": "examples/browser-model-chat/memory/panel.css",
-        "bytes": 20046,
-        "sha256": "6aaffa0ff599c9ee4c6b92e9ea8c80b509e91ecc8e4c90721ebc2da00ef27b38"
+        "bytes": 23489,
+        "sha256": "24885fe4c86b9b7488abdc17078bf0ba26a11bbccbf8547a088c82c0ff3f40f1"
       },
       {
         "path": "examples/browser-model-chat/memory/panel.mjs",
-        "bytes": 39474,
-        "sha256": "07ac4f22d7f1cc4a160f722187c39472f80178f611ca785b95aa389874557a4b"
+        "bytes": 50776,
+        "sha256": "f2467f5bd0a624f8e8daeb3d31fd2ec9232c85357976bcb9945e0f304c1ccbec"
       },
       {
         "path": "examples/browser-model-chat/memory/rag-adapter.mjs",
@@ -137,8 +137,8 @@
       },
       {
         "path": "examples/browser-model-chat/memory/restore-events.mjs",
-        "bytes": 6346,
-        "sha256": "d24864e4927d94490bec59dea31a33ec0b111b26260440449b4c35c002a0965a"
+        "bytes": 6661,
+        "sha256": "0fa12ae417fe7235995418b27aa24ef25eeb7177081e6fb00b41f8415fa525d9"
       },
       {
         "path": "examples/browser-model-chat/memory/scoped-pockets.mjs",
@@ -162,8 +162,8 @@
       },
       {
         "path": "examples/browser-model-chat/memory/workspace.mjs",
-        "bytes": 7393,
-        "sha256": "db56d1d9c195ee9eb5376dadcda37fab7e305a50e2ddec62dc2f556cfa4f5cd8"
+        "bytes": 7433,
+        "sha256": "7c9f1bdddfa5457a76f1203f2803e13a0c65d80e03a9b3d01cc90eae02b6588c"
       },
       {
         "path": "examples/browser-model-chat/model-contract.mjs",
@@ -188,7 +188,7 @@
       {
         "path": "examples/browser-model-chat/stage-static.mjs",
         "bytes": 24714,
-        "sha256": "11a34bd53d72cbef9d7af7dad7e943f79f269a5790cb30c0e7fd056e383838ff"
+        "sha256": "f8bc3505993719d51cd5ffb19f523b599f21b6b8fe8d515941e4bc4cf55c19c7"
       },
       {
         "path": "examples/browser-model-chat/style.css",
@@ -222,8 +222,8 @@
       },
       {
         "path": "modules/browser-rag-ts/src/application/graphRenderer.ts",
-        "bytes": 30197,
-        "sha256": "84f4ad2cb4c46e28540dc5192cf55334f9dbdcf12b0f58cde6223e415e054f92"
+        "bytes": 32018,
+        "sha256": "ee1ba430004366dc46a9b9c552700e4d76c5fc38428a9b9cab7da7074077026c"
       },
       {
         "path": "modules/browser-rag-ts/src/application/layoutGraph.ts",
@@ -270,7 +270,7 @@
     "version": "0.3.0-alpha.1",
     "threeVersion": "0.185.0",
     "bundlePath": "memory/graph-renderer.mjs",
-    "bundleSha256": "611341828e66e710497d8b0025947e9efb9ae2b268828c812856d230d614ea7a",
+    "bundleSha256": "b4283ce805072898247381732481a47d30ba38d5373e6becda17a7ff0a9c7f13",
     "layoutBackend": "local",
     "licenses": {
       "LICENSES/forcegraph-tsl.txt": "1a897e0ee6f1fc65889976eadb848acefac9db7f9c97274a6c490f52390cd474",
@@ -294,13 +294,13 @@
   "files": [
     {
       "path": "app.mjs",
-      "bytes": 22990,
-      "sha256": "3e08016c8e662d41cb4047b08d1732602aded7489bff8b5bf0baa39fe0da9ef5"
+      "bytes": 23190,
+      "sha256": "de7cdc1c76b29609234f4b2cb7d550ac50c5f3ad409f092f16f2a16359030102"
     },
     {
       "path": "bootstrap.mjs",
-      "bytes": 1552,
-      "sha256": "61816724d02825def7caeed52d88e4f1ef3a589f0829f6d4bd363eedd9ce3d3a"
+      "bytes": 1612,
+      "sha256": "a632bc49c40e6ffacaefd0ff165dfc32f155697854bc11fcf2f10d6d3b7e39f1"
     },
     {
       "path": "capabilities.mjs",
@@ -349,8 +349,8 @@
     },
     {
       "path": "memory/automatic-memory.mjs",
-      "bytes": 11474,
-      "sha256": "c19e61feb8012dd3d3ff9dbf25c44152e3ae83dedc7f648cb95a2d3d0244a7e6"
+      "bytes": 11626,
+      "sha256": "efe6573fdd179ac37792471b5a5f373f56d0ad6fb67184fa40d4f89007dfd572"
     },
     {
       "path": "memory/citations.mjs",
@@ -359,33 +359,33 @@
     },
     {
       "path": "memory/compaction-cue.mjs",
-      "bytes": 2674,
-      "sha256": "fe7a54213648904ec7c1857709afd4eccfeca6a5a82f1be4dfe744fc2772627c"
+      "bytes": 2726,
+      "sha256": "8091c632052291ee20b52232cae5241d98e9426d201815b8d006456e07338aa4"
     },
     {
       "path": "memory/context-panel.mjs",
-      "bytes": 13170,
-      "sha256": "fbcaade294a3a928791a3a5f0b0c491fb080766cf5954008d90e1eecce32d8cc"
+      "bytes": 15501,
+      "sha256": "89eab09d1662182cf3eeb5be02a2b229d1788841475ccccc66477c7bf00d6f6d"
     },
     {
       "path": "memory/context.mjs",
-      "bytes": 30820,
-      "sha256": "9483a97479efaa8421a2403ecf425d479a457bd45a3f194f056b05c3b8372ade"
+      "bytes": 36567,
+      "sha256": "4bae557cc8f5fe31a9bec99ab376e607a842d7b53585978519548c4a61bad826"
     },
     {
       "path": "memory/conversation-index.mjs",
-      "bytes": 11164,
-      "sha256": "caabc3f547adc465a9a421527fae69dfb2dc582c1557cf7ad93ae96d819a1b9f"
+      "bytes": 11332,
+      "sha256": "dd48f03cd978506afacdc6c1d29ee1dc99b861332547e1ceedf62a531f721b19"
     },
     {
       "path": "memory/events.mjs",
-      "bytes": 6987,
-      "sha256": "201d9cf92c7e8c0bb1f0b0d6a3ab60c787531f99c202125938e0dcc0d2a775f3"
+      "bytes": 7126,
+      "sha256": "1b266f1dd2da58e847500cf7fd67e5f8e4b9562dff1b0331104c428c0e021fcc"
     },
     {
       "path": "memory/graph-renderer.mjs",
-      "bytes": 1321608,
-      "sha256": "611341828e66e710497d8b0025947e9efb9ae2b268828c812856d230d614ea7a"
+      "bytes": 1322308,
+      "sha256": "b4283ce805072898247381732481a47d30ba38d5373e6becda17a7ff0a9c7f13"
     },
     {
       "path": "memory/navigation.mjs",
@@ -394,13 +394,13 @@
     },
     {
       "path": "memory/panel.css",
-      "bytes": 20046,
-      "sha256": "6aaffa0ff599c9ee4c6b92e9ea8c80b509e91ecc8e4c90721ebc2da00ef27b38"
+      "bytes": 23489,
+      "sha256": "24885fe4c86b9b7488abdc17078bf0ba26a11bbccbf8547a088c82c0ff3f40f1"
     },
     {
       "path": "memory/panel.mjs",
-      "bytes": 39474,
-      "sha256": "07ac4f22d7f1cc4a160f722187c39472f80178f611ca785b95aa389874557a4b"
+      "bytes": 50776,
+      "sha256": "f2467f5bd0a624f8e8daeb3d31fd2ec9232c85357976bcb9945e0f304c1ccbec"
     },
     {
       "path": "memory/rag-adapter.mjs",
@@ -414,8 +414,8 @@
     },
     {
       "path": "memory/restore-events.mjs",
-      "bytes": 6346,
-      "sha256": "d24864e4927d94490bec59dea31a33ec0b111b26260440449b4c35c002a0965a"
+      "bytes": 6661,
+      "sha256": "0fa12ae417fe7235995418b27aa24ef25eeb7177081e6fb00b41f8415fa525d9"
     },
     {
       "path": "memory/scoped-pockets.mjs",
@@ -439,8 +439,8 @@
     },
     {
       "path": "memory/workspace.mjs",
-      "bytes": 7393,
-      "sha256": "db56d1d9c195ee9eb5376dadcda37fab7e305a50e2ddec62dc2f556cfa4f5cd8"
+      "bytes": 7433,
+      "sha256": "7c9f1bdddfa5457a76f1203f2803e13a0c65d80e03a9b3d01cc90eae02b6588c"
     },
     {
       "path": "model-contract.mjs",
@@ -513,5 +513,5 @@
       "sha256": "4baf1abc8a47bb8eb7a41fdc1e924cf8ac80f4645f4524611a6d7ecb3712983e"
     }
   ],
-  "identitySha256": "fcbc149d01c4d7c8ddfdf3e1c9d02bb0204b310102feb565f148f2dfbb87536d"
+  "identitySha256": "f50c288b05da47324097691dcd8484eb3037538efcf08feec9088650f422122f"
 }

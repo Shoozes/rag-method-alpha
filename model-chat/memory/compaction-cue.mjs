@@ -8,7 +8,7 @@ function successful(event) {
   return event?.type === 'compacted' && identity(event.id) && positive(event.cycle)
     && positive(event.capacity) && positive(event.reserve) && event.reserve < event.capacity
     && positive(event.beforePromptTokens) && positive(event.afterPromptTokens)
-    && event.beforePromptTokens + event.reserve > event.capacity
+    && ('trigger' in event ? event.trigger === 'manual' : event.beforePromptTokens + event.reserve > event.capacity)
     && event.afterPromptTokens + event.reserve <= event.capacity
     && event.afterPromptTokens < event.beforePromptTokens
     && hash(event.summaryHash) && hash(event.requestBeforeSha256) && hash(event.requestAfterSha256)

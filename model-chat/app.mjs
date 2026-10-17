@@ -171,7 +171,7 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
       errorCode: state.errorCode, errorDetail: reportText(state.error), browser: reportText(navigator.userAgent), pageVisible: !document.hidden,
     }, null, 2);
     if (document.activeElement !== $('diagnostic-report')) $('diagnostic-report').value = latestReport;
-    $('send').disabled = state.phase !== 'ready' || preparingContext;
+    $('send').disabled = state.phase !== 'ready' || preparingContext || workspace?.context.manualCompactionStatus?.().busy === true;
     $('stop').hidden = state.phase !== 'generating' && !preparingContext;
     $('unload').disabled = state.phase === 'generating';
     $('clear').disabled = state.phase === 'generating';
@@ -292,7 +292,7 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
   });
   $('composer').addEventListener('submit', async event => {
     event.preventDefault();
-    if (controller.getState().phase !== 'ready' || preparingContext) return;
+    if (controller.getState().phase !== 'ready' || preparingContext || workspace?.context.manualCompactionStatus?.().busy === true) return;
     const text = $('prompt').value.trim();
     if (!text) { $('prompt').focus(); return; }
     // Keep this preview bounded; no attachment/context injection or tool execution.
@@ -349,7 +349,7 @@ export function mountApp(adapter = createRuntimeAdapter(), { controllerOptions, 
   }, { once: true });
   if (workspace) {
     if (typeof workspace.context.subscribeUsage === 'function') {
-      unsubscribeUsage = workspace.context.subscribeUsage(showContextUsage);
+      unsubscribeUsage = workspace.context.subscribeUsage(value => { showContextUsage(value); queueMicrotask(() => render(controller.getState())); });
       showContextUsage(workspace.context.usageSnapshot());
     }
     const turns = workspace.conversation.snapshot().turns;

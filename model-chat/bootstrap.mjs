@@ -9,7 +9,8 @@ if (new URL(location.href).searchParams.get('memory') === '1') {
       import('./memory/workspace.mjs'), import('./memory/panel.mjs'), import('./memory/rag-core.mjs'),
     ]);
     mountPanel = mountMemoryPanel;
-    workspace = await createWorkspace({ adapter, core, storage: localStorage, graphEnabled: new URL(location.href).searchParams.get('graph') !== '0' });
+    workspace = await createWorkspace({ adapter, core, storage: localStorage, graphEnabled: new URL(location.href).searchParams.get('graph') !== '0',
+      getControllerState: () => app?.controller.getState() });
     app = mountApp(workspace.provider, { workspace });
   } catch (error) {
     workspace?.dispose();

@@ -61,12 +61,16 @@ export async function validateRetainedEvents({ events, conversation, records } =
         catch { fail('dispatch citation provenance'); }
       }
     } else if (event.type === 'compacted') {
+      if ('trigger' in event && event.trigger !== 'manual') fail('compaction trigger');
       if ('recordId' in event || 'recordIds' in event || 'versions' in event || !ids.length) fail('compaction references');
       versionBound(event, ids);
       if (!positive(event.cycle) || !positive(event.capacity) || !positive(event.reserve) || event.reserve >= event.capacity
         || !positive(event.beforePromptTokens) || !positive(event.afterPromptTokens)
-        || event.beforePromptTokens + event.reserve <= event.capacity || event.afterPromptTokens + event.reserve > event.capacity) fail('compaction budget');
+        || event.trigger !== 'manual' && event.beforePromptTokens + event.reserve <= event.capacity
+        || event.trigger === 'manual' && event.afterPromptTokens >= event.beforePromptTokens
+        || event.afterPromptTokens + event.reserve > event.capacity) fail('compaction budget');
       if (!hashPattern.test(event.summaryHash || '') || !hashPattern.test(event.requestBeforeSha256 || '')
+        || event.trigger === 'manual' && event.requestBeforeSha256 === event.requestAfterSha256
         || !hashPattern.test(event.requestAfterSha256 || '') || !Array.isArray(event.sourceHashes) || event.sourceHashes.length !== ids.length) fail('compaction hashes');
       for (let index = 0; index < ids.length; index++) {
         const id = ids[index];

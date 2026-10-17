@@ -37,7 +37,8 @@ export async function createAutomaticMemory({ ownerScope, conversation, memory, 
   const protectedIds = () => [...new Set([...legacyProtectedIds(), ...personaSources()])];
   const blockedIds = () => {
     const history = personaHistory(), forgotten = new Set(history.filter(record => record.status === 'forgotten').map(record => record.id));
-    return [...new Set([...blocked, ...memory.snapshot().records.filter(record => record.status === 'forgotten').flatMap(record => record.sourceTurnIds),
+    const savedHistory = memory.snapshot().records, forgottenSaved = new Set(savedHistory.filter(record => record.status === 'forgotten').map(record => record.id));
+    return [...new Set([...blocked, ...savedHistory.filter(record => forgottenSaved.has(record.id)).flatMap(record => record.sourceTurnIds),
       ...history.filter(record => forgotten.has(record.id) && record.origin.conversationId === owner.conversationId).map(record => record.origin.turnId)])];
   };
   const getScope = () => selectedScope;
