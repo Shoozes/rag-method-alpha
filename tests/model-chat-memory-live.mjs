@@ -350,11 +350,11 @@ try {
       });
       const selected = () => page.locator('[data-memory-node][data-matched="true"]').evaluateAll(nodes => nodes.map(node => node.dataset.memoryNode).sort());
       await page.locator('#memory-query').fill('harbor access code'); await page.locator('#memory-query').press('Enter');
-      await page.waitForFunction(() => !document.getElementById('memory-query').disabled && document.getElementById('memory-status').textContent === 'Matching memories are lit up.');
+      await page.waitForFunction(() => !document.getElementById('memory-query').disabled && document.getElementById('memory-search-summary').textContent === '1 match · graph search only');
       assert.deepEqual(await selected(), ['turn:' + seeded.sourceTurnId]);
       await page.locator('#memory-query').fill('flying violet whale'); assert.deepEqual(await selected(), []);
       await page.locator('#memory-query').press('Enter');
-      await page.waitForFunction(() => !document.getElementById('memory-query').disabled && document.getElementById('memory-status').textContent === 'No matching memories.');
+      await page.waitForFunction(() => !document.getElementById('memory-query').disabled && document.getElementById('memory-search-summary').textContent === 'No matches · graph search only');
       assert.deepEqual(await selected(), []); await page.locator('#memory-query-clear').click();
       assert.equal(await page.locator('#memory-query').inputValue(), ''); assert.deepEqual(await selected(), []);
       await page.locator('#memory-pocket').selectOption('global');
