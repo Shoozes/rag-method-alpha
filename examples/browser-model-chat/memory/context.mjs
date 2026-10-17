@@ -9,6 +9,9 @@ const immutable = value => {
 };
 const aborted = () => new DOMException('Context preparation was cancelled. Original transcript is preserved.', 'AbortError');
 const checkAbort = signal => { if (signal?.aborted) throw aborted(); };
+export class ManualCompactionError extends Error {
+  constructor(code, message, options) { super(message, options); this.name = 'ManualCompactionError'; this.code = code; }
+}
 function abortable(result, signal) {
   if (!signal) return Promise.resolve(result);
   return new Promise((resolve, reject) => {
@@ -117,10 +120,11 @@ function createInspectionRecord({ state, queryId, messages, measurement, automat
   return record;
 }
 
-export function createContextManager({ conversation, memory, retrieval, core, automaticMemory, measure, events, capacity = 2048, reserve = 160 }) {
+export function createContextManager({ conversation, memory, retrieval, core, automaticMemory, measure, events, getControllerState, capacity = 2048, reserve = 160 }) {
   if (typeof measure !== 'function' || !Number.isSafeInteger(capacity) || !Number.isSafeInteger(reserve) || reserve < 1 || reserve >= capacity) throw Error('Native context meter and valid budget required.');
   let cutoff = 0, compacted = null, cycle = 0, serial = 0, preparing = false, prepared;
   let disposed = false, activePreparation, preparedAbortCleanup, usageBinding;
+  const manualRequest = Symbol('manual-compaction');
   const usageObservers = new Set();
   const inspectionObservers = new Set();
   let inspectionBinding, inspection = { schema: 'memory-context-inspection/v1', ephemeral: true, phase: 'unmeasured',
@@ -216,8 +220,47 @@ export function createContextManager({ conversation, memory, retrieval, core, au
     }
     return start;
   }
-  return Object.freeze({
+  const manualRefusal = reason => new ManualCompactionError('MANUAL_COMPACTION_' + reason.toUpperCase().replaceAll('-', '_'), {
+    disposed: 'Context manager is disposed.', unavailable: 'Manual compaction needs an authoritative model controller and event ledger.',
+    'model-not-ready': 'Load the model before compacting context.', busy: 'Wait for the active reply or context operation to finish.',
+    empty: 'There is no conversation to compact.', 'insufficient-history': 'There is no eligible older user context outside the protected recent exchange.',
+    'scope-disabled': 'Conversation context is disabled in the current memory scope.',
+  }[reason] || 'Manual compaction is unavailable.');
+  function manualReadiness() {
+    if (disposed) return 'disposed';
+    if (typeof getControllerState !== 'function' || typeof events?.append !== 'function') return 'unavailable';
+    let state;
+    try { state = getControllerState(); } catch { return 'unavailable'; }
+    if (state?.phase === 'generating') return 'busy';
+    return state?.phase === 'ready' ? null : 'model-not-ready';
+  }
+  function manualPlan(state, records) {
+    const policyRefresh = JSON.stringify(records) !== memoryIdentity || automaticMemory?.identity() !== automaticIdentity;
+    const start = policyRefresh ? state.turns.length - 1 : cutoff;
+    const end = recentCutoff(state.turns, start);
+    const protectedIds = new Set([...records.flatMap(record => record.sourceTurnIds), ...(automaticMemory?.getBlockedTurnIds() || [])]);
+    const eligibleIds = state.turns.slice(start, end).filter(turn => turn.role === 'user' && !protectedIds.has(turn.id)).map(turn => turn.id);
+    return { start, end, eligibleIds };
+  }
+  function manualCompactionStatus() {
+    let reason = disposed ? 'disposed' : preparing ? 'busy' : manualReadiness();
+    if (!reason) {
+      try {
+        const state = conversation.snapshot();
+        if (!state.turns.length) reason = 'empty';
+        else if (automaticMemory && !automaticMemory.allowConversation()) reason = 'scope-disabled';
+        else {
+          const plan = manualPlan(state, memory?.snapshot().records || []);
+          if (plan.end <= plan.start || !plan.eligibleIds.length) reason = 'insufficient-history';
+        }
+      } catch { reason = 'unavailable'; }
+    }
+    return immutable({ eligible: !reason, busy: reason === 'busy', reason: reason || 'ready' });
+  }
+  const manager = Object.freeze({
     snapshot: () => clone({ cutoff, cycle, compacted }),
+    manualCompactionStatus,
+    compactNow({ signal } = {}) { return manager.prepare({ signal, [manualRequest]: true }); },
     usageSnapshot,
     inspectionSnapshot,
     subscribeInspection(observer) {
@@ -234,7 +277,11 @@ export function createContextManager({ conversation, memory, retrieval, core, au
       if (!disposed) publishUsage({ phase: usage.measurement ? 'stale' : 'unmeasured', compaction: null, error: null });
       if (!disposed && (inspection.latestPrepared || inspection.lastSubmitted)) failInspection('stale');
     },
-    async prepare({ signal: externalSignal } = {}) {
+    async prepare({ signal: externalSignal, [manualRequest]: manual = false } = {}) {
+      if (manual) {
+        const status = manualCompactionStatus();
+        if (!status.eligible) throw manualRefusal(status.reason);
+      }
       if (disposed) throw Error('Context manager is disposed.');
       if (preparing) throw Error('Context preparation is already in progress.');
       const controller = new AbortController(), signal = controller.signal;
@@ -245,14 +292,19 @@ export function createContextManager({ conversation, memory, retrieval, core, au
       preparing = true;
       preparedAbortCleanup?.(); preparedAbortCleanup = undefined;
       prepared = undefined;
+      let committed = false;
+      const checkReady = () => {
+        checkAbort(signal);
+        if (manual) { const reason = manualReadiness(); if (reason) throw manualRefusal(reason); }
+      };
       try {
-      checkAbort(signal);
+      checkReady();
       publishInspection({ phase: 'preparing', latestPrepared: null, error: null });
       checkAbort(signal);
       publishUsage({ phase: 'measuring', compaction: null, error: null });
       checkAbort(signal);
       const state = conversation.snapshot();
-      if (!state.turns.length || state.turns.at(-1).role !== 'user') throw Error('Context preparation requires the latest authored user turn.');
+      if (!state.turns.length || !manual && state.turns.at(-1).role !== 'user') throw Error('Context preparation requires the latest authored user turn.');
       const queryId = `q-${++serial}`;
       const records = memory ? memory.snapshot().records : [];
       const recordIdentity = JSON.stringify(records);
@@ -261,38 +313,46 @@ export function createContextManager({ conversation, memory, retrieval, core, au
       // excerpts. Reproject from originals so stale derived facts cannot return.
       const policyRefresh = recordIdentity !== memoryIdentity || autoIdentity !== automaticIdentity;
       const candidateCutoff = policyRefresh || automaticMemory && !automaticMemory.allowConversation() ? state.turns.length - 1 : cutoff;
-      const query = state.turns.at(-1).content;
+      const queryTurn = manual ? state.turns.findLast(turn => turn.role === 'user') : state.turns.at(-1);
+      const query = queryTurn.content;
+      const plan = manual ? manualPlan(state, records) : null;
       const currentSummary = candidateCutoff > 0 ? await abortable(sourceSummary(state.turns.slice(0, candidateCutoff), records, query), signal) : null;
       checkAbort(signal);
-      const automaticResult = automaticMemory ? await abortable(automaticMemory.prepareContext({ query, excludeTurnId: state.turns.at(-1).id }), signal) : { hits: [] };
+      const automaticResult = automaticMemory ? await abortable(automaticMemory.prepareContext({ query, excludeTurnId: queryTurn.id }), signal) : { hits: [] };
       checkAbort(signal);
       const automaticHits = automaticResult.hits;
       if (automaticHits.some(hit => !['user', 'source'].includes(hit.role))) throw Error('Generated text cannot become quoted user evidence.');
-      const result = memory && retrieval && (!automaticMemory || automaticMemory.allowConversation()) ? await abortable(retrieval.search({ queryId, query: state.turns.at(-1).content, records, scope: scopeOf(state) }), signal) : { queryId, hits: [] };
+      const result = memory && retrieval && (!automaticMemory || automaticMemory.allowConversation()) ? await abortable(retrieval.search({ queryId, query, records, scope: scopeOf(state) }), signal) : { queryId, hits: [] };
       checkAbort(signal);
       const evidence = result.hits;
       const originalRequest = assemble(state.turns.slice(candidateCutoff), evidence, currentSummary, automaticHits);
+      checkReady();
       const before = await inspect(originalRequest, signal);
       let messages = originalRequest, after = before, nextSummary, nextCutoff = candidateCutoff;
       publishUsage({ measurement: measuredUsage(before), conversationVersion: state.version });
       checkAbort(signal);
-      if (!fits(before)) {
+      if (manual || !fits(before)) {
         publishUsage({ phase: 'compacting' });
         checkAbort(signal);
         // Keep the entire latest turn; fail rather than silently truncate it.
-        nextCutoff = recentCutoff(state.turns, candidateCutoff + 1);
+        nextCutoff = manual ? plan.end : recentCutoff(state.turns, candidateCutoff + 1);
         if (nextCutoff <= candidateCutoff) throw Error('The latest turn exceeds the available context budget. Shorten it; original transcript is preserved.');
         nextSummary = await abortable(sourceSummary(state.turns.slice(0, nextCutoff), records, query), signal);
         checkAbort(signal);
+        if (manual && (!nextSummary?.items?.some(item => plan.eligibleIds.includes(item.turnId)) || nextSummary.contentHash === currentSummary?.contentHash)) {
+          throw new ManualCompactionError('MANUAL_COMPACTION_NO_SOURCE_CONTEXT', 'No new eligible authored passage can be retained by the existing compaction pipeline.');
+        }
         messages = assemble(state.turns.slice(nextCutoff), evidence, nextSummary, automaticHits);
+        checkReady();
         after = await inspect(messages, signal);
         if (!fits(after)) throw Error('Compacted context still exceeds the native budget. Original transcript and prior context are preserved.');
+        if (manual && after.promptTokens >= before.promptTokens) throw new ManualCompactionError('MANUAL_COMPACTION_NO_REDUCTION', 'Compaction did not reduce the measured prompt. Original transcript and prior context are preserved.');
       }
       if (conversation.snapshot().version !== state.version || (memory && JSON.stringify(memory.snapshot().records) !== JSON.stringify(records))
         || automaticMemory && autoIdentity !== automaticMemory.identity()) throw Error('Conversation or memory changed while preparing context; retry against current state.');
       checkAbort(signal);
-      if (policyRefresh) { cutoff = candidateCutoff; compacted = currentSummary; memoryIdentity = recordIdentity; automaticIdentity = autoIdentity; }
-      if (nextSummary) {
+      if (!manual && policyRefresh) { cutoff = candidateCutoff; compacted = currentSummary; memoryIdentity = recordIdentity; automaticIdentity = autoIdentity; }
+      if (!manual && nextSummary) {
         cutoff = nextCutoff; compacted = nextSummary; cycle++;
         emit({ type: 'compacted', cycle, strategy: compacted.strategy, sourceTurnIds: compacted.sources.map(source => source.turnId),
           sourceHashes: compacted.sources.map(source => source.contentHash), summaryHash: compacted.contentHash,
@@ -312,25 +372,40 @@ export function createContextManager({ conversation, memory, retrieval, core, au
           || source.turnId === hit.turnId && source.offsets.start === hit.offsets.start && source.offsets.end === hit.offsets.end)) continue;
         extractiveSources.push({ key: 'chat.' + hit.turnId, turnId: hit.turnId, turnHash: hit.turnHash, offsets: { ...hit.offsets }, lineHash: hit.lineHash });
       }
-      prepared = { serialized: JSON.stringify(messages), recordIdentity, autoIdentity, automaticHits, conversationVersion: state.version, signal: externalSignal,
+      if (!manual) prepared = { serialized: JSON.stringify(messages), recordIdentity, autoIdentity, automaticHits, conversationVersion: state.version, signal: externalSignal,
         event: { type: 'context-dispatched', queryId, recordIds: evidence.map(hit => hit.recordId), versions: evidence.map(hit => hit.version),
           sourceTurnIds: [...new Set(evidence.flatMap(hit => hit.sourceTurnIds))], promptTokens: after.promptTokens,
           requestSha256: after.requestSha256, conversationVersion: state.version, policyRefresh,
           ...(contextSources.length ? { contextSources } : {}),
           ...(extractiveSources.length ? { extractiveSources } : {}) } };
-      usageBinding = { recordIdentity, autoIdentity, conversationVersion: state.version };
-      if (externalSignal) {
+      if (!manual) usageBinding = { recordIdentity, autoIdentity, conversationVersion: state.version };
+      if (!manual && externalSignal) {
         const cancelled = () => { prepared = undefined; publishUsage({ phase: 'cancelled', compaction: null, error: null }); failInspection('cancelled'); };
         externalSignal.addEventListener('abort', cancelled, { once: true });
         preparedAbortCleanup = () => externalSignal.removeEventListener('abort', cancelled);
       }
-      inspectionBinding = { recordIdentity, autoIdentity, conversationVersion: state.version };
+      if (!manual) inspectionBinding = { recordIdentity, autoIdentity, conversationVersion: state.version };
       let record = null;
       try { record = createInspectionRecord({ state, queryId, messages, measurement: after, automaticResult, retrievalResult: result,
         automaticHits, evidence, summary, capacity, reserve, memoryScope: automaticMemory?.getScope?.() }); }
       catch { /* Inspector metadata availability cannot fail an authorized request. */ }
+      if (manual) {
+        checkReady();
+        if (conversation.snapshot().version !== state.version || JSON.stringify(memory?.snapshot().records || []) !== recordIdentity
+          || automaticMemory && autoIdentity !== automaticMemory.identity()) throw Error('Conversation or memory changed while preparing context; retry against current state.');
+        // No async work or cancellation boundary follows this atomic commit. A
+        // manual preview never creates a provider-dispatch authorization.
+        events.append({ type: 'compacted', trigger: 'manual', cycle: cycle + 1, strategy: nextSummary.strategy,
+          sourceTurnIds: nextSummary.sources.map(source => source.turnId), sourceHashes: nextSummary.sources.map(source => source.contentHash),
+          summaryHash: nextSummary.contentHash, beforePromptTokens: before.promptTokens, afterPromptTokens: after.promptTokens, capacity, reserve,
+          requestBeforeSha256: before.requestSha256, requestAfterSha256: after.requestSha256, conversationVersion: state.version });
+        cutoff = nextCutoff; compacted = nextSummary; cycle++; memoryIdentity = recordIdentity; automaticIdentity = autoIdentity;
+        usageBinding = { recordIdentity, autoIdentity, conversationVersion: state.version }; committed = true;
+        if (record) record.purpose = 'manual-compaction';
+      }
+      if (manual) inspectionBinding = { recordIdentity, autoIdentity, conversationVersion: state.version };
       publishInspection({ phase: 'prepared', latestPrepared: record, error: record ? null : 'Context prepared, but its bounded local inspection is unavailable.' });
-      checkAbort(signal);
+      if (!committed) checkAbort(signal);
       publishUsage({ phase: 'ready', measurement: measuredUsage(after), conversationVersion: state.version,
         compaction: nextSummary ? { cycle, beforePromptTokens: before.promptTokens, afterPromptTokens: after.promptTokens } : null, error: null });
       return { messages: clone(messages), evidence: clone(evidence), queryId, measurement: after,
@@ -341,11 +416,13 @@ export function createContextManager({ conversation, memory, retrieval, core, au
         publishUsage({ phase: signal.aborted || error.name === 'AbortError' ? 'cancelled' : 'error',
           compaction: null,
           error: signal.aborted || error.name === 'AbortError' ? null : String(error.message).slice(0, 240) });
+        if (manual && error.name !== 'AbortError' && !(error instanceof ManualCompactionError)) throw new ManualCompactionError('MANUAL_COMPACTION_FAILED', String(error.message).slice(0, 240), { cause: error });
         throw error;
       } finally {
         preparing = false;
         if (activePreparation === controller) activePreparation = undefined;
         externalSignal?.removeEventListener('abort', cancel);
+        if (manual && !disposed) notifyUsage();
       }
     },
     validateDispatch(messages) {
@@ -389,4 +466,5 @@ export function createContextManager({ conversation, memory, retrieval, core, au
       inspection = { schema: 'memory-context-inspection/v1', ephemeral: true, phase: 'unmeasured', latestPrepared: null, lastSubmitted: null, error: null, limits: inspectionLimits };
     },
   });
+  return manager;
 }

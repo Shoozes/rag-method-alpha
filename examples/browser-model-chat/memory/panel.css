@@ -134,3 +134,28 @@
 
 /* Keep the graph inside short app viewports; details remain scrollable. */
 @media(max-height:480px){.memory-panel-body{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden}.memory-graph-view{flex:1;min-height:0;gap:8px}.memory-map{flex:1;min-height:80px}.memory-context-panel{flex:1;min-height:0;overflow:auto}}
+
+/* Search annotates actual sources; it never represents a model dispatch. */
+.memory-search-summary{flex:none;margin:-4px 0 0;color:#eee8ff;font:12px/1.4 "Segoe UI",sans-serif;overflow-wrap:anywhere}
+.memory-dialog .memory-graph[data-renderer=tsl] .memory-map-node{width:var(--node-size,44px);max-width:none;height:var(--node-size,44px)}
+.memory-graph[data-presentation=spatial][data-renderer=tsl] .memory-map-node::before{width:calc(var(--node-size,44px) - 6px);height:calc(var(--node-size,44px) - 6px)}
+.memory-graph[data-presentation=spatial][data-renderer=tsl] .memory-map-node:is(:hover,:focus-visible,[data-matched=true],[aria-pressed=true])::before{opacity:1;background:transparent;border:2px solid var(--memory-node-color,#c4b5fd);box-shadow:0 0 12px color-mix(in srgb,var(--memory-node-color,#c4b5fd) 65%,transparent),0 0 26px color-mix(in srgb,var(--memory-node-color,#c4b5fd) 40%,transparent)}
+.memory-graph[data-presentation=spatial][data-renderer=tsl] .memory-map-node[aria-pressed=true]::before{outline:1px solid #f4f0ff;outline-offset:4px;animation:memory-node-select 320ms ease-out both}
+.memory-graph[data-presentation=spatial] .memory-node-label{bottom:calc(100% - 4px);max-width:170px}
+.memory-graph[data-presentation=spatial] .memory-map-node:is([data-matched=true],[aria-pressed=true]) .memory-node-label{color:#fff6ff;border-color:var(--memory-node-color);font-weight:600;background:#090912ed}
+.memory-graph.has-query .memory-map-node[data-matched=false] .memory-node-label{opacity:.4}
+.memory-graph[data-presentation=spatial] .memory-map-node[data-memory-highlight=search] .memory-node-label::after{content:" · match";color:var(--memory-node-color)}
+@keyframes memory-node-select{from{transform:translate(-50%,-50%) scale(.9)}to{transform:translate(-50%,-50%) scale(1)}}
+.memory-node-preview{position:absolute;z-index:40;left:12px;bottom:12px;width:min(380px,calc(100% - 24px));max-height:160px;overflow:hidden;padding:10px 12px;background:#080810f2;border-left:2px solid #a78bfa;box-shadow:0 8px 24px #0008;pointer-events:none;overflow-wrap:anywhere}
+.memory-node-preview strong{font:600 12px/1.4 "Segoe UI",sans-serif;color:#f1edff}
+.memory-node-preview p{margin:5px 0;font:13px/1.45 "Segoe UI",sans-serif;color:#e5deef;white-space:pre-wrap}
+.memory-node-preview small{display:block;color:#bdb2cc;font:11px/1.4 ui-monospace,monospace}
+.memory-detail{z-index:45;border-left:2px solid var(--memory-selected-color,#c4b5fd);border-radius:3px}
+.memory-compaction-cue{z-index:30}
+.memory-compact-tools{display:flex;flex:1;flex-wrap:wrap;gap:6px 10px;align-items:center;min-width:0;justify-content:flex-end}
+.memory-compact-tools #memory-compact-status{flex-basis:100%;margin:0;text-align:right;font-size:11px;line-height:1.4;max-width:100%}
+#memory-compact-now{font-size:12px;white-space:nowrap}
+#memory-compact-now:enabled{border-color:#ad95da77;color:#e9ddff}
+.memory-dialog button:disabled{cursor:default}
+@media(max-width:600px){.memory-compact-tools{flex-basis:100%;justify-content:flex-start}.memory-compact-tools #memory-compact-status{text-align:left}.memory-node-preview{left:8px;bottom:8px;width:calc(100% - 16px);max-height:145px}}
+@media(forced-colors:active){.memory-node-preview{background:Canvas;color:CanvasText;border-color:CanvasText}.memory-graph .memory-map-node[data-matched=true]{outline:2px solid Highlight}.memory-graph.has-query .memory-map-node[data-matched=false] .memory-node-label{opacity:1}}

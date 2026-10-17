@@ -101,8 +101,10 @@ export function createConversationIndex({ conversation, core, ownerScope, getAct
     const excluded = ids(excludeTurnIds, 'Excluded sources'), current = read();
     if (!current.originals) return freeze({ hits: [], status: current.status });
     const latestUser = current.originals.findLast(turn => turn.role === 'user')?.id;
-    const eligible = current.originals.filter(turn => !current.blocked.has(turn.id) && !current.protectedIds.has(turn.id) && !excluded.has(turn.id)
-      && (purpose === 'display' || turn.role === 'user' && turn.id !== latestUser));
+    // Display searches the same owner-authorized originals shown in the graph.
+    // Prompt protection still prevents saved/persona evidence from being quoted twice.
+    const eligible = current.originals.filter(turn => !current.blocked.has(turn.id) && !excluded.has(turn.id)
+      && (purpose === 'display' || !current.protectedIds.has(turn.id) && turn.role === 'user' && turn.id !== latestUser));
     const queryTerms = terms(query);
     const status = { ...current.status, eligibleTurnCount: eligible.length, purpose, meaningfulQueryTermCount: queryTerms.size, coreTruncated: false };
     if (!queryTerms.size) return freeze({ hits: [], status });

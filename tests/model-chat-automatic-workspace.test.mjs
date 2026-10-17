@@ -115,8 +115,9 @@ test('Global/Persona/Conversation selection strictly filters actual sources', as
     const result = await workspace.automaticMemory.search({ query: 'Mars moons Fred' });
     assert.ok(result.hits.length > 0); assert.ok(result.hits.every(hit => hit.scope === selected));
     if (selected === 'conversation') {
-      assert.deepEqual(result.hits.map(hit => hit.turnId), [independent.id]);
-      assert.equal(result.hits.some(hit => hit.turnId === authored.id), false, 'Persona-owned origin is protected from derived conversation search');
+      assert.deepEqual(new Set(result.hits.map(hit => hit.turnId)), new Set([authored.id, independent.id]), 'Display search includes the visible authorized originals');
+      assert.deepEqual((await workspace.automaticMemory.prepareContext({ query: 'Mars moons Fred', excludeTurnId: independent.id })).hits, [],
+        'Persona-owned origin and latest query remain excluded from automatic prompt evidence');
       assert.ok(conversationNodes(workspace).some(node => node.turnId === authored.id), 'the original canonical graph node remains visible');
     }
     if (selected === 'persona') assert.deepEqual(result.hits.map(hit => hit.provenance.origin.turnId), [authored.id]);
@@ -218,7 +219,7 @@ test('message Forget, persona Forget and Global removal persist without source r
   assert.deepEqual(restored.conversation.snapshot().turns.slice(0, 2).map(turn => turn.content), [pinned.content, separate.content]);
 });
 
-test('saved-record correction/forget protects every manual source from automatic search and compaction', async t => {
+test('saved-record correction remains display-searchable; Forget blocks every historical source from memory and compaction', async t => {
   const { workspace, storage } = await fixture(t);
   const first = append(workspace, 'My name is Fred.');
   const saved = await workspace.memory.save({ text: first.content, sourceTurnIds: [first.id], scope: scope(workspace), modelSafe: true });
@@ -229,10 +230,16 @@ test('saved-record correction/forget protects every manual source from automatic
   let prepared = await workspace.prepare();
   assert.deepEqual(prepared.evidence.map(hit => hit.text), [correction.content]); assert.doesNotMatch(messagesText(prepared), /Fred/);
   assert.equal(prepared.memorySources.some(hit => [first.id, correction.id].includes(hit.turnId)), false);
+  const beforeForget = await workspace.automaticMemory.search({ query: 'Fred Ada name' });
+  for (const turnId of [first.id, correction.id]) assert.ok(beforeForget.hits.some(hit => hit.turnId === turnId), 'Protected history remains display-searchable before Forget');
   await workspace.memory.forget({ recordId: saved.id }); append(workspace, 'Please tell me my name.');
   prepared = await workspace.prepare(); assert.deepEqual(prepared.evidence, []); assert.doesNotMatch(messagesText(prepared), /Fred|Ada/);
   await workspace.persist(); const { workspace: restored } = await fixture(t, { storage });
   assert.equal((await restored.automaticMemory.search({ query: 'Fred Ada name' })).hits.some(hit => [first.id, correction.id].includes(hit.turnId)), false);
+  assert.equal(conversationNodes(restored).some(node => [first.id, correction.id].includes(node.turnId)), false);
+  assert.deepEqual((await restored.automaticMemory.prepareContext({ query: 'Fred Ada', excludeTurnId: restored.conversation.snapshot().turns.at(-1).id })).hits, []);
+  assert.deepEqual(restored.conversation.snapshot().turns.slice(0, 3).map(turn => turn.content), [first.content, 'Your name is Fred.', correction.content],
+    'Forget removes memory access without rewriting canonical chat history');
 });
 
 test('scope/forget mutations invalidate a prepared dispatch and used glow changes only at the fixture send boundary', async t => {
@@ -294,7 +301,10 @@ test('forgetting corrected Persona history excludes every Amber/Copper origin fr
   const correction = append(workspace, 'The expedition codename is Copper.');
   await workspace.automaticMemory.correctPersona({ recordId: 'p-0001', expectedVersion: 1, turnId: correction.id, text: correction.content });
   const correctedSearch = await workspace.automaticMemory.search({ query: 'expedition codename' });
-  assert.deepEqual(correctedSearch.hits.map(hit => [hit.scope, hit.text]), [['persona', correction.content]]);
+  assert.deepEqual(new Set(correctedSearch.hits.map(hit => JSON.stringify([hit.scope, hit.text]))),
+    new Set([['conversation', first.content], ['conversation', correction.content], ['persona', correction.content]].map(value => JSON.stringify(value))));
+  assert.deepEqual((await workspace.automaticMemory.prepareContext({ query: 'expedition codename', excludeTurnId: correction.id })).hits
+    .map(hit => [hit.scope, hit.text]), [['persona', correction.content]], 'Display of source history does not admit old versions to the prompt');
   const pin = workspace.automaticMemory.snapshot().nodes.find(node => node.scope === 'persona');
   await workspace.automaticMemory.forget(pin);
   append(workspace, 'What is the expedition codename?'); await workspace.persist();

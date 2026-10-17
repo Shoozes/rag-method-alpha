@@ -59,6 +59,7 @@ export function createEventStore() {
       if (!actualEvent || Array.isArray(actualEvent) || typeof actualEvent !== 'object') throw new TypeError('A memory event must be an object.');
       const data = cloneData(actualEvent);
       if (!types.has(data.type)) throw new TypeError('Unknown memory event type.');
+      if (data.type === 'compacted' && 'trigger' in data && data.trigger !== 'manual') throw new TypeError('Unknown compaction trigger.');
       if ('id' in data || 'seq' in data) throw new TypeError('Memory event identity belongs to the store.');
       if ('recordId' in data) identity(data.recordId, 'recordId');
       references(data, 'recordIds');

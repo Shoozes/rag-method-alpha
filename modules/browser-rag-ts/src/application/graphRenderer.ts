@@ -67,6 +67,10 @@ export interface RagGraphHitTarget {
 
 export interface RagGraphNodeTarget extends RagGraphHitTarget {
   readonly visible: boolean;
+  /** Memory-spatial body radius in CSS pixels, excluding its optional aura. */
+  readonly radius_px?: number;
+  /** Memory-spatial camera-forward distance in world units; smaller is nearer. */
+  readonly depth?: number;
 }
 
 export interface RagGraphViewportDiagnostics {
@@ -275,6 +279,7 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
   let selectedNodeId: string | null = null;
   let hitNodeIds = new Set<string>();
   let visibleNodeIds: readonly string[] = [];
+  const renderedNodeData = new Map<string, RenderNodeData>();
   let hasGraphData = false;
   let framePending = false;
   let userAdjusted = false;
@@ -292,7 +297,7 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
   const stopCamera = ():void => { if(cameraFrame)cancelAnimationFrame(cameraFrame);cameraFrame=0; };
   const nodeMotion = createNodeSpawnMotion({
     reducedMotion:()=>!motionEnabled,
-    refreshNodeStyles:(ids)=>{ for(const id of ids)dirtyMotionIds.add(id);if(!motionStyleFrame)motionStyleFrame=requestAnimationFrame(()=>{motionStyleFrame=0;if(graph){graph.refreshNodeStyles(dirtyMotionIds);graph.render();options.canvas.dataset.spawnActive=String(nodeMotion.activeCount);}dirtyMotionIds.clear();}); },
+    refreshNodeStyles:(ids)=>{ for(const id of ids)dirtyMotionIds.add(id);if(!motionStyleFrame)motionStyleFrame=requestAnimationFrame(()=>{motionStyleFrame=0;if(graph){graph.refreshNodeStyles(dirtyMotionIds);graph.render();options.canvas.dataset.spawnActive=String(nodeMotion.activeCount);if(memorySpatial)publishDiagnostics();}dirtyMotionIds.clear();}); },
     onError:(error)=>options.onTerminalFailure(error instanceof Error?error.message:String(error)),
   });
   const styledRadius = (node:{readonly id:string|number;readonly data?:RenderNodeData}):number => {
@@ -348,16 +353,30 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
     camera.lookAt(pose.target.x, pose.target.y, pose.target.z);
     camera.updateMatrixWorld();
     camera.updateProjectionMatrix();
+    const direction = memorySpatial ? { x: pose.position.x - pose.target.x, y: pose.position.y - pose.target.y, z: pose.position.z - pose.target.z } : null;
+    const distance = direction ? Math.hypot(direction.x, direction.y, direction.z) : 0;
+    const focalPixels = measured.height / (2 * Math.tan(25 * Math.PI / 180));
     return [...nodeIds].flatMap((nodeId) => {
       const position = graph?.getNodePosition(nodeId);
       if (!position) return [];
       const projected = new THREE.Vector3(position.x, position.y, position.z).project(camera);
       const visible = projected.z >= -1 && projected.z <= 1 && Math.abs(projected.x) <= 1 && Math.abs(projected.y) <= 1;
+      let body: { radius_px: number; depth: number } | undefined;
+      if (direction && distance > 0) {
+        const depth = ((pose.position.x - position.x) * direction.x + (pose.position.y - position.y) * direction.y
+          + (pose.position.z - position.z) * direction.z) / distance;
+        const data = renderedNodeData.get(nodeId);
+        // Native state appearances multiply; these are the wrapper-owned flags.
+        const stateScale = (selectedNodeId === nodeId ? 1.22 : 1) * (hitNodeIds.has(nodeId) ? 1.12 : 1);
+        const pixels = data && depth > 0 ? styledRadius({ id: nodeId, data }) * stateScale * focalPixels / depth : 0;
+        body = { depth: Number.isFinite(depth) ? depth : 0, radius_px: Number.isFinite(pixels) ? Math.max(0, pixels) : 0 };
+      }
       return [{
         node_id: nodeId,
         x: ((projected.x + 1) / 2) * measured.width,
         y: ((1 - projected.y) / 2) * measured.height,
-        visible,
+        visible: visible && (!memorySpatial || Boolean(body && body.depth > 0 && body.radius_px > 0)),
+        ...(body || {}),
       }];
     });
   };
@@ -516,6 +535,9 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
         })),
         links: positioned.links.map((link) => ({ id: link.id, source: link.source, target: link.target, data: { kind: link.kind } })),
       });
+      renderedNodeData.clear();
+      if (memorySpatial) for (const node of positioned.nodes) renderedNodeData.set(node.id,
+        { kind: node.kind, record_id: node.record_id, source_id: node.source_id, path: node.path });
       visibleNodeIds = positioned.nodes.map((node) => node.id);
       const currentIds = new Set(visibleNodeIds);
       for (const id of baseColors.keys()) if (!currentIds.has(id)) baseColors.delete(id);
@@ -585,6 +607,7 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
       hitNodeIds.clear();
       visibleNodeIds = [];
       baseColors.clear();
+      renderedNodeData.clear();
       hasGraphData = false;
       framePending = false;
       userAdjusted = false;
@@ -608,6 +631,7 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
       graph.dispose();
       graph = null;
       baseColors.clear();
+      renderedNodeData.clear();
       selectedNodeId = null;
       hitNodeIds.clear();
       visibleNodeIds = [];

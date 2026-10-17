@@ -57,3 +57,20 @@ test('multiple successes are coalesced once with a bounded visible node set and 
   assert.equal(taken.durationMs, COMPACTION_CUE_MS); assert.ok(COMPACTION_CUE_MS >= 1000 && COMPACTION_CUE_MS <= 4000);
   cue.dispose(); assert.equal(cue.observe(success('e-3')), false); assert.equal(cue.take(nodes), null);
 });
+
+test('only explicit manual under-budget successes cue, retaining the same lineage and reduction checks', () => {
+  const event = { ...success(), trigger: 'manual', beforePromptTokens: 1100, afterPromptTokens: 400 };
+  const cue = createCompactionCue();
+  assert.equal(cue.observe(event), true); assert.deepEqual(cue.take([node('t-1')]).nodeIds, ['turn:t-1']);
+  assert.equal(cue.observe(event), false); assert.equal(cue.take([node('t-1')]), null);
+  assert.equal(createCompactionCue([event]).take([node('t-1')]), null);
+  for (const trigger of [undefined, null, '', 'automatic', 'overflow', false, {}]) {
+    assert.equal(createCompactionCue().observe({ ...event, trigger }), false);
+  }
+  const { trigger, ...untagged } = event;
+  assert.equal(createCompactionCue().observe(untagged), false);
+  for (const patch of [{ afterPromptTokens: 1100 }, { afterPromptTokens: 1900 }, { summaryHash: '' },
+    { sourceHashes: [] }, { requestAfterSha256: event.requestBeforeSha256 }]) {
+    assert.equal(createCompactionCue().observe({ ...event, ...patch }), false);
+  }
+});

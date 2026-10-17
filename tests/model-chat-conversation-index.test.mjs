@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { buildCore } from '../examples/browser-model-chat/memory/build-core.mjs';
 import { createConversationStore } from '../examples/browser-model-chat/memory/store.mjs';
 import { createConversationIndex } from '../examples/browser-model-chat/memory/conversation-index.mjs';
+import { createWorkspace } from '../examples/browser-model-chat/memory/workspace.mjs';
 
 const corePath = process.env.BROWSER_MEMORY_CORE_MODULE?.trim() || (await buildCore()).corePath;
 const core = await import(pathToFileURL(resolve(corePath)).href);
@@ -66,7 +67,7 @@ test('blank, function-word-only and unrelated queries cannot manufacture matchin
   assert.equal((await index.search({ query: 'What is it?' })).status.meaningfulQueryTermCount, 0);
 });
 
-test('blocked sources leave graph and all search; manual-history protection affects search only', async () => {
+test('blocked sources leave graph and all search; protected originals remain display-only', async () => {
   let blocked = [], protectedIds = [];
   const { index, append } = setup({ getBlockedTurnIds: () => blocked, getProtectedTurnIds: () => protectedIds });
   const saved = append('The project city is Bristol.');
@@ -74,12 +75,60 @@ test('blocked sources leave graph and all search; manual-history protection affe
   const duplicate = append('The project city is Bristol.');
   protectedIds = [saved.id, corrected.id];
   assert.equal(index.snapshot().nodes.length, 3);
-  assert.deepEqual((await index.search({ query: 'project city' })).hits.map(hit => hit.turnId), [duplicate.id]);
+  assert.deepEqual(new Set((await index.search({ query: 'project city' })).hits.map(hit => hit.turnId)), new Set([saved.id, corrected.id, duplicate.id]));
+  assert.deepEqual((await index.search({ query: 'project city', purpose: 'prompt' })).hits, []);
   blocked = [duplicate.id];
   assert.deepEqual(index.snapshot().nodes.map(node => node.turnId), [corrected.id, saved.id]);
-  assert.deepEqual((await index.search({ query: 'project city' })).hits, []);
+  assert.deepEqual(new Set((await index.search({ query: 'project city' })).hits.map(hit => hit.turnId)), new Set([saved.id, corrected.id]));
+  assert.deepEqual((await index.search({ query: 'project city', purpose: 'prompt' })).hits, []);
   blocked = [saved.id, corrected.id, duplicate.id];
   assert.deepEqual(index.snapshot().nodes, []); assert.deepEqual((await index.search({ query: 'Bristol' })).hits, []);
+});
+
+async function workspaceFixture(t) {
+  const forbidden = () => { throw Error('Display/prompt retrieval must not call a model or tokenization adapter.'); };
+  const workspace = await createWorkspace({ core, graphEnabled: false, adapter: { measure: forbidden, reply: forbidden } });
+  t.after(() => workspace.dispose());
+  return workspace;
+}
+
+test('saved hello original stays searchable for display without entering automatic prompt evidence', async t => {
+  const workspace = await workspaceFixture(t), automatic = workspace.automaticMemory;
+  const authored = workspace.conversation.append({ role: 'user', content: 'hello' });
+  const generated = workspace.conversation.append({ role: 'assistant', content: 'hello from a generated reply' });
+  const latest = workspace.conversation.append({ role: 'user', content: 'hello again' });
+  const { actorId, conversationId } = workspace.ownerScope;
+  const saved = await workspace.memory.save({ text: 'hello', sourceTurnIds: [authored.id], scope: { actorId, conversationId }, modelSafe: true });
+  const display = await automatic.search({ query: 'hello' });
+  assert.deepEqual(new Set(display.hits.map(hit => hit.turnId)), new Set([authored.id, generated.id, latest.id]));
+  assertSources(display.hits, workspace.conversation);
+  assert.ok(automatic.snapshot().nodes.some(node => node.id === 'turn:' + authored.id));
+  assert.deepEqual((await automatic.prepareContext({ query: 'hello', excludeTurnId: latest.id })).hits, []);
+  await workspace.memory.forget({ recordId: saved.id });
+  assert.ok(!(await automatic.search({ query: 'hello' })).hits.some(hit => hit.turnId === authored.id));
+  assert.ok(!automatic.snapshot().nodes.some(node => node.id === 'turn:' + authored.id));
+  assert.deepEqual((await automatic.prepareContext({ query: 'hello', excludeTurnId: latest.id })).hits, []);
+});
+
+test('persona-pinned hello keeps its visible Conversation original searchable while prompt protection and forget remain intact', async t => {
+  const workspace = await workspaceFixture(t), automatic = workspace.automaticMemory;
+  const authored = workspace.conversation.append({ role: 'user', content: 'hello from the owner' });
+  const generated = workspace.conversation.append({ role: 'assistant', content: 'hello from a generated reply' });
+  const latest = workspace.conversation.append({ role: 'user', content: 'hello next question' });
+  await automatic.pinPersona({ turnId: authored.id, text: authored.content });
+  const all = await automatic.search({ query: 'hello' }), persona = all.hits.find(hit => hit.scope === 'persona');
+  assert.ok(persona); assert.ok(all.hits.some(hit => hit.nodeId === 'turn:' + authored.id));
+  const prompt = await automatic.prepareContext({ query: 'hello', excludeTurnId: latest.id });
+  assert.deepEqual(prompt.hits.map(hit => hit.nodeId), [persona.nodeId]);
+  assert.ok(prompt.hits.every(hit => hit.role !== 'assistant' && hit.nodeId !== 'turn:' + authored.id && hit.nodeId !== 'turn:' + latest.id));
+  await automatic.setScope('conversation');
+  const display = await automatic.search({ query: 'hello' });
+  assert.deepEqual(new Set(display.hits.map(hit => hit.turnId)), new Set([authored.id, generated.id, latest.id]));
+  assertSources(display.hits, workspace.conversation);
+  assert.deepEqual((await automatic.prepareContext({ query: 'hello', excludeTurnId: latest.id })).hits, []);
+  await automatic.forget(persona);
+  assert.ok(!(await automatic.search({ query: 'hello' })).hits.some(hit => hit.turnId === authored.id));
+  assert.ok(!automatic.snapshot().nodes.some(node => node.id === 'turn:' + authored.id));
 });
 
 test('reloading the canonical store recreates the same derived sources without duplicate persisted rows', async () => {

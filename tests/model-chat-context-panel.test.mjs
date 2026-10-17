@@ -59,6 +59,57 @@ test('source totals and completeness remain separate from the retained row array
   assert.equal(absent.candidateCount, null); assert.equal(absent.candidatesComplete, null);
 });
 
+test('submitted memory summary uses admission accounting, never the presence of system instructions', () => {
+  const instructionOnly = '[{"role":"system","content":"Base instructions. No saved evidence matched this query."}]';
+  const empty = { ...record('submitted'), admitted: [], admittedCount: 0, admittedComplete: true, exactMemoryContext: instructionOnly };
+  const noMemory = contextInspectionView(snapshot({ latestPrepared: null, lastSubmitted: empty }));
+  assert.equal(noMemory.memorySummary, 'No recalled memory was included in this submitted request.');
+  assert.equal(noMemory.memoryTitle, 'Exact submitted system text');
+  assert.match(noMemory.memoryNote, /System instructions alone are not recalled memory/);
+  assert.equal(noMemory.exactMemoryContext, instructionOnly, 'Actual submitted system text remains exact even with no recalled memory');
+  const included = contextInspectionView(snapshot({ latestPrepared: null, lastSubmitted: { ...record('submitted'), admittedCount: 1, admittedComplete: true } }));
+  assert.equal(included.memorySummary, '1 memory source was included in this submitted request.');
+  assert.equal(included.memoryTitle, 'Exact submitted system and memory text');
+  const unknown = contextInspectionView(snapshot({ latestPrepared: null, lastSubmitted: { ...empty, admittedCount: undefined, admittedComplete: false } }));
+  assert.equal(unknown.memorySummary, 'Memory inclusion is unavailable for this submitted request.');
+  assert.equal(unknown.exactMemoryContext, instructionOnly);
+});
+
+test('prepared stale and cancelled memory selections are never described as sent', () => {
+  for (const phase of ['prepared', 'stale', 'cancelled']) {
+    const view = contextInspectionView(snapshot({ phase, latestPrepared: { ...record(phase), admittedCount: 1, admittedComplete: true }, lastSubmitted: record('submitted') }));
+    assert.equal(view.memorySummary, '1 memory source was selected for this preparation. Not sent.');
+    assert.match(view.memoryTitle, /^Exact prepared/); assert.match(view.memoryNote, /This text was not submitted/);
+    assert.equal(view.exactMemoryContext, record().exactMemoryContext);
+    assert.doesNotMatch(view.memorySummary, /included in this submitted request/);
+  }
+  const empty = contextInspectionView(snapshot({ latestPrepared: { ...record(), admitted: [], admittedCount: 0, admittedComplete: true } }));
+  assert.equal(empty.memorySummary, 'No recalled memory selected for this preparation. Not sent.');
+  assert.equal(contextInspectionView(snapshot({ latestPrepared: null })).memorySummary, 'No submitted request to inspect yet.');
+});
+
+test('omitted exact text and rows do not turn confirmed included memory into a false zero', () => {
+  const omitted = { ...record('submitted'), admitted: [], admittedCount: 5, admittedComplete: false,
+    exactMemoryContext: null, memoryContextComplete: false, memoryContextUnavailableReason: 'Exact prefix exceeds 16 KiB.' };
+  const view = contextInspectionView(snapshot({ latestPrepared: null, lastSubmitted: omitted }));
+  assert.equal(view.memorySummary, '5 memory sources were included in this submitted request.');
+  assert.equal(view.exactMemoryContext, null); assert.equal(view.memoryUnavailableReason, omitted.memoryContextUnavailableReason);
+  assert.equal(view.admitted.length, 0); assert.equal(view.admittedComplete, false);
+});
+
+test('manual compaction purpose labels only an unsent preview and cannot promote it to submission', () => {
+  for (const phase of ['prepared', 'stale', 'cancelled', 'error']) {
+    const value = { ...record(phase), purpose: 'manual-compaction', admittedCount: 1, admittedComplete: true };
+    const view = contextInspectionView(snapshot({ phase, latestPrepared: value, lastSubmitted: record('submitted') }));
+    assert.equal(view.choices[0].label, 'Manual compaction preview'); assert.equal(view.selected, 'prepared');
+    assert.match(view.state, /Manual compaction preview.*Not sent\./);
+    assert.equal(view.memorySummary, '1 memory source was selected for this manual preview. Not sent.');
+    assert.equal(view.admissionLabel, 'Selected for manual compaction preview');
+    assert.equal(view.memoryTitle, 'Exact preview system and memory text');
+    assert.equal(view.exactMemoryContext, value.exactMemoryContext);
+  }
+});
+
 // Small DOM/event fixture for ownership and keyboard state, not browser visual proof.
 class NodeFixture extends EventTarget {
   constructor(tag, ownerDocument) { super(); this.tagName = tag; this.ownerDocument = ownerDocument; this.attributes = new Map(); this.childNodes = []; this.hidden = false; this.value = ''; this._text = ''; }
@@ -117,6 +168,32 @@ test('inspection text stays literal, missing scores are not invented, and subscr
   assert.match(inspector.panel.textContent, /Included in submitted request/);
   inspector.dispose(); assert.equal(fixture.unsubscribed, true); assert.equal(inspector.tabs.removed, true); assert.equal(inspector.panel.removed, true);
   fixture.emit(snapshot({ phase: 'error', error: 'Late observer update' })); assert.doesNotMatch(inspector.panel.textContent, /Late observer update/);
+});
+
+test('visible summary and exact prefix follow the chosen request through empty zero and prepared states', () => {
+  const fixture = uiFixture(snapshot({ latestPrepared: null })), { inspector } = fixture;
+  const summary = byId(inspector, 'memory-context-summary');
+  assert.equal(summary.textContent, 'No submitted request to inspect yet.');
+  assert.equal(summary.getAttribute('aria-live'), 'polite');
+  const prefix = value => walk(inspector.panel).find(node => node.getAttribute('aria-label') === value);
+  const submitted = { ...record('submitted'), admitted: [], admittedCount: 0, admittedComplete: true,
+    exactMemoryContext: '[{"role":"system","content":"System instructions only."}]' };
+  fixture.emit(snapshot({ latestPrepared: null, lastSubmitted: submitted, phase: 'submitted' }));
+  assert.equal(summary.textContent, 'No recalled memory was included in this submitted request.');
+  assert.equal(prefix('Exact memory context').textContent, submitted.exactMemoryContext);
+  const prepared = { ...record(), admittedCount: 1, admittedComplete: true };
+  fixture.emit(snapshot({ latestPrepared: prepared, lastSubmitted: submitted }));
+  assert.match(summary.textContent, /selected for this preparation\. Not sent\./);
+  assert.equal(prefix('Exact memory context').textContent, prepared.exactMemoryContext);
+  const choice = byId(inspector, 'memory-context-request'); choice.value = 'submitted'; choice.dispatchEvent(new Event('change'));
+  assert.equal(summary.textContent, 'No recalled memory was included in this submitted request.');
+  assert.equal(prefix('Exact memory context').textContent, submitted.exactMemoryContext, 'Prepared text is never relabeled as submitted');
+  fixture.emit(snapshot({ latestPrepared: prepared, lastSubmitted: { ...submitted, admittedCount: 2, admittedComplete: false,
+    memoryContextComplete: false, exactMemoryContext: null, memoryContextUnavailableReason: 'Exact text unavailable at inspector limit.' } }));
+  assert.equal(summary.textContent, '2 memory sources were included in this submitted request.');
+  assert.equal(prefix('Exact memory context').hidden, true);
+  assert.match(inspector.panel.textContent, /Exact text unavailable at inspector limit/);
+  inspector.dispose();
 });
 
 test('bounded source lists visibly distinguish retained details, omitted-all, and genuine zero', () => {

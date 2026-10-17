@@ -10,7 +10,7 @@ export const storageKey = 'private-one-chat-memory-v1';
 const defaultOwner = { actorId: 'local-user', personaId: 'local-assistant', conversationId: 'local-chat' };
 export const workspaceStorageKey = owner => Object.keys(defaultOwner).every(key => owner[key] === defaultOwner[key])
   ? storageKey : storageKey + ':' + JSON.stringify([owner.actorId, owner.personaId, owner.conversationId]);
-export async function createWorkspace({ adapter, core, storage, graphEnabled = true, automaticMemoryEnabled = true,
+export async function createWorkspace({ adapter, core, storage, graphEnabled = true, automaticMemoryEnabled = true, getControllerState,
   actorId = defaultOwner.actorId, personaId = defaultOwner.personaId, conversationId = defaultOwner.conversationId }) {
   if (typeof personaId !== 'string' || !personaId.trim() || personaId.length > 200) throw Error('Invalid persona identity.');
   const ownerScope = Object.freeze({ actorId, personaId, conversationId });
@@ -80,7 +80,7 @@ export async function createWorkspace({ adapter, core, storage, graphEnabled = t
     globalState: globalBaseline ?? undefined, ensureSharedFresh, persist });
   const unsubscribeConversation = conversation.subscribe(() => automaticMemory?.notify());
   const retrieval = createRetrieval({ core, onEvent: event => events.append(event) });
-  const context = createContextManager({ conversation, memory, retrieval, core, automaticMemory, measure: (messages, options) => adapter.measure(messages, options), events });
+  const context = createContextManager({ conversation, memory, retrieval, core, automaticMemory, measure: (messages, options) => adapter.measure(messages, options), events, getControllerState });
   const graph = graphEnabled ? createMemoryGraph(events) : undefined;
   const workspace = {
     conversation, memory, retrieval, context, events, graph, automaticMemory, ownerScope,

@@ -13,7 +13,7 @@ assert.doesNotMatch(source, /^import\b/m);
 // Exercise the actual wrapper against a graph-engine boundary. This proves
 // options, payloads and lifecycle decisions, not GPU pixels or native projection.
 async function mount(options = {}, width = 390, height = 500) {
-  const state = { colors: new Map(), nodes: [], surfaces: [], frames: [], renders: 0, raf: new Map(), motion: { pulses: 0 } };
+  const state = { colors: new Map(), nodes: [], surfaces: [], frames: [], renders: 0, raf: new Map(), motion: { pulses: 0, scales: new Map() } };
   const canvas = { clientWidth: width, clientHeight: height, dataset: {}, addEventListener() {}, removeEventListener() {}, dispatchEvent() {} };
   const graph = {
     getStartupReport: () => ({ renderer: { selected: 'webgl2' } }),
@@ -43,8 +43,8 @@ async function mount(options = {}, width = 390, height = 500) {
     createThreePlatform: () => ({}), createForceGraph3D: async value => {
       state.options = value; state.pose = structuredClone(value.renderer.cameraPose); return graph;
     },
-    createNodeSpawnMotion: callbacks => ({ scale: () => 1, activeCount: 0, setMany() {}, animate() {},
-      pulse() { if (!callbacks.reducedMotion()) state.motion.pulses++; }, cancelAll() {}, dispose() {} }),
+    createNodeSpawnMotion: callbacks => { state.motion.refresh = callbacks.refreshNodeStyles; return { scale: id => state.motion.scales.get(id) ?? 1, activeCount: 0, setMany() {}, animate() {},
+      pulse() { if (!callbacks.reducedMotion()) state.motion.pulses++; }, cancelAll() {}, dispose() {} }; },
     sampleCameraPoseTween() { throw Error('No tween sampling expected in quiet contract checks.'); },
     planPerspectiveCameraFrame: (bounds, frameOptions) => {
       state.frames.push(structuredClone({ bounds, options: frameOptions }));
@@ -110,6 +110,79 @@ test('ordinary atlas and previous flat memory presentations retain material, fra
     assert.equal(state.options.renderer.nodeSurface.metalness, 0.88); assert.equal(state.options.renderer.nodeSurface.emissive, 0.62);
     assert.deepEqual(state.frames[0].options, { aspect: 1.8, verticalFovDegrees: 50, padding: 1.16, minimumDistance: 24 });
     assert.equal('presentation' in renderer.diagnostics(), false); assert.equal('presentation' in canvas.dataset, false); renderer.dispose();
+  }
+});
+
+test('memory body targets project actual styled radii at finite depth through zoom and minimum pixel floors', async () => {
+  const { renderer, state, canvas } = await mount({ presentation: 'memory-spatial' }, 900, 500);
+  renderer.render({ nodes: [node('chunk', 'chunk', 0, 0, 0), node('source', 'source', 0, 0, 20)], links: [] });
+  const focal = canvas.clientHeight / (2 * Math.tan(25 * Math.PI / 180));
+  const near = { position: { x: 0, y: 0, z: 100 }, target: { x: 0, y: 0, z: 0 } };
+  renderer.setCameraPose(near);
+  let targets = structuredClone(renderer.diagnostics().node_targets);
+  assert.deepEqual(targets.map(target => target.depth), [100, 80]);
+  assert.ok(Math.abs(targets[0].radius_px - 6 * focal / 100) < 1e-9);
+  assert.ok(Math.abs(targets[1].radius_px - 7.5 * focal / 80) < 1e-9);
+  assert.ok(targets[0].radius_px * 2 > 44, 'The target exposes a real visible body wider than the former fixed tap box.');
+  assert.deepEqual(JSON.parse(canvas.dataset.nodeTargets), targets);
+  renderer.setCameraPose({ ...near, position: { x: 0, y: 0, z: 200 } });
+  const zoomed = structuredClone(renderer.diagnostics().node_targets);
+  assert.ok(Math.abs(zoomed[0].radius_px * 2 - targets[0].radius_px) < 1e-9);
+  renderer.setCameraPose({ ...near, position: { x: 0, y: 0, z: 1000 } });
+  targets = structuredClone(renderer.diagnostics().node_targets);
+  assert.ok(Math.abs(targets[0].radius_px - 8) < 1e-9); assert.ok(Math.abs(targets[1].radius_px - 9) < 1e-9);
+  assert.ok(targets.every(target => Number.isFinite(target.radius_px) && Number.isFinite(target.depth)));
+  assert.equal(state.raf.size, 0); renderer.dispose();
+});
+
+test('body radius includes multiplying selected/focused and actual spawn scale without inflating aura', async () => {
+  const { renderer, state, canvas, flush } = await mount({ presentation: 'memory-spatial' });
+  renderer.render({ nodes: [node('body', 'chunk', 0, 0, 0)], links: [] });
+  renderer.setCameraPose({ position: { x: 0, y: 0, z: 100 }, target: { x: 0, y: 0, z: 0 } });
+  const base = renderer.diagnostics().node_targets[0].radius_px;
+  renderer.setInteractionState('body', ['body']);
+  assert.ok(Math.abs(renderer.diagnostics().node_targets[0].radius_px - base * 1.22 * 1.12) < 1e-9);
+  state.motion.scales.set('body', 0.5);
+  assert.ok(Math.abs(renderer.diagnostics().node_targets[0].radius_px - base * 1.22 * 1.12 * 0.5) < 1e-9);
+  state.motion.refresh(['body']); assert.equal(state.raf.size, 1); flush();
+  assert.ok(Math.abs(JSON.parse(canvas.dataset.nodeTargets)[0].radius_px - base * 1.22 * 1.12 * 0.5) < 1e-9);
+  assert.equal(state.raf.size, 0, 'Publishing targets reuses the one bounded style frame without starting another.');
+  renderer.setInteractionState(null, []);
+  assert.ok(Math.abs(renderer.diagnostics().node_targets[0].radius_px - base * 0.5) < 1e-9);
+  assert.equal(state.motion.pulses, 0); renderer.dispose();
+});
+
+test('camera-forward target depth supports angled views and nearer overlapping bodies sort first', async () => {
+  const { renderer } = await mount({ presentation: 'memory-spatial' });
+  renderer.render({ nodes: [node('far', 'chunk', -30, -40, -50), node('near', 'chunk', 30, 40, 50)], links: [] });
+  renderer.setCameraPose({ position: { x: 60, y: 80, z: 100 }, target: { x: 0, y: 0, z: 0 } });
+  const [far, near] = renderer.diagnostics().node_targets;
+  assert.ok(Math.abs(near.depth - Math.sqrt(60 ** 2 + 80 ** 2 + 100 ** 2) / 2) < 1e-9);
+  assert.ok(Math.abs(far.depth - near.depth * 3) < 1e-9);
+  assert.ok(near.radius_px > far.radius_px);
+  assert.deepEqual([far, near].sort((a, b) => a.depth - b.depth).map(target => target.node_id), ['near', 'far']);
+  renderer.dispose();
+});
+
+test('behind-camera body targets remain finite and hidden; metadata clears with topology and disposal', async () => {
+  const { renderer } = await mount({ presentation: 'memory-spatial' });
+  renderer.render({ nodes: [node('behind', 'source', 0, 0, 150)], links: [] });
+  renderer.setCameraPose({ position: { x: 0, y: 0, z: 100 }, target: { x: 0, y: 0, z: 0 } });
+  const target = renderer.diagnostics().node_targets[0];
+  assert.equal(target.depth, -50); assert.equal(target.radius_px, 0); assert.equal(target.visible, false);
+  renderer.clear(); assert.equal(renderer.diagnostics().node_targets.length, 0);
+  renderer.render({ nodes: [node('replacement', 'chunk', 0, 0, 0)], links: [] });
+  assert.deepEqual([...renderer.diagnostics().node_targets].map(target => target.node_id), ['replacement']);
+  renderer.dispose(); assert.equal(renderer.diagnostics().node_targets.length, 0);
+});
+
+test('ordinary consumer node and hit target shapes retain their exact original keys', async () => {
+  for (const options of [{}, { nodeSurface: 'scope-colored', preserveNodeColors: true }]) {
+    const { renderer } = await mount(options); renderer.render(positioned);
+    renderer.setInteractionState('conversation', ['persona']);
+    for (const target of renderer.diagnostics().node_targets) assert.deepEqual(Object.keys(target), ['node_id', 'x', 'y', 'visible']);
+    for (const target of renderer.diagnostics().hit_targets) assert.deepEqual(Object.keys(target), ['node_id', 'x', 'y']);
+    renderer.dispose();
   }
 });
 

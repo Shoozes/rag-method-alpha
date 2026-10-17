@@ -107,3 +107,18 @@ test('compaction hashes/order/capacity claims and the original empty-store fake 
     events: [{ id: 'e-1', seq: 1, type: 'saved', recordId: 'missing-record', version: 1, sourceTurnIds: ['t-9999'], contentHash: '0'.repeat(64) }] });
   await assert.rejects(createWorkspace({ adapter, core, storage: { getItem: () => serialized } }), /event binding is invalid/);
 });
+
+test('explicit manual under-budget events restore while invalid tags and unsuccessful manual claims fail', async () => {
+  const base = await fixture();
+  const event = base.events.find(event => event.type === 'compacted');
+  event.trigger = 'manual'; event.beforePromptTokens = 1100;
+  await validateRetainedEvents(input(base));
+  for (const patch of [{ trigger: null }, { trigger: '' }, { trigger: 'automatic' }, { trigger: false },
+    { afterPromptTokens: 1100 }, { afterPromptTokens: 1900 }, { requestAfterSha256: event.requestBeforeSha256 },
+    { sourceHashes: [] }, { summaryHash: '' }]) {
+    const changed = clone(base); Object.assign(changed.events.find(event => event.type === 'compacted'), patch);
+    await assert.rejects(validateRetainedEvents(input(changed)), /Retained memory event binding is invalid/);
+  }
+  const untagged = clone(base); delete untagged.events.find(event => event.type === 'compacted').trigger;
+  await assert.rejects(validateRetainedEvents(input(untagged)), /compaction budget/);
+});

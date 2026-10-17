@@ -2,6 +2,16 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { MEMORY_EVENT_TYPES, createEventStore, createMemoryGraph } from '../examples/browser-model-chat/memory/events.mjs';
 
+test('compaction trigger is optional for legacy events and accepts only the explicit manual tag', () => {
+  const store = createEventStore();
+  assert.equal('trigger' in store.append({ type: 'compacted' }), false);
+  assert.equal(store.append({ type: 'compacted', trigger: 'manual' }).trigger, 'manual');
+  for (const trigger of [null, '', 'automatic', 'overflow', false, {}]) {
+    assert.throws(() => store.append({ type: 'compacted', trigger }), /compaction trigger/);
+  }
+  assert.equal(store.list().length, 2);
+});
+
 test('actual events have stable store identities, immutable snapshots and no input aliases', () => {
   const store = createEventStore();
   const input = { type: 'saved', recordId: 'm-1', sourceTurnIds: ['t-1'], detail: { text: 'Original source' } };

@@ -4,14 +4,31 @@ const scalar = value => typeof value === 'string' || typeof value === 'number' &
 /** Display only supplied inspection fields; this view never performs retrieval. */
 export function contextInspectionView(snapshot, preferred = 'prepared') {
   const choices = [];
-  if (snapshot?.latestPrepared) choices.push({ value: 'prepared', label: 'Latest prepared', record: snapshot.latestPrepared });
+  if (snapshot?.latestPrepared) choices.push({ value: 'prepared', label: snapshot.latestPrepared.purpose === 'manual-compaction' ? 'Manual compaction preview' : 'Latest prepared', record: snapshot.latestPrepared });
   if (snapshot?.lastSubmitted) choices.push({ value: 'submitted', label: 'Last submitted', record: snapshot.lastSubmitted });
   const selected = choices.find(choice => choice.value === preferred) ?? choices[0];
   const record = selected?.record;
   const phase = phases.has(snapshot?.phase) ? snapshot.phase : 'unmeasured';
   const submitted = selected?.value === 'submitted';
+  const manual = !submitted && record?.purpose === 'manual-compaction';
+  const preparation = manual ? 'manual preview' : 'preparation';
   const memoryAvailable = record?.memoryContextComplete === true && typeof record.exactMemoryContext === 'string';
   const messagesAvailable = record?.complete === true && Array.isArray(record.exactMessages);
+  const admitted = Array.isArray(record?.admitted) ? record.admitted : [];
+  const admittedCount = Number.isSafeInteger(record?.admittedCount) && record.admittedCount >= 0 ? record.admittedCount : null;
+  // The exact system prefix also contains base instructions, including when no
+  // memory matched. Only supplied admission accounting establishes memory use.
+  const hasMemory = admittedCount !== null ? admittedCount > 0 : admitted.some(row => row.admitted === true) ? true
+    : record?.admittedComplete === true && admitted.length === 0 ? false : null;
+  const count = admittedCount === null ? 'Memory' : `${admittedCount} memory ${admittedCount === 1 ? 'source' : 'sources'}`;
+  const verb = admittedCount !== null && admittedCount !== 1 ? 'were' : 'was';
+  const memorySummary = !record ? 'No submitted request to inspect yet.'
+    : submitted ? hasMemory === true ? `${count} ${verb} included in this submitted request.`
+      : hasMemory === false ? 'No recalled memory was included in this submitted request.'
+        : 'Memory inclusion is unavailable for this submitted request.'
+      : hasMemory === true ? `${count} ${verb} selected for this ${preparation}. Not sent.`
+        : hasMemory === false ? `No recalled memory selected for this ${preparation}. Not sent.`
+          : `Memory selection is unavailable for this ${preparation}. Not sent.`;
   return {
     choices: choices.map(({ value, label }) => ({ value, label })), selected: selected?.value ?? preferred,
     phase, record: record ?? null,
@@ -19,13 +36,18 @@ export function contextInspectionView(snapshot, preferred = 'prepared') {
       : phase === 'error' ? 'Request preparation failed.' : phase === 'cancelled' ? 'Request preparation was cancelled.'
         : 'No inspected request in this session.'
       : submitted ? 'Submitted to the model Worker. This does not prove the model used any source.'
+        : manual ? `Manual compaction preview${['cancelled', 'stale', 'error'].includes(record.phase) ? ' · ' + (record.phase === 'error' ? 'failed' : record.phase) : ''}. Not sent.`
         : record.phase === 'cancelled' ? 'Prepared · cancelled. This request was not submitted.'
           : record.phase === 'stale' ? 'Prepared · stale. This request was not submitted.' : 'Prepared · not submitted.',
     error: typeof snapshot?.error === 'string' ? snapshot.error : '',
-    admissionLabel: submitted ? 'Included in submitted request' : 'Selected for prepared request',
-    admitted: Array.isArray(record?.admitted) ? record.admitted : [],
+    memorySummary,
+    memoryTitle: `Exact ${submitted ? 'submitted' : manual ? 'preview' : 'prepared'} system${hasMemory === true ? ' and memory' : ''} text`,
+    memoryNote: submitted ? 'Verbatim leading system messages from this submitted request. System instructions alone are not recalled memory.'
+      : `Verbatim leading system messages for this ${manual ? 'manual compaction preview' : 'preparation'}. System instructions alone are not recalled memory. This text was not submitted.`,
+    admissionLabel: submitted ? 'Included in submitted request' : manual ? 'Selected for manual compaction preview' : 'Selected for prepared request',
+    admitted,
     candidates: Array.isArray(record?.candidates) ? record.candidates : [],
-    admittedCount: Number.isSafeInteger(record?.admittedCount) && record.admittedCount >= 0 ? record.admittedCount : null,
+    admittedCount,
     admittedComplete: typeof record?.admittedComplete === 'boolean' ? record.admittedComplete : null,
     candidateCount: Number.isSafeInteger(record?.candidateCount) && record.candidateCount >= 0 ? record.candidateCount : null,
     candidatesComplete: typeof record?.candidatesComplete === 'boolean' ? record.candidatesComplete : null,
@@ -60,10 +82,11 @@ export function createContextInspector({ context, document: doc = globalThis.doc
   const requestChoice = el('select', undefined, { id: 'memory-context-request', 'aria-label': 'Inspected request' });
   requestLabel.append(el('span', 'Request'), requestChoice);
   const state = el('p', '', { class: 'memory-note', 'aria-live': 'polite', 'aria-atomic': 'true' });
+  const memorySummary = el('p', '', { id: 'memory-context-summary', class: 'memory-note', 'aria-live': 'polite', 'aria-atomic': 'true' });
   const error = el('p', '', { class: 'memory-note memory-error', role: 'status' }); error.hidden = true;
   const identity = el('dl', undefined, { class: 'memory-context-identity' });
-  const memoryTitle = el('h3', 'Exact memory context');
-  const memoryNote = el('p', 'Exact leading system/memory messages, including the instruction and any supplied summary. This is request text, not model reasoning.', { class: 'memory-note' });
+  const memoryTitle = el('h3', 'Exact system and memory text');
+  const memoryNote = el('p', '', { class: 'memory-note' });
   const memoryText = el('pre', '', { class: 'memory-context-text', tabindex: '0', 'aria-label': 'Exact memory context' });
   const memoryUnavailable = el('p', '', { class: 'memory-note' });
   const admittedTitle = el('h3', 'Selected sources');
@@ -79,7 +102,7 @@ export function createContextInspector({ context, document: doc = globalThis.doc
   messagesDisclosure.append(el('summary', 'Full request · exact messages'), messagesText);
   const messagesUnavailable = el('p', '', { class: 'memory-note' });
   const ephemeral = el('p', 'Session inspection only. Reload clears this view. Scores and reasons appear only when supplied by retrieval.', { class: 'memory-note' });
-  panel.append(requestLabel, state, error, identity, memoryTitle, memoryNote, memoryText, memoryUnavailable,
+  panel.append(requestLabel, state, memorySummary, error, identity, memoryTitle, memoryNote, memoryText, memoryUnavailable,
     admittedTitle, admitted, admittedNote, candidateNote, candidatesDisclosure, messagesDisclosure, messagesUnavailable, ephemeral);
   let disposed = false, selectedTab = 'graph', preferredRequest = 'prepared';
 
@@ -124,12 +147,14 @@ export function createContextInspector({ context, document: doc = globalThis.doc
     for (const choice of view.choices) requestChoice.append(el('option', choice.label, { value: choice.value }));
     requestChoice.value = view.selected; requestLabel.hidden = view.choices.length < 2;
     state.textContent = view.state; error.textContent = view.error; error.hidden = !view.error;
+    memorySummary.textContent = view.memorySummary;
     identity.replaceChildren();
     const record = view.record;
     for (const [key, label] of [['queryId', 'Query'], ['requestSha256', 'Request SHA-256'], ['conversationVersion', 'Conversation version'],
       ['replyTurnId', 'Reply message'], ['scope', 'Scope']]) metadata(identity, label, record?.[key]);
     identity.hidden = !record;
     memoryTitle.hidden = memoryNote.hidden = admittedTitle.hidden = ephemeral.hidden = !record;
+    memoryTitle.textContent = view.memoryTitle; memoryNote.textContent = view.memoryNote;
     memoryText.hidden = view.exactMemoryContext === null; memoryText.textContent = view.exactMemoryContext ?? '';
     memoryUnavailable.hidden = !record || view.exactMemoryContext !== null; memoryUnavailable.textContent = String(view.memoryUnavailableReason);
     admittedTitle.textContent = view.admissionLabel;

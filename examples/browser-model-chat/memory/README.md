@@ -87,14 +87,36 @@ language corrections or commands are not parsed. Explicit Save/Edit/Forget and
 marked-correction behavior remain; Persona excerpts own their source recall,
 while originals remain inspectable in Conversation.
 
-Search lights matching nodes. Last-used highlights refer only to evidence
+Typing searches after a short pause; Enter searches immediately. A persistent
+scope-colored ring and match count identify actual hits, including authored
+messages protected from duplicate prompt retrieval. The count says **graph search
+only**: searching does not submit a model request. Desktop hover or keyboard
+focus previews content and scope; tap/select opens source words and provenance.
+Native targets follow the visible sphere size and depth. Reduced motion keeps
+the match ring and disables selection movement.
+
+Context states whether recalled memory was included and shows exact submitted
+system/memory text when retained. Prepared, cancelled and manual previews say
+they were not sent; missing text stays unavailable. Last-used highlights refer only to evidence
 actually dispatched with a reply; preparing or cancelling alone does not claim
-use. Tap a node for its excerpt and provenance; Back returns to the graph.
+use. Their request hash and source ownership must match; a Persona turn from
+another chat cannot highlight a colliding local turn ID. Back returns to the graph.
 Conversation citations keep exact references. Global and cross-chat Persona
 excerpts expose their own source; they are not invented current-chat messages.
 Historical links mean **Sources sent at the time**, not answer truth, current
 eligibility or authenticated history. Source hashes establish internal binding,
 not independent authentication of editable browser storage.
+
+**Compact now** explicitly runs the existing bounded context selection and native
+prompt-meter pipeline. A ready loaded model and eligible older history are
+required; protected recent exchanges and original messages remain intact. The
+button explains empty, short-history, loading, active-reply and scope gates.
+Cancel stops an in-flight attempt. A success needs a real committed compaction
+event, lower measured prompt count and final fit; it sends no reply request and
+does not save facts or promote Persona memory. Its actual source nodes receive
+the one-time cue described above, including under-budget manual reductions.
+Failure/cancellation cannot apply a late result. A failed save after success is
+reported as session-only compaction, rather than hiding the committed event.
 
 Forget excludes the selected indexed message and preserves the transcript.
 Persona Forget and Global removal retain tombstones. All versions of manually
