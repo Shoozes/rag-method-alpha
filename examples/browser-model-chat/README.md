@@ -17,10 +17,10 @@ and broader acceptance remain unrecorded. Use the [mobile checklist](./MOBILE.md
 
 ## Current memory experiment
 
-### Local Markdown and message-copy candidate
+### Markdown and message copy
 
-This branch adds a locally verified candidate; publication is a separate step.
-The deployed site's manifest remains the authority for its current contents.
+The reviewed upgrade is published in the experimental preview. The deployed
+site's manifest remains the authority for its exact source and contents.
 Assistant messages support a bounded Markdown subset: paragraphs, emphasis,
 flat ordered/unordered lists, inline and fenced code, and explicit absolute
 HTTP/HTTPS links. User messages remain literal. Raw HTML, images, headings,
@@ -39,7 +39,8 @@ reply limit. Missing or unrecognized reasons stay unknown, without guessing
 from text length. Completion metadata is session UI state; reloaded messages
 do not invent an earlier completion reason. Stop still unloads the model and
 requires a cache-first reload. No model or training configuration changes are
-included in this candidate.
+included in this feature. The current product boundary and remaining gates are
+recorded in [the preview checklist](../../docs/dev/MODEL_CHAT_PRODUCT_CHECKLIST.md).
 
 Open `?memory=1` to index accepted user and assistant messages as Conversation
 nodes. Generated assistant text is available for inspection and search, but
@@ -239,7 +240,7 @@ viewport offsets; they do not establish physical Safari keyboard behavior.
 - Cancel, stop, unload, and page teardown terminate the owned model worker. Loading can be retried with a fresh worker; cancelling a reply unloads the model too.
 - Chat is session-only. Reloading clears the transcript and draft; cached model bytes may persist in the browser. Clearing the conversation does not erase the model cache.
 - The send gate bounds accepted history to six completed turns and checks a 6,000-character history/input budget. Individual input is limited to 4,000 characters, generated replies to 160 tokens, and model context to 2,048 tokens. An interrupted attempt remains visible but is excluded from subsequent accepted history.
-- In this local candidate, assistant messages render the limited safe Markdown subset described above; user text stays literal. The basic mode has no RAG context, attachment injection, saved conversation, tool execution, agent team, or autonomous orchestration. The optional memory mode is described separately above. Existing retrieval and graph behavior retain their own owners and entry points.
+- Assistant messages render the limited safe Markdown subset described above; user text stays literal. The basic mode has no RAG context, attachment injection, saved conversation, tool execution, agent team, or autonomous orchestration. The optional memory mode is described separately above. Existing retrieval and graph behavior retain their own owners and entry points.
 - The loading screen has a static usable state, optional visual effects, and reduced-motion styling. Visual effects pause when the tab is hidden; model work is not paused by visibility. Effects do not drive readiness or progress.
 
 The full-file integrity buffer and model initialization add memory pressure beyond the 153.4 MB file. A passing desktop run does not establish another browser's memory, cache, recovery, or device support.

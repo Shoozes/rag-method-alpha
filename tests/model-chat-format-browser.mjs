@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Production bootstrap, DOM renderer, canonical stores, context and citations.
 // Only runtime-adapter is replaced by the labeled deterministic UI fixture below.
-// No model, native tokenizer, Worker, WASM, external request or OS clipboard access.
+// No model, native tokenizer, Worker, WASM or OS clipboard access. Explicit live
+// mode fetches only the approved deployment directory and verifies published bytes.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -16,11 +17,16 @@ const memoryRoot = resolve(process.env.BROWSER_MODEL_MEMORY_ROOT || join(root, '
 const runtimeRoot = resolve(process.env.BROWSER_MODEL_RUNTIME_ROOT || join(root, '../rag-model-onboarding/.artifacts/model-chat/runtime'));
 const output = join(root, '.artifacts/proof/chat-format');
 const profilePrefix = 'rag-chat-format-fixture-';
+const approvedLiveUrl = 'https://shoozes.github.io/rag-method-alpha/model-chat/';
+const approvedSourceHead = '71559daf0dc23ef3f9f17587564c92f68a4f03c9';
+const liveUrl = process.env.FORMAT_BROWSER_BASE_URL;
+const live = liveUrl !== undefined;
 const coreSha256 = 'c282ebb3965c4a25b48fb66082ce18c72184449f2123633a901ffceb9939ace6';
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const started = Date.now(), harnessSha256 = digest(await readFile(fileURLToPath(import.meta.url)));
 const checks = [], observations = [], assets = [], forbidden = [], pageErrors = [], screenshots = [];
-const cleanup = { contextClosed: false, serverClosed: false, ownedProfileRemoved: false };
+const cleanup = { localServerStarted: false, contextClosed: false, serverClosed: false, ownedProfileRemoved: false };
+const approvedAssetBytes = new Map();
 let server, context, page, profile, base, browserVersion, sourceBefore, sourceAfter, failure;
 let requests = 0, assetBytes = 0, workers = 0, deadline;
 const adapter = `
@@ -87,15 +93,60 @@ async function snapshot() {
   });
 }
 async function clipboardMode(mode) { await page.evaluate(mode => { window.__formatClipboard.mode = mode; }, mode); }
+async function imagePixels(bytes) {
+  return page.evaluate(async encoded => {
+    const pixels = Uint8Array.from(atob(encoded), value => value.charCodeAt(0));
+    const bitmap = await createImageBitmap(new Blob([pixels], { type: 'image/png' }));
+    const canvas = document.createElement('canvas'); canvas.width = bitmap.width; canvas.height = bitmap.height;
+    const context = canvas.getContext('2d', { willReadFrequently: true }); context.drawImage(bitmap, 0, 0); bitmap.close();
+    const hash = await crypto.subtle.digest('SHA-256', context.getImageData(0, 0, canvas.width, canvas.height).data);
+    return { width: canvas.width, height: canvas.height, rgbaSha256: [...new Uint8Array(hash)].map(value => value.toString(16).padStart(2, '0')).join('') };
+  }, bytes.toString('base64'));
+}
 async function capture() {
-  const name = process.env.FORMAT_BROWSER_CAPTURE_NAME || 'chat-format-mobile.png';
+  const name = process.env.FORMAT_BROWSER_CAPTURE_NAME || (live ? 'chat-format-mobile-live.png' : 'chat-format-mobile.png');
   assert.match(name, /^[a-z0-9][a-z0-9-]{0,80}\.png$/, 'Capture name is one bounded PNG basename');
   await mkdir(output, { recursive: true });
+  const bytes = await page.screenshot(), capturedSha256 = digest(bytes);
+  if (live) {
+    const originalPath = join(output, 'chat-format-mobile.png');
+    let original;
+    try { original = await readFile(originalPath); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    if (original) {
+      const originalSha256 = digest(original);
+      assert.equal(originalSha256, 'a8d55ccedecec64f10656c35521db83d32faafcd7ec51f1f8b7d364bf2d77613', 'Preserved candidate screenshot identity');
+      const originalPixels = await imagePixels(original), livePixels = await imagePixels(bytes);
+      if (originalPixels.rgbaSha256 === livePixels.rgbaSha256 && originalPixels.width === livePixels.width && originalPixels.height === livePixels.height) {
+        screenshots.push({ path: '.artifacts/proof/chat-format/chat-format-mobile.png', bytes: original.length,
+          sha256: originalSha256, width: 390, height: 844, labeledFixture: true, liveCaptured: true,
+          reusedCandidatePixels: true, capturedBytes: bytes.length, capturedSha256, pixelIdentity: livePixels,
+          baseUrl: approvedLiveUrl, approvedSourceHead });
+        return;
+      }
+    }
+  }
   try { await access(join(output, name)); throw Error('Refusing to overwrite an existing format proof capture: ' + name); }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
-  await page.screenshot({ path: join(output, name) });
-  const bytes = await readFile(join(output, name));
-  screenshots.push({ path: '.artifacts/proof/chat-format/' + name, bytes: bytes.length, sha256: digest(bytes), width: 390, height: 844, labeledFixture: true });
+  await writeFile(join(output, name), bytes, { flag: 'wx' });
+  screenshots.push({ path: '.artifacts/proof/chat-format/' + name, bytes: bytes.length, sha256: capturedSha256, width: 390, height: 844,
+    labeledFixture: true, ...(live ? { liveCaptured: true, reusedCandidatePixels: false, baseUrl: approvedLiveUrl, approvedSourceHead } : {}) });
+}
+
+async function expectedAsset(path) {
+  if (approvedAssetBytes.has(path)) return approvedAssetBytes.get(path);
+  let bytes;
+  if (path === 'memory/rag-core.mjs') {
+    bytes = await readFile(join(memoryRoot, 'rag-core.mjs'));
+    assert.equal(digest(bytes), coreSha256, 'Exact approved generated core bytes');
+  } else if (path === 'memory/graph-renderer.mjs') throw Error('The graph is disabled in this focused formatting proof');
+  else {
+    const source = path.startsWith('theme/') ? 'modules/browser-rag-ts/demo/' + path.slice(6) : 'examples/browser-model-chat/' + path;
+    assert.match(source, /^[a-zA-Z0-9_./-]+$/, 'Ordinary source asset path');
+    assert.ok(!source.split('/').some(part => part === '..' || part === '.'), 'No dot-segment source path');
+    bytes = live ? execFileSync('git', ['show', approvedSourceHead + ':' + source], { cwd: root, maxBuffer: 4 * 1024 * 1024 })
+      : await readFile(join(root, source));
+  }
+  approvedAssetBytes.set(path, bytes); return bytes;
 }
 
 async function proof() {
@@ -349,14 +400,20 @@ async function proof() {
 }
 
 try {
+  if (live) assert.equal(liveUrl, approvedLiveUrl, 'Live mode is restricted to the exact approved HTTPS deployment directory');
   assert.equal(digest(await readFile(join(memoryRoot, 'rag-core.mjs'))), coreSha256, 'Existing exact core bundle required; this harness never builds');
   const pw = process.env.BROWSER_MODEL_PLAYWRIGHT_MODULE;
   assert.ok(pw, 'Set BROWSER_MODEL_PLAYWRIGHT_MODULE to an existing Playwright module; no install or private path fallback');
   const chrome = process.env.MODEL_CHAT_BROWSER || 'C:/Program Files/Google/Chrome/Application/chrome.exe'; await access(chrome); await access(pw);
   const { chromium } = await import(pathToFileURL(resolve(pw)).href);
   sourceBefore = await identity();
-  server = await startServer({ port: 0, root: join(root, 'examples/browser-model-chat'), runtimeRoot, memoryCoreRoot: memoryRoot, memoryGraphRoot: memoryRoot });
-  base = new URL(server.url);
+  if (live) {
+    assert.equal(execFileSync('git', ['rev-parse', approvedSourceHead + '^{commit}'], { cwd: root, encoding: 'utf8' }).trim(), approvedSourceHead);
+    base = new URL(approvedLiveUrl);
+  } else {
+    server = await startServer({ port: 0, root: join(root, 'examples/browser-model-chat'), runtimeRoot, memoryCoreRoot: memoryRoot, memoryGraphRoot: memoryRoot });
+    cleanup.localServerStarted = true; base = new URL(server.url);
+  }
   profile = await mkdtemp(join(await realpath(tmpdir()), profilePrefix));
   context = await chromium.launchPersistentContext(profile, { executablePath: chrome, headless: true,
     viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce', args: ['--no-first-run', '--disable-background-networking', '--disable-component-update'] });
@@ -387,20 +444,20 @@ try {
     }, { once: true });
   });
   await context.route('**/*', async route => {
-    const url = new URL(route.request().url()), path = url.pathname.slice(1) || 'index.html';
+    const url = new URL(route.request().url());
+    const withinBase = url.origin === base.origin && url.pathname.startsWith(base.pathname);
+    const path = withinBase ? url.pathname.slice(base.pathname.length) || 'index.html' : url.pathname;
     assert.ok(++requests <= 500, 'Finite 500-request budget');
-    if (url.origin !== base.origin || /^(?:runtime\/|engine-worker\.mjs$)|\.(?:wasm|gguf)$/i.test(path) || route.request().resourceType() === 'worker') {
+    if (!withinBase || /^(?:runtime\/|engine-worker\.mjs$)|\.(?:wasm|gguf)$/i.test(path) || route.request().resourceType() === 'worker') {
       forbidden.push(path); return route.abort();
     }
     if (path === 'runtime-adapter.mjs') return route.fulfill({ status: 200, contentType: 'application/javascript; charset=utf-8', body: adapter });
     try {
-      const response = await route.fetch(); assert.equal(response.status(), 200, path);
+      const response = await route.fetch({ maxRedirects: 0 }); assert.equal(response.status(), 200, path);
+      const responseUrl = new URL(response.url()); assert.equal(responseUrl.origin, base.origin); assert.ok(responseUrl.pathname.startsWith(base.pathname));
       const bytes = await response.body(); assetBytes += bytes.length; assert.ok(assetBytes < 32 * 1024 * 1024, 'Finite 32 MiB served-byte budget');
       if (/\.m?js$/.test(path)) assert.match(response.headers()['content-type'] || '', /^(?:application|text)\/javascript(?:;|$)/i, path + ' executable MIME');
-      const source = path === 'memory/rag-core.mjs' ? join(memoryRoot, 'rag-core.mjs')
-        : path === 'memory/graph-renderer.mjs' ? join(memoryRoot, 'graph-renderer.mjs')
-          : path.startsWith('theme/') ? join(root, 'modules/browser-rag-ts/demo', path.slice(6)) : join(root, 'examples/browser-model-chat', path);
-      const hash = digest(bytes); assert.equal(hash, digest(await readFile(source)), path + ' actual production bytes');
+      const hash = digest(bytes); assert.equal(hash, digest(await expectedAsset(path)), path + ' actual ' + (live ? 'approved published ' : '') + 'production bytes');
       assets.push({ path, sha256: hash, bytes: bytes.length, mime: response.headers()['content-type'] });
       return route.fulfill({ response });
     } catch (error) { pageErrors.push(error.message); return route.abort(); }
@@ -421,15 +478,17 @@ finally {
   }
   const uniqueAssets = [...new Map(assets.map(asset => [asset.path, asset])).values()].sort((a, b) => a.path.localeCompare(b.path));
   const result = { schema: 'chat-format-browser/v1', status: failure ? 'fail' : 'pass', harnessSha256, durationMs: Date.now() - started,
+    mode: live ? 'approved-https-ui-fixture' : 'local-ui-fixture', ...(live ? { baseUrl: approvedLiveUrl, approvedSourceHead } : {}),
     browserVersion, sourceBefore, sourceAfter, coreSha256, fixtureAdapterSha256: digest(adapter), checks, observations, screenshots,
     assets: { requests, verified: assets.length, unique: uniqueAssets, bytes: assetBytes, identitySha256: digest(JSON.stringify(assets)) },
     boundary: { productionBootstrap: true, onlyAdapterReplaced: true, productionCanonicalStore: true, productionContextAndCitations: true,
       fixtureOnly: true, nativeModelCalls: 0, nativeTokenization: false, modelDownloads: 0, osClipboardTouched: false,
-      externalRequests: 0, workers, forbidden, pageErrors, physicalDevice: false, graphExecuted: false }, cleanup, error: failure };
+      externalRequests: 0, approvedDeploymentRequests: live ? requests : 0, workers, forbidden, pageErrors, physicalDevice: false, graphExecuted: false }, cleanup, error: failure };
   const bytes = JSON.stringify(result); assert.ok(Buffer.byteLength(bytes) <= 40 * 1024, 'Compact proof limit');
   if (process.env.FORMAT_BROWSER_STDOUT === '1') console.log('FORMAT_BROWSER_PROOF_JSON ' + bytes);
   else {
-    await mkdir(output, { recursive: true }); await writeFile(join(output, 'browser-result.tmp'), bytes);
-    console.log(`Chat format browser: ${result.status}; ${checks.filter(check => check.status === 'pass').length}/${checks.length} groups; ${result.durationMs} ms. Proof: .artifacts/proof/chat-format/browser-result.tmp`);
+    const proofName = live ? 'live-browser-result.tmp' : 'browser-result.tmp';
+    await mkdir(output, { recursive: true }); await writeFile(join(output, proofName), bytes);
+    console.log(`Chat format browser: ${result.status}; ${checks.filter(check => check.status === 'pass').length}/${checks.length} groups; ${result.durationMs} ms. Proof: .artifacts/proof/chat-format/${proofName}`);
   }
 }

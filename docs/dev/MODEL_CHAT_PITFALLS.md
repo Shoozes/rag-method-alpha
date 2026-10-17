@@ -261,3 +261,53 @@ generic wrapper and graph-disabled fallback. Physical iOS remains unqualified.
 **Next prevention step:** Require the unchanged complete touch/color route after
 graph state-theme changes; check fixed-coordinate semantics before adjusting
 palette anchors or a pixel threshold.
+
+### Q: Streaming repaint reopened a pending Copy action
+
+**Story ID / status / search synopsis:** `RAG-CHAT-006`; resolved in the tested
+DOM lifecycle scope; Current. Search hooks: streaming re-enabled Copy, pending
+clipboard write, stale manual-copy fallback, late focus after pagehide,
+"Clipboard unavailable. Select and copy the original text below."
+
+**Sources:** `Shoozes/rag-method-alpha`, safe formatting/copy repair `71559da`.
+Pinned wllama 3.5.1 and LFM2.5-230M are unchanged; no model call was needed.
+**What:** Token repaint and an asynchronous Copy operation shared one disabled
+button state. A token could enable a second write while the first was pending;
+out-of-order outcomes could then show stale status or focus an old fallback.
+**Context and constraints:** Copy must preserve the exact original string while
+the rendered message may change. Clipboard completion must not mutate a cleared
+or disposed view. The OS clipboard is user-controlled, separate from storage.
+**Why it happened:** Initial `paintMessage` derived disabled state only from
+nonempty text. Copy set disabled before awaiting the clipboard, but repaint
+could overwrite that state. Epoch/connected-node checks alone did not exclude
+pagehide, whose document nodes can still be connected.
+**Where:** `examples/browser-model-chat/app.mjs`, `paintMessage`, Copy handler
+and pagehide cleanup; `tests/model-chat-format-browser.mjs`.
+**Evidence:** The initial 12-group browser pass omitted delayed clipboard
+operations. Independent source review located the shared-state race; a retained
+pre-fix failing clipboard replay is not claimed. The final browser fixture
+holds a clipboard promise, emits a token, forces duplicate activation and
+asserts exactly one write, disabled state and exact click-time fallback text.
+A late rejection after pagehide cannot change status, fallback or focus.
+**Developer story:** Passing ordinary copy/error cases did not cover ownership
+while streaming. Review identified the missing interleaving. The repair added
+per-message in-flight ownership and a synchronous view-lifetime guard, then
+extended the actual DOM fixture before the clean candidate was committed.
+**How to catch it:** Run the Copy concurrency/teardown group in
+`tests/model-chat-format-browser.mjs`; preserve its delayed-promise and forced
+duplicate-event assertions alongside selection, reload and exact raw copy.
+**Solutions tried:** Disabling only in the click handler was insufficient;
+repaint must respect the same in-flight owner. A connected node does not prove
+an active view. No clipboard permission bypass or model/prompt change was used.
+**Current solution:** A WeakSet guards both repaint and duplicate activation.
+Async UI updates require the current session epoch, a connected message and
+`viewActive`; pagehide clears that last gate synchronously.
+**Decision rationale:** Keep one small ownership guard per async UI action
+rather than serializing model tokens or changing accepted conversation data.
+**Effectiveness:** Cross-device effectiveness is unknown. All 12 actual Chrome
+fixture groups and 479 regression tests pass for the repaired source; the
+fixture does not write the OS clipboard or establish physical iOS behavior.
+**Relevance check:** Current; streaming and denied/delayed clipboard access are
+normal supported routes.
+**Next prevention step:** Keep this interleaving when changing message actions;
+qualify real clipboard permissions and mobile behavior in the device gate.
