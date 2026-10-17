@@ -13,7 +13,7 @@ export function createRuntimeAdapter({ WorkerClass = Worker, initWaitMs = 180_00
     for (const request of pending.values()) { request.cleanup(); request.reject(reason); }
     pending.clear();
   }
-  function request(operation, payload, { signal, onProgress, onToken, beforeDispatch, onDispatch } = {}) {
+  function request(operation, payload, { signal, onProgress, onToken, onCompletion, beforeDispatch, onDispatch } = {}) {
     if (signal?.aborted) return Promise.reject(new DOMException('Cancelled', 'AbortError'));
     try { beforeDispatch?.(); } catch (error) { return Promise.reject(error); }
     if (!worker) {
@@ -37,6 +37,15 @@ export function createRuntimeAdapter({ WorkerClass = Worker, initWaitMs = 180_00
           item.onProgress?.(data.value);
         }
         else if (data.type === 'token') item.onToken?.(data.value);
+        else if (data.type === 'completion') {
+          if (item.operation !== 'reply' || item.completionSent) return;
+          item.completionSent = true;
+          let reason, maxTokens;
+          try { reason = data.value?.finishReason; maxTokens = data.value?.maxTokens; } catch { /* Unknown metadata stays unknown. */ }
+          const completion = { finishReason: maxTokens === 160 && (reason === 'length' || reason === 'stop') ? reason : 'unknown',
+            maxTokens: maxTokens === 160 ? 160 : null };
+          try { item.onCompletion?.(completion); } catch { /* Observation cannot interrupt a successful reply. */ }
+        }
         else {
           pending.delete(data.id); item.cleanup();
           if (data.type === 'error') {
@@ -83,7 +92,7 @@ export function createRuntimeAdapter({ WorkerClass = Worker, initWaitMs = 180_00
       const id = ++serial;
       const abort = () => terminate();
       signal?.addEventListener('abort', abort, { once: true });
-      const item = { operation, resolve, reject, onProgress, onToken, initTimer: null, lastStage: null,
+      const item = { operation, resolve, reject, onProgress, onToken, onCompletion, completionSent: false, initTimer: null, lastStage: null,
         cleanup: () => { signal?.removeEventListener('abort', abort); if (item.initTimer !== null) clearTimeoutFn(item.initTimer); item.initTimer = null; } };
       pending.set(id, item);
       try {
