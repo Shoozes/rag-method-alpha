@@ -4,7 +4,7 @@
   "publicReleaseQualified": false,
   "memoryPreview": true,
   "source": {
-    "head": "0119fe1adf0a09a1a78f37d22fe763f960a801c2",
+    "head": "0225e4b5575e1d639abdf344b92d4fe0b98ec0f5",
     "dirty": false,
     "reviewStatus": "unreviewed",
     "fingerprintScope": "allowlisted browser sources, generated memory core, build source, theme, licenses and packager",
@@ -513,5 +513,5 @@
       "sha256": "4baf1abc8a47bb8eb7a41fdc1e924cf8ac80f4645f4524611a6d7ecb3712983e"
     }
   ],
-  "identitySha256": "f50c288b05da47324097691dcd8484eb3037538efcf08feec9088650f422122f"
+  "identitySha256": "119dc77880499bc8b72b2691b6ef9281421485fa24f4d2031244a490afccecaf"
 }
