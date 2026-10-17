@@ -106,7 +106,14 @@ export async function extractAutomaticContext(turns, { query, protectedTurnIds =
       }
     }
   }
-  const queryTerms = terms(query), meaningful = candidates.filter(candidate => [...terms(candidate.quote)].some(term => queryTerms.has(term)));
+  // Repeated exact text must not occupy several of the ranker's bounded top-k
+  // slots. Keep the first eligible original slice as its single reference;
+  // case, Unicode and internal whitespace remain distinct source text.
+  const seenQuotes = new Set(), uniqueCandidates = candidates.filter(candidate => {
+    if (seenQuotes.has(candidate.quote)) return false;
+    seenQuotes.add(candidate.quote); return true;
+  });
+  const queryTerms = terms(query), meaningful = uniqueCandidates.filter(candidate => [...terms(candidate.quote)].some(term => queryTerms.has(term)));
   const byId = new Map(candidates.map(candidate => [candidate.id, candidate]));
   let ranked = [], coreCandidatePoolCount = 0, coreTruncated = false;
   if (meaningful.length) {
@@ -138,7 +145,7 @@ export async function extractAutomaticContext(turns, { query, protectedTurnIds =
     : 'No older user passage selected.');
   if (points(render([])) > maxTotalCodepoints) limit('The derived-context notice exceeds the total codepoint limit.');
   for (const candidate of [...(fallback ? [fallback] : []), ...ranked]) {
-    if (selected.some(item => item.id === candidate.id)) continue;
+    if (selected.some(item => item.id === candidate.id || item.quote === candidate.quote)) continue;
     if (selected.length >= maxItems) continue;
     if (points(render([...selected, candidate])) > maxTotalCodepoints) { omittedByBudgetCount++; continue; }
     selected.push(candidate);
@@ -150,7 +157,8 @@ export async function extractAutomaticContext(turns, { query, protectedTurnIds =
   const text = render(selected);
   return freeze({ strategy, text, items, excerpts: items.map(item => ({ turnId: item.turnId, text: item.quote, truncated: false })),
     sources, contentHash: await digest(text), coverage: { inputTurnCount: originals.length, eligibleUserTurnCount, protectedTurnCount,
-      ignoredAssistantTurnCount, scanBytes, candidateCount: candidates.length, meaningfulQueryTermCount: queryTerms.size,
+      ignoredAssistantTurnCount, scanBytes, candidateCount: candidates.length, uniqueCandidateCount: uniqueCandidates.length,
+      duplicateCandidateCount: candidates.length - uniqueCandidates.length, meaningfulQueryTermCount: queryTerms.size,
       matchedCandidateCount: meaningful.length, coreCandidatePoolCount, coreTruncated, retainedItemCount: items.length,
       omittedCandidateCount: candidates.length - items.length, omittedByBudgetCount,
       newestFallbackUsed: Boolean(fallback && selected.some(candidate => candidate.id === fallback.id)),

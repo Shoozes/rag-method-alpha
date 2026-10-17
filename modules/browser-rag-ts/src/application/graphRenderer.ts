@@ -11,6 +11,21 @@ import { graphColorNumber, graphFamilyColorNumber } from "./graphPalette.js";
 export type RagRendererMode = "tsl" | "svg";
 export type RagRendererBackend = "auto" | "webgl2";
 
+export interface RagNodePosition {
+  readonly node_id: string;
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}
+
+/** A temporary renderer-only override; original layout coordinates and colors remain authoritative. */
+export interface RagNodePresentation {
+  readonly positions: readonly RagNodePosition[];
+  readonly active: boolean;
+  update(positions: readonly RagNodePosition[], colorProgress?: number): boolean;
+  restore(): void;
+}
+
 interface RenderNodeData {
   readonly kind: PositionedGraphNode["kind"];
   readonly record_id: string | null;
@@ -30,6 +45,7 @@ export interface RagGraphRenderer {
   getCameraPose(): CameraPose | null;
   setCameraPose(pose: CameraPose): void;
   setInteractionState(selectedNodeId: string | null, hitNodeIds: readonly string[]): void;
+  beginNodePresentation(nodeIds: readonly string[], presentation?: { readonly targetColor?: number }): RagNodePresentation | null;
   diagnostics(): RagGraphRendererDiagnostics;
   clear(): void;
   dispose(): void;
@@ -219,6 +235,8 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
   });
   let selectionSurfaceColor = 0x0ea5ff;
   const baseColors = new Map<string, number>();
+  const presentationColors = new Map<string, number>();
+  const displayedNodeColor = (id: string): number | undefined => presentationColors.get(id) ?? baseColors.get(id);
   const resolvedNodeColor = (node: { readonly id: string | number; readonly data?: RenderNodeData }): number => {
     const id = String(node.id), supplied = options.nodeColor?.(id);
     if (supplied !== undefined && (!Number.isInteger(supplied) || supplied < 0 || supplied > 0xffffff)) {
@@ -226,7 +244,8 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
     }
     const color = supplied ?? nodeColor(node);
     baseColors.set(id, color);
-    return memorySpatial ? memoryLinearColor(color) : color;
+    const displayed = presentationColors.get(id) ?? color;
+    return memorySpatial ? memoryLinearColor(displayed) : displayed;
   };
   let graph: ForceGraph<RenderNodeData, { readonly kind: string }> | null = await createForceGraph3D<RenderNodeData, { readonly kind: string }>({
     platform: createThreePlatform({ THREE, TSL }),
@@ -264,6 +283,9 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
     },
     interaction: { hover: true, dragNodes: false, selection: "single", navigation: true },
     stateTheme: {
+      // Fixed memory-layout coordinates are placement, not a semantic Pin.
+      // Preserve scope hues instead of the producer's warm pinned-state tint.
+      ...(memorySpatial ? { pinned: { colorMix: 0 } } : {}),
       selected: { color: graphColorNumber("selected"), colorMix: preserveNodeColors ? 0 : 0.98, scale: memorySpatial ? 1.22 : 1.42 },
       focused: { color: graphColorNumber("hit"), colorMix: preserveNodeColors ? 0 : 0.82, scale: memorySpatial ? 1.12 : 1.2 },
       ...(memorySpatial ? { hovered: { colorMix: 0, scale: 1.06 } } : scopeColoredSurface ? { hovered: { colorMix: 0 } } : {}),
@@ -294,6 +316,8 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
   let cameraFrame = 0;
   let motionStyleFrame = 0;
   const dirtyMotionIds = new Set<string>();
+  let nodePresentation: RagNodePresentation | null = null;
+  const restoreNodePresentation = (): void => { nodePresentation?.restore(); };
   const stopCamera = ():void => { if(cameraFrame)cancelAnimationFrame(cameraFrame);cameraFrame=0; };
   const nodeMotion = createNodeSpawnMotion({
     reducedMotion:()=>!motionEnabled,
@@ -425,8 +449,8 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
     options.canvas.dataset.nodeTargets = JSON.stringify(nodeTargets);
     options.canvas.dataset.viewport = JSON.stringify(viewportDiagnostics());
     options.canvas.dataset.cameraPose = JSON.stringify(currentCameraPose());
-    options.canvas.dataset.nodeColors = JSON.stringify(visibleNodeIds.flatMap(id => baseColors.has(id)
-      ? [{ node_id: id, base_color: baseColors.get(id)! }] : []));
+    options.canvas.dataset.nodeColors = JSON.stringify(visibleNodeIds.flatMap(id => displayedNodeColor(id) !== undefined
+      ? [{ node_id: id, base_color: displayedNodeColor(id)! }] : []));
     if (memorySpatial) {
       options.canvas.dataset.presentation = "memory-spatial";
       options.canvas.dataset.nodePositions = JSON.stringify(nodePositions());
@@ -445,6 +469,7 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
       return;
     }
     const sizeChanged = !lastViewport || measured.width !== lastViewport.width || measured.height !== lastViewport.height;
+    if (sizeChanged) restoreNodePresentation();
     if (hasGraphData && (framePending || (sizeChanged && !userAdjusted))) {
       const frame = memorySpatial ? frameSpatialMemory(graph, options.canvas, visibleNodeIds) : frameVisibleGraph(graph, options.canvas);
       if (frame) automaticFrameCount += 1;
@@ -468,12 +493,14 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
 
   const markPointerNavigation = (event: PointerEvent): void => {
     if (event.buttons !== 0) {
+      restoreNodePresentation();
       userAdjusted = true;
       stopCamera();
       publishDiagnostics();
     }
   };
   const markWheelNavigation = (): void => {
+    restoreNodePresentation();
     stopCamera();
     userAdjusted = true;
     publishDiagnostics();
@@ -483,6 +510,16 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
   const resizeObserver = new ResizeObserver(scheduleViewportUpdate);
   resizeObserver.observe(options.canvas);
 
+  const syncSelectedSurface = (): void => {
+    if (graph && memorySpatial && selectedNodeId) {
+      const color = displayedNodeColor(selectedNodeId);
+      if (color !== undefined && color !== selectionSurfaceColor) {
+        selectionSurfaceColor = color;
+        graph.setNodeSurface(memorySurface(color));
+      }
+    }
+  };
+
   const applyInteractionState = (): void => {
     if (!graph) return;
     const view = graph.getGraphView();
@@ -491,13 +528,7 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
     graph.setNodeFlagsMany(hitNodeIds, NodeFlags.Focused);
     if (selectedNodeId && view.hasNode(selectedNodeId)) graph.setSelection([selectedNodeId]);
     else graph.clearSelection();
-    if (memorySpatial && selectedNodeId) {
-      const color = baseColors.get(selectedNodeId);
-      if (color !== undefined && color !== selectionSurfaceColor) {
-        selectionSurfaceColor = color;
-        graph.setNodeSurface(memorySurface(color));
-      }
-    }
+    syncSelectedSurface();
     graph.setLinkStyle({
       width: (link) => hitNodeIds.has(String(link.source)) && hitNodeIds.has(String(link.target))
         ? (link.data?.kind === "reference" ? 3.4 : 2.5)
@@ -520,6 +551,7 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
       if (memorySpatial && positioned.nodes.some(node => ![node.x, node.y, node.z].every(Number.isFinite))) {
         throw new Error("Spatial memory nodes require finite host-supplied X, Y and Z coordinates.");
       }
+      restoreNodePresentation();
       graphRevision += 1;
       stopCamera();nodeMotion.cancelAll(false);dirtyMotionIds.clear();
       const priorIds = new Set(visibleNodeIds);
@@ -551,14 +583,15 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
         publishDiagnostics();
       }
     },
-    setMotionEnabled(enabled:boolean):void { motionEnabled=enabled;if(!enabled){stopCamera();nodeMotion.cancelAll(true);}options.canvas.dataset.motionEnabled=String(enabled); },
+    setMotionEnabled(enabled:boolean):void { motionEnabled=enabled;if(!enabled){restoreNodePresentation();stopCamera();nodeMotion.cancelAll(true);}options.canvas.dataset.motionEnabled=String(enabled); },
     replaySpawn():void { if(!motionEnabled)return;spawn(visibleNodeIds);if(graph&&!userAdjusted){const to=graph.getCameraPose();if(to){const from={position:memorySpatial?{x:to.target.x+(to.position.x-to.target.x)*1.12,y:to.target.y+(to.position.y-to.target.y)*1.12,z:to.target.z+(to.position.z-to.target.z)*1.12}:{x:to.position.x,y:to.position.y,z:to.position.z*1.12},target:to.target};graph.setCameraPose(from);fly(from,to,1200);}} },
-    stopMotion():void {stopCamera();nodeMotion.cancelAll(true);},
+    stopMotion():void {restoreNodePresentation();stopCamera();nodeMotion.cancelAll(true);},
     refreshViewport(): void {
       scheduleViewportUpdate();
     },
     fit(): void {
       if (!graph || !hasGraphData) return;
+      restoreNodePresentation();
       userAdjusted = false;
       framePending = true;
       updateViewport();
@@ -567,6 +600,7 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
     setCameraPose(pose: CameraPose): void {
       const next = copyCameraPose(pose);
       if (!graph) return;
+      restoreNodePresentation();
       stopCamera();
       userAdjusted = true;
       framePending = false;
@@ -586,6 +620,63 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
       graph?.render();
       publishDiagnostics();
     },
+    beginNodePresentation(nodeIds: readonly string[], presentation: { readonly targetColor?: number } = {}): RagNodePresentation | null {
+      if (!graph || !memorySpatial || !motionEnabled || !Array.isArray(nodeIds) || !nodeIds.length || nodeIds.length > 12
+        || new Set(nodeIds).size !== nodeIds.length || nodeIds.some(id => !visibleNodeIds.includes(id))
+        || !presentation || typeof presentation !== "object"
+        || (presentation.targetColor !== undefined && (!Number.isInteger(presentation.targetColor)
+          || presentation.targetColor < 0 || presentation.targetColor > 0xffffff))) return null;
+      const targetColor = presentation.targetColor;
+      restoreNodePresentation();
+      const revision = graphRevision;
+      const originals = nodeIds.flatMap(node_id => {
+        const point = graph?.getNodePosition(node_id);
+        return point && [point.x, point.y, point.z].every(Number.isFinite)
+          ? [Object.freeze({ node_id, x: point.x, y: point.y, z: point.z })] : [];
+      });
+      if (originals.length !== nodeIds.length) return null;
+      const originalColors = nodeIds.map(id => displayedNodeColor(id));
+      if (targetColor !== undefined && originalColors.some(color => color === undefined)) return null;
+      stopCamera(); nodeMotion.cancelAll(true);
+      let active = true;
+      const current = (): boolean => active && Boolean(graph) && graphRevision === revision && nodePresentation === lease;
+      const paint = (positions: readonly RagNodePosition[]): void => {
+        if (!graph) return;
+        for (const point of positions) graph.setNodeFixed(point.node_id, { x: point.x, y: point.y, z: point.z });
+        graph.refreshNodeStyles(nodeIds); syncSelectedSurface(); graph.render(); publishDiagnostics();
+      };
+      const lease: RagNodePresentation = Object.freeze({
+        positions: Object.freeze(originals),
+        get active(): boolean { return current(); },
+        update(positions: readonly RagNodePosition[], colorProgress = 0): boolean {
+          if (!current() || !motionEnabled || !Array.isArray(positions) || positions.length !== originals.length
+            || !Number.isFinite(colorProgress) || colorProgress < 0 || colorProgress > 1
+            || positions.some((point, index) => point?.node_id !== originals[index]!.node_id
+              || ![point.x, point.y, point.z].every(value => Number.isFinite(value) && Math.abs(value) <= 100_000))) return false;
+          if (targetColor !== undefined) {
+            for (const [index, id] of nodeIds.entries()) {
+              const source = originalColors[index]!;
+              // Interpolate canonical sRGB anchors, then use the same linear
+              // material conversion as every settled memory body.
+              let color = 0;
+              for (const shift of [16, 8, 0]) color |= Math.round(((source >> shift) & 255)
+                + (((targetColor >> shift) & 255) - ((source >> shift) & 255)) * colorProgress) << shift;
+              presentationColors.set(id, color);
+            }
+          }
+          paint(positions); return true;
+        },
+        restore(): void {
+          if (!active) return;
+          const restore = current(); active = false;
+          if (nodePresentation === lease) nodePresentation = null;
+          for (const id of nodeIds) presentationColors.delete(id);
+          if (restore) paint(originals);
+        },
+      });
+      nodePresentation = lease;
+      return lease;
+    },
     diagnostics(): RagGraphRendererDiagnostics {
       return Object.freeze({
         runtime: runtimeDiagnostics(),
@@ -595,18 +686,20 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
         node_targets: Object.freeze([...projectedTargets(visibleNodeIds)]),
         viewport: viewportDiagnostics(),
         camera_pose: currentCameraPose(),
-        node_colors: Object.freeze(visibleNodeIds.flatMap(id => baseColors.has(id)
-          ? [Object.freeze({ node_id: id, base_color: baseColors.get(id)! })] : [])),
+        node_colors: Object.freeze(visibleNodeIds.flatMap(id => displayedNodeColor(id) !== undefined
+          ? [Object.freeze({ node_id: id, base_color: displayedNodeColor(id)! })] : [])),
         ...(memorySpatial ? { presentation: "memory-spatial" as const, node_positions: Object.freeze(nodePositions()) } : {}),
       });
     },
     clear(): void {
+      restoreNodePresentation();
       stopCamera();nodeMotion.cancelAll(false);dirtyMotionIds.clear();
       graphRevision += 1;
       selectedNodeId = null;
       hitNodeIds.clear();
       visibleNodeIds = [];
       baseColors.clear();
+      presentationColors.clear();
       renderedNodeData.clear();
       hasGraphData = false;
       framePending = false;
@@ -619,6 +712,7 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
     },
     dispose(): void {
       if (!graph) return;
+      restoreNodePresentation();
       stopCamera();nodeMotion.dispose();if(motionStyleFrame)cancelAnimationFrame(motionStyleFrame);motionStyleFrame=0;dirtyMotionIds.clear();
       resizeObserver.disconnect();
       if (scheduledViewportFrame) cancelAnimationFrame(scheduledViewportFrame);
@@ -631,6 +725,7 @@ export async function createTslRagGraphRenderer(options: CreateRagGraphRendererO
       graph.dispose();
       graph = null;
       baseColors.clear();
+      presentationColors.clear();
       renderedNodeData.clear();
       selectedNodeId = null;
       hitNodeIds.clear();

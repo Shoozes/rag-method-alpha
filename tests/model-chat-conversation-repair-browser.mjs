@@ -11,13 +11,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startServer } from '../examples/browser-model-chat/serve.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const prepared = resolve(process.env.BROWSER_MEMORY_PREPARED_ROOT || join(root, '../rag-summary-pocket'));
+const prepared = resolve(process.env.BROWSER_MEMORY_PREPARED_ROOT || root);
 const coreRoot = join(prepared, '.artifacts/memory');
 const runtimeRoot = resolve(process.env.BROWSER_MODEL_RUNTIME_ROOT || join(root, '../rag-model-onboarding/.artifacts/model-chat/runtime'));
 const output = join(root, '.artifacts/proof/conversation-repair');
 const profilePrefix = 'rag-conversation-repair-fixture-';
 const coreSha256 = 'c282ebb3965c4a25b48fb66082ce18c72184449f2123633a901ffceb9939ace6';
-const graphSha256 = 'b4283ce805072898247381732481a47d30ba38d5373e6becda17a7ff0a9c7f13';
+const graphSha256 = '6472ea58741464fff73401c640c094acb145adcbf732025329937e48f608c651';
 const digest = value => createHash('sha256').update(value).digest('hex');
 const pause = ms => new Promise(done => setTimeout(done, ms));
 const checks = [], observations = [], screenshots = [], assets = [], forbidden = [], pageErrors = [], ports = [], barriers = [];

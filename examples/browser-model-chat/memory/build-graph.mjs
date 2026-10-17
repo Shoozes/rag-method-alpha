@@ -64,7 +64,8 @@ export async function buildGraph({
   if (!graphPath.endsWith('.mjs')) throw new Error('Graph output must be one .mjs module.');
   await safeOutput(graphPath);
   const dependencies = resolve(dependencyRoot);
-  if (!descendant(repository, dependencies)) throw new Error('Prepared graph dependencies must be inside this checkout.');
+  const dependencyInfo = await lstat(dependencies);
+  if (!dependencyInfo.isDirectory() || dependencyInfo.isSymbolicLink()) throw new Error('Prepared graph dependencies must use an ordinary directory.');
   const lock = JSON.parse(await ordinary(join(repository, 'modules/browser-rag-ts/package-lock.json')));
   const archive = await ordinary(join(repository, graphArchivePath));
   if (archive.length !== 313331 || digest(archive) !== graphArchiveSha256
@@ -100,8 +101,11 @@ export async function buildGraph({
   for (const name of Object.keys(built.metafile.inputs).sort()) {
     if (name === 'memory-graph-renderer-entry.ts') continue;
     const path = resolve(repository, name);
-    if (!descendant(repository, path)) throw new Error('Graph bundle imported a file outside this checkout.');
-    sources.push({ path: portable(relative(repository, path)), sha256: digest(await ordinary(path)) });
+    const local = descendant(repository, path);
+    const prepared = descendant(graphRoot, path) || descendant(threeRoot, path);
+    if (!local && !prepared) throw new Error('Graph bundle imported a file outside this checkout or its verified prepared dependencies.');
+    sources.push({ path: local ? portable(relative(repository, path)) : 'prepared-dependencies/' + portable(relative(dependencies, path)),
+      sha256: digest(await ordinary(path)) });
   }
   sources.push({ path: 'examples/browser-model-chat/memory/build-graph.mjs', sha256: digest(await ordinary(fileURLToPath(import.meta.url))) });
   sources.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);

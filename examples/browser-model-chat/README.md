@@ -39,8 +39,10 @@ excluding the selected source from recall; independent repeats can still be
 retrieved. Browser persistence can fail, and stale shared state requires reload.
 The [memory guide](./memory/README.md) records the full bounds, correction and
 tombstone rules, setup and evidence limits. Current routing checks use labeled
-provider/meter fixtures; they do not establish new native-model quality or iOS
-support. No model training or autonomous orchestration is included.
+provider/meter fixtures. The separate [native Space journey](../../docs/dev/SPACE_JOURNEY_ACCEPTANCE.md)
+uses the pinned model and real prompt meter, and reports model-quality failures
+separately from application checks. Physical iOS support remains unqualified.
+No model training or autonomous orchestration is included.
 
 ## Run locally
 
@@ -106,8 +108,10 @@ Supply one prepared dependency root, normally `.artifacts/memory/dependencies/`:
 - `three/`: the locked package's `package.json`, `LICENSE`, `build/three.core.js`,
   `build/three.webgpu.js` and `build/three.tsl.js` at their original relative paths.
 
-These inputs can be extracted from already-retained, integrity-verified archives;
-do not substitute another Three version or copy an unrelated dependency tree.
+These inputs can be extracted from already-retained, integrity-verified archives.
+An explicit `BROWSER_MEMORY_GRAPH_DEPENDENCY_ROOT` may also name a shared prepared
+directory outside this checkout; the same package/file integrity checks apply.
+Do not substitute another Three version or copy an unrelated dependency tree.
 With an already prepared esbuild module, run from the repository root:
 
 ```powershell
@@ -120,7 +124,7 @@ node examples/browser-model-chat/stage-static.mjs --memory-preview --output .art
 
 The builder verifies prepared package bytes and emits one self-contained
 `.artifacts/memory/graph-renderer.mjs`, plus complete graph/Three MIT texts.
-The explicit memory export contains **44 payload files plus its manifest**.
+The explicit memory export contains **47 payload files plus its manifest**.
 Automatic memory adds `memory/automatic-memory.mjs`, `memory/conversation-index.mjs`,
 `memory/scoped-pockets.mjs` and `memory/starter-facts.mjs`. The existing graph
 bundle and `LICENSES/forcegraph-tsl.txt` / `LICENSES/three.txt` remain included. Preserve those full notices
@@ -128,7 +132,10 @@ alongside the first-party/runtime MIT texts and separate LFM model license.
 `memory/navigation.mjs` adapts contained pan/pinch input to that same renderer;
 it does not introduce another graph runtime.
 `memory/compaction-cue.mjs` displays committed source-linked compaction activity;
-it does not add a retained summary node or change memory ownership.
+`memory/retained-compaction.mjs` projects its retained summary, and
+`memory/summary-effects.mjs` temporarily moves represented source meshes toward
+that summary with bounded trails. Canonical originals remain searchable.
+These presentation modules do not change memory ownership.
 `memory/context-panel.mjs` distinguishes actual returned candidates, admitted
 sources, prepared requests and the last submitted request. Exact bounded text
 is session-only; hidden reasoning, native template expansion and KV state are

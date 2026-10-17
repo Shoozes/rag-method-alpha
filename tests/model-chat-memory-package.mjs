@@ -28,7 +28,7 @@ const payloadPaths = ['index.html', 'style.css', 'app.mjs', 'loader-controller.m
   'LICENSES/lfm-open-license-1.0.txt', 'LICENSES/forcegraph-tsl.txt', 'LICENSES/three.txt', 'NOTICE.txt', 'README.txt', ...memoryAssets].sort();
 const expectedFiles = [...payloadPaths, 'site-manifest.json'].sort();
 const pinned = {
-  'memory/graph-renderer.mjs': 'b4283ce805072898247381732481a47d30ba38d5373e6becda17a7ff0a9c7f13',
+  'memory/graph-renderer.mjs': '6472ea58741464fff73401c640c094acb145adcbf732025329937e48f608c651',
   'memory/rag-core.mjs': 'c282ebb3965c4a25b48fb66082ce18c72184449f2123633a901ffceb9939ace6',
   'LICENSES/forcegraph-tsl.txt': '1a897e0ee6f1fc65889976eadb848acefac9db7f9c97274a6c490f52390cd474',
   'LICENSES/three.txt': '8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc',
@@ -349,6 +349,7 @@ try {
       records: window.localMemoryPreview.workspace.memory.snapshot().records,
       sources: window.localMemoryPreview.workspace.sourcesForAnswer(answerTurnId),
       automaticNodes: window.localMemoryPreview.workspace.automaticMemory.snapshot().nodes,
+      summary: window.localMemoryPreview.workspace.context.summarySnapshot(),
       graphNodeCount: window.localMemoryPreview.workspace.graph.snapshot().nodes.length }), fixture.answerTurnId);
     assert.equal(restored.conversation, fixture.after); assert.deepEqual(restored.sources, fixture.sources); assert.deepEqual(restored.records, []);
     assert.ok(restored.graphNodeCount > 0, 'internal execution history remains separate from saved memory presentation');
@@ -357,10 +358,48 @@ try {
     assert.equal(await page.locator(`#turn-${fixture.original.id} .content`).textContent(), fixture.original.content);
     assert.equal(restored.automaticNodes.filter(node => node.kind === 'message').length, 4);
     assert.equal(restored.automaticNodes.filter(node => node.kind === 'global').length, 3);
-    assert.equal(await page.locator('#memory-graph [data-memory-kind="message"]').count(), 4, 'canonical turns, not event-history nodes');
+    const canonicalTurns = JSON.parse(restored.conversation).turns;
+    assert.equal(canonicalTurns.length, 4, 'all four canonical turns survive reload');
+    assert.ok(restored.summary && restored.summary.summaryHash === fixture.summary.contentHash, 'the exact retained summary survives reload');
+    assert.deepEqual(restored.summary.sourceTurnIds, [fixture.original.id], 'only the authored source represented by this fixture is absorbed');
+    const represented = new Set(restored.summary.sourceTurnIds.map(id => 'turn:' + id));
+    for (const id of restored.summary.sourceTurnIds) assert.equal(canonicalTurns.find(turn => turn.id === id)?.role, 'user');
+    const overview = await page.locator('#memory-graph [data-memory-kind="message"]').evaluateAll(nodes => nodes.map(node => node.dataset.memoryNode));
+    assert.deepEqual(overview.slice().sort(), canonicalTurns.map(turn => 'turn:' + turn.id).filter(id => !represented.has(id)).sort(),
+      'the settled overview hides exactly the represented authored source and keeps all other recent/user/assistant nodes');
+    assert.equal(await page.locator('#memory-graph [data-memory-kind="summary"]').count(), 1);
+    assert.equal(await page.locator('#memory-graph [data-memory-kind="summary"]').getAttribute('data-memory-node'), restored.summary.id);
+    assert.equal(await page.locator('#memory-graph [data-memory-kind="summary"]').getAttribute('data-summary-hash'), fixture.summary.contentHash);
     assert.equal(await page.locator('#memory-graph [data-memory-kind="global"]').count(), 3);
     assert.equal(await page.locator('#memory-graph [data-memory-kind="record"]').count(), 0, 'automatic nodes do not manufacture manual saved records');
     assert.equal(await page.locator('#memory-graph svg').count(), 0, 'no substitute SVG renderer');
+    const readBoundary = () => page.evaluate(() => {
+      const workspace = window.localMemoryPreview.workspace;
+      return { conversation: workspace.conversation.exportState(), events: workspace.events.list(),
+        inspection: workspace.context.inspectionSnapshot(), usedNodeIds: workspace.automaticMemory.snapshot().usedNodeIds,
+        persona: workspace.automaticMemory.exportPersona(), records: workspace.memory.snapshot().records };
+    });
+    const beforeSearch = await readBoundary();
+    await page.locator('#memory-open').click();
+    await page.locator('#memory-query').fill(fixture.original.content);
+    await page.locator('#memory-query').press('Enter');
+    await page.waitForFunction(sourceId => document.getElementById('memory-search-summary').textContent.includes('graph search only')
+      && [...document.querySelectorAll('#memory-graph [data-memory-node]')].some(node => node.dataset.memoryNode === 'turn:' + sourceId), fixture.original.id);
+    const revealed = page.locator('#memory-graph [data-memory-node="turn:' + fixture.original.id + '"]');
+    assert.equal(await revealed.count(), 1, 'existing graph search reveals the actual absorbed source');
+    await revealed.click();
+    assert.equal(await page.locator('#memory-detail-text').textContent(), fixture.original.content, 'the revealed source retains its exact canonical words');
+    assert.deepEqual(await readBoundary(), beforeSearch, 'graph search/source inspection changes no canonical history, admission, dispatch, persona or saved records');
+    assert.equal(await page.locator('#app').getAttribute('data-phase'), 'idle', 'source inspection does not load the model');
+    await page.locator('#memory-back').click(); await page.locator('#memory-query-clear').click();
+    await page.waitForFunction(sourceId => ![...document.querySelectorAll('#memory-graph [data-memory-node]')]
+      .some(node => node.dataset.memoryNode === 'turn:' + sourceId), fixture.original.id);
+    assert.deepEqual(await readBoundary(), beforeSearch, 'clearing graph search restores the settled projection without data changes');
+    await page.locator('#memory-close').click();
+    observations.push({ restoredCanonicalTurns: canonicalTurns.length, settledMessageNodes: overview.length,
+      representedSourceIds: restored.summary.sourceTurnIds, retainedSummaryNodeId: restored.summary.id,
+      unrepresentedOriginalsVisible: true, exactSourceRevealedByGraphSearch: true, modelLoadedForInspection: false,
+      searchChangedCanonicalOrDispatchState: false, clearingSearchRestoresAbsorption: true });
     assert.equal(workers, 0); assert.equal(await page.locator('[role="alert"]:visible').filter({ hasText: /\S/ }).count(), 0);
   });
   await check('offline browser and immutable package boundaries remain intact after reload', async () => {

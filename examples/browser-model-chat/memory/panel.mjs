@@ -1,9 +1,14 @@
 import { mountMemoryNavigation } from './navigation.mjs';
 import { createCompactionCue } from './compaction-cue.mjs';
 import { createContextInspector } from './context-panel.mjs';
-import { createSummaryEffects } from './summary-effects.mjs';
+import { createSummaryEffects, createSummaryStartGate } from './summary-effects.mjs';
 
 export const MEMORY_SCOPE_COLORS = Object.freeze({ conversation: '#0ea5ff', persona: '#c81fff', global: '#f59e0b' });
+export const MEMORY_SUMMARY_COLOR = '#22e37f';
+export function memoryNodeColor(node) {
+  return node?.kind === 'summary' && node.scope === 'conversation'
+    ? Number.parseInt(MEMORY_SUMMARY_COLOR.slice(1), 16) : memoryScopeColor(node?.scope);
+}
 export function memoryScopeColor(scope) {
   const color = Object.hasOwn(MEMORY_SCOPE_COLORS, scope) ? MEMORY_SCOPE_COLORS[scope] : undefined;
   return color === undefined ? undefined : Number.parseInt(color.slice(1), 16);
@@ -47,14 +52,20 @@ export function submittedMemoryNodeIds(snapshot, requestSha256, currentScope) {
 }
 
 /** A retained output is a display projection, never another retrieval record. */
-export function projectConversationSummary(base, summary) {
+export function projectConversationSummary(base, summary, visibleSourceNodeIds = []) {
   if (!summary || summary.kind !== 'summary' || summary.scope !== 'conversation' || summary.derived !== true
     || summary.id !== 'summary:' + summary.eventId || !Array.isArray(summary.sourceTurnIds) || !summary.sourceTurnIds.length) return base;
   const sources = new Set(summary.sourceTurnIds.map(id => 'turn:' + id));
-  const ordered = [...base.nodes.filter(node => sources.has(node.id)), ...base.nodes.filter(node => !sources.has(node.id))];
+  const authoredSource = node => sources.has(node.id) && node.kind === 'message' && node.scope === 'conversation'
+    && node.role === 'user' && node.id === 'turn:' + node.turnId;
+  // A settled summary represents these authored sources in the overview. Exact originals
+  // stay in storage, and the existing search/source inspector can reveal their real nodes.
+  const reveal = new Set(Array.isArray(visibleSourceNodeIds) ? visibleSourceNodeIds : []);
+  const ordered = [...base.nodes.filter(node => authoredSource(node) && reveal.has(node.id)),
+    ...base.nodes.filter(node => !authoredSource(node))];
   const nodes = [summary, ...ordered].slice(0, 12), ids = new Set(nodes.map(node => node.id));
   const links = [...base.links.filter(link => ids.has(link.source) && ids.has(link.target)),
-    ...nodes.filter(node => sources.has(node.id)).map(node => ({ id: JSON.stringify([node.id, summary.id]),
+    ...nodes.filter(authoredSource).map(node => ({ id: JSON.stringify([node.id, summary.id]),
       source: node.id, target: summary.id, kind: 'retained-excerpt' }))];
   return { ...base, nodes, links };
 }
@@ -116,6 +127,7 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   button.setAttribute('aria-haspopup', 'dialog'); button.setAttribute('aria-controls', 'memory-dialog'); options.before(button);
   const dialog = el('dialog', undefined, { id: 'memory-dialog', class: 'memory-dialog', 'aria-labelledby': 'memory-title' });
   for (const [scope, color] of Object.entries(MEMORY_SCOPE_COLORS)) dialog.style.setProperty('--memory-scope-' + scope, color);
+  dialog.style.setProperty('--memory-summary-color', MEMORY_SUMMARY_COLOR);
   const header = el('header', undefined, { class: 'memory-panel-header' });
   const back = control('Back', 'memory-back'), fit = control('Fit', 'memory-fit'), expand = control('⤢', 'memory-expand'), close = control('Chat', 'memory-close'); back.hidden = true; fit.hidden = true;
   expand.setAttribute('aria-label', 'Expand Memory'); expand.setAttribute('aria-expanded', 'false'); expand.title = 'Expand Memory';
@@ -170,11 +182,13 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   compact.setAttribute('aria-describedby', 'memory-compact-status');
   const compactTools = el('div', undefined, { class: 'memory-compact-tools' }); compactTools.append(openSummary, compact, compactCancel, compactNote);
   compactTools.hidden = typeof context?.compactNow !== 'function'; footer.append(compactTools);
-  const legend = el('div', undefined, { class: 'memory-scope-legend', role: 'list', 'aria-label': 'Memory scopes' }); legend.hidden = !automaticMemory;
+  const legend = el('div', undefined, { class: 'memory-scope-legend', role: 'list', 'aria-label': 'Memory colors and types' }); legend.hidden = !automaticMemory;
   for (const [scope] of Object.entries(MEMORY_SCOPE_COLORS)) {
     const label = el('span', scope[0].toUpperCase() + scope.slice(1), { role: 'listitem' });
     label.style.setProperty('--memory-node-color', 'var(--memory-scope-' + scope + ')'); legend.append(label);
   }
+  const summaryLegend = el('span', 'Conversation summary', { role: 'listitem' });
+  summaryLegend.style.setProperty('--memory-node-color', 'var(--memory-summary-color)'); legend.append(summaryLegend);
   const status = el('p', '', { id: 'memory-status', role: 'status', 'aria-live': 'polite' });
   const graphRegion = el('section', undefined, { id: 'memory-graph-view', class: 'memory-graph-view', role: 'tabpanel', 'aria-labelledby': 'memory-graph-tab' });
   graphRegion.append(searchForm, searchSummary, legend, map, editor, status, footer);
@@ -185,27 +199,64 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
   let legacyView = false, suspendedCamera = null;
   let searchTimer = 0, searchEpoch = 0, searching = false, searchBinding = null, pendingSearchFit = false, previewNodeId = null;
   let compactController = null, compactMessage = '', manualCueNodeIds = [], lastDispatchSha256 = null;
+  let compactionPresentation = null;
   const nodeButtons = new Map();
   const compactionCue = createCompactionCue(events.list());
   const summaryEffects = createSummaryEffects({ container: picture, getTargets: () => renderer?.diagnostics().node_targets ?? [],
+    getNodeColor: id => memoryNodeColor(currentMap.nodes.find(node => node.id === id)),
+    getNodePositions: () => renderer?.diagnostics().node_positions ?? [],
+    beginNodePresentation: (ids, options) => renderer?.beginNodePresentation(ids, options) ?? null,
+    onFinish: finishCompactionPresentation,
     getMotionEnabled: () => !motionPreference.matches, initialEventIds: events.list().filter(event => event.type === 'compacted').map(event => event.id) });
   let pendingCompactionCue = null, compactionTimer = 0, requestHighlightTimer = 0, requestHighlightUntil = 0;
+  const summaryStart = createSummaryStartGate({
+    isCurrent: eventId => !disposed && dialog.open && !graphRegion.hidden && isAutomaticView() && editor.hidden && detail.hidden
+      && doc.visibilityState !== 'hidden' && ['all', 'conversation'].includes(automaticMemory.getScope())
+      && (typeof context.usageSnapshot !== 'function' || context.usageSnapshot().phase === 'ready')
+      && pendingCompactionCue?.eventIds.includes(eventId) && context.summarySnapshot?.()?.eventId === eventId && Boolean(renderer),
+    getLayout: () => {
+      // Footer/readiness changes may resize the graph. Complete its real layout before
+      // acquiring the reversible source-position lease; later user resizing still cancels it.
+      drawRenderer();
+      return { width: canvas.clientWidth, height: canvas.clientHeight, revision: renderer?.diagnostics().runtime.graph_revision };
+    },
+    start: startCompactionCue,
+    onUnavailable: () => cancelCompactionCue(),
+  });
   const stopCompactionAnimation = () => { summaryEffects.stop(); for (const target of nodeButtons.values()) target.classList.remove('is-compaction-source'); };
   function cancelCompactionCue() {
+    summaryStart.cancel();
     clearTimeout(compactionTimer); compactionTimer = 0; pendingCompactionCue = null; stopCompactionAnimation();
     compactionNote.hidden = true; compactionNote.textContent = ''; delete compactionNote.dataset.eventId;
+    if (compactionPresentation) finishCompactionPresentation(compactionPresentation.eventId);
+  }
+  function finishCompactionPresentation(eventId) {
+    if (compactionPresentation?.eventId !== eventId) return;
+    compactionPresentation = null;
+    if (!disposed) drawMap();
   }
   function playCompactionCue() {
-    if (!pendingCompactionCue || compactionTimer || !dialog.open || graphRegion.hidden || !isAutomaticView() || !editor.hidden || !detail.hidden) return;
+    if (!pendingCompactionCue || compactionTimer || !dialog.open || graphRegion.hidden || !isAutomaticView()
+      || !['all', 'conversation'].includes(automaticMemory.getScope()) || !editor.hidden || !detail.hidden) return;
     if (picture.dataset.renderer === 'loading') return;
+    if (typeof context.usageSnapshot === 'function' && context.usageSnapshot().phase !== 'ready') return;
+    const summary = context.summarySnapshot?.();
+    if (summary && pendingCompactionCue.eventIds.includes(summary.eventId) && renderer) summaryStart.queue(summary.eventId);
+    else startCompactionCue();
+  }
+  function startCompactionCue() {
+    if (!pendingCompactionCue) return;
     const cue = pendingCompactionCue, summary = context.summarySnapshot?.();
     const actualSummary = summary && cue.eventIds.includes(summary.eventId) && currentMap.nodes.some(node => node.id === summary.id);
     if (actualSummary && renderer && !renderer.diagnostics().node_targets.some(target => target.node_id === summary.id && target.visible)) return;
     pendingCompactionCue = null;
     compactionNote.textContent = actualSummary ? 'Conversation summary ready · ' + summary.sourceTurnIds.length + ' authored sources. Originals kept.' : cue.message;
     compactionNote.dataset.eventId = cue.eventIds.at(-1); compactionNote.hidden = false;
-    if (actualSummary && renderer) summaryEffects.play({ eventId: summary.eventId,
-      sourceNodeIds: summary.sourceTurnIds.map(id => 'turn:' + id), targetNodeId: summary.id });
+    if (actualSummary && renderer) {
+      const effect = summaryEffects.play({ eventId: summary.eventId,
+        sourceNodeIds: summary.sourceTurnIds.map(id => 'turn:' + id), targetNodeId: summary.id });
+      if (!effect.played) finishCompactionPresentation(summary.eventId);
+    } else if (compactionPresentation) finishCompactionPresentation(compactionPresentation.eventId);
     compactionTimer = setTimeout(cancelCompactionCue, cue.durationMs);
   }
   const snapshot = () => conversation.snapshot();
@@ -224,7 +275,12 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
     viewFrame = requestAnimationFrame(() => { viewFrame = 0; if (!disposed && dialog.open) { if (view === 'graph') drawMap(); buttons(); } });
   } });
   body.prepend(inspector.tabs); body.append(inspector.panel);
-  const autoSnapshot = () => projectConversationSummary(automaticMemory.snapshot({ preferredNodeIds: hits?.map(hit => hit.nodeId) ?? manualCueNodeIds, limit: 12 }), context.summarySnapshot?.());
+  const autoSnapshot = () => {
+    const preferred = hits?.map(hit => hit.nodeId) ?? manualCueNodeIds;
+    const visibleSources = [...(compactionPresentation?.sourceNodeIds ?? []), ...preferred];
+    return projectConversationSummary(automaticMemory.snapshot({ preferredNodeIds: visibleSources, limit: 12 }),
+      context.summarySnapshot?.(), visibleSources);
+  };
   const setStatus = (value, error = false) => { status.textContent = value; status.classList.toggle('memory-error', error); status.setAttribute('role', error ? 'alert' : 'status'); status.hidden = !value; };
   const errorText = error => typeof error?.message === 'string' ? error.message.slice(0, 180) : 'The memory operation could not finish.';
   const currentSearchBinding = () => JSON.stringify([isAutomaticView(), scope(), snapshot().version,
@@ -378,10 +434,13 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
     else if (preserveCamera) picture.dataset.renderer = 'suspended';
   }
   function fallback(reason = '') {
+    const hadPresentation = Boolean(compactionPresentation); compactionPresentation = null;
+    cancelCompactionCue();
     navigation.cancel(); fit.hidden = true;
     renderer?.dispose(); renderer = null; topology = ''; canvas.hidden = true;
     picture.dataset.renderer = 'list'; picture.classList.add('is-fallback');
     for (const node of nodeButtons.values()) node.hidden = false;
+    if (hadPresentation) drawMap(false);
     if (reason) setStatus(isAutomaticView() ? 'Graph unavailable. Your memory is still available below.' : 'Graph unavailable. Your saved words are still available.', true);
     playCompactionCue();
   }
@@ -423,7 +482,7 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
       canvas.hidden = false;
       const value = await module.createTslRagGraphRenderer({ canvas, backend, onNodeActivate: id => {
         const node = currentMap.nodes.find(node => node.id === id); if (node) showDetail(node, true);
-      }, nodeColor: id => memoryScopeColor(currentMap.nodes.find(node => node.id === id)?.scope), preserveNodeColors: true, nodeSurface: 'scope-colored', presentation: 'memory-spatial',
+      }, nodeColor: id => memoryNodeColor(currentMap.nodes.find(node => node.id === id)), preserveNodeColors: true, nodeSurface: 'scope-colored', presentation: 'memory-spatial',
       onTerminalFailure: () => { if (generation === rendererGeneration && renderAllowed()) fallback('device unavailable'); } });
       if (generation !== rendererGeneration || !renderAllowed()) { value.dispose(); return; }
       renderer = value; rendererModule = module; renderer.setMotionEnabled(!motionPreference.matches);
@@ -443,7 +502,7 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
       });
     rendererPromise = startup;
   }
-  function drawMap() {
+  function drawMap(paint = true) {
     currentMap = isAutomaticView() ? autoSnapshot() : projectMemoryMap({ active: active(), turns: snapshot().turns, graphData: graph?.snapshot() ?? null, preferredRecordIds: hits?.map(hit => hit.recordId) ?? [] });
     if (isAutomaticView()) {
       pocket.value = automaticMemory.getScope();
@@ -480,14 +539,17 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
       if (node.kind === 'summary') { target.dataset.summaryEventId = node.eventId; target.dataset.summaryHash = node.summaryHash; }
       if (isAutomaticView()) { target.dataset.memoryScope = node.scope; target.dataset.memoryRole = node.role; }
       else { delete target.dataset.memoryScope; delete target.dataset.memoryRole; }
-      if (memoryScopeColor(node.scope) !== undefined) target.style.setProperty('--memory-node-color', MEMORY_SCOPE_COLORS[node.scope]);
+      const visualColor = memoryNodeColor(node);
+      if (visualColor !== undefined) target.style.setProperty('--memory-node-color', '#' + visualColor.toString(16).padStart(6, '0'));
       else target.style.removeProperty('--memory-node-color');
       target.dataset.matched = String(matches.has(node.id)); target.setAttribute('aria-pressed', String(selected?.id === node.id));
     }
     picture.classList.toggle('has-query', hits !== null); empty.hidden = currentMap.nodes.length > 0;
-    if (!currentMap.nodes.length) { stopRenderer(); picture.dataset.renderer = 'empty'; }
-    else if (!graph) fallback(); else void ensureRenderer();
-    if (renderer) drawRenderer();
+    if (paint) {
+      if (!currentMap.nodes.length) { stopRenderer(); picture.dataset.renderer = 'empty'; }
+      else if (!graph) fallback(); else void ensureRenderer();
+      if (renderer) drawRenderer();
+    }
   }
   function refresh() {
     if (disposed) return;
@@ -627,13 +689,13 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
     }
     invalidateSearch(); query.value = ''; setSearchSummary(''); setStatus(''); hidePreview(); cancelCompactionCue();
     const controller = compactController = new AbortController(); compactMessage = ''; busy = true; buttons();
+    let committedSummaryEventId = null;
     try {
       const result = await context.compactNow({ signal: controller.signal });
       if (disposed) return;
       const event = events.list().findLast(item => item.type === 'compacted' && item.cycle === result.compaction?.cycle);
       const summary = context.summarySnapshot?.();
-      manualCueNodeIds = summary?.eventId === event?.id ? summary.sourceTurnIds.map(id => 'turn:' + id) : [];
-      graphView(false); navigation.fit(); pendingCompactionCue = compactionCue.take(currentMap.nodes); playCompactionCue();
+      committedSummaryEventId = summary?.eventId === event?.id ? summary.eventId : null;
       compactMessage = (summary ? 'Conversation summary ready · ' + summary.sourceTurnIds.length + ' authored sources retained. ' : 'Context compacted. ')
         + result.compaction.before.promptTokens + ' → ' + result.compaction.after.promptTokens + ' prompt tokens. Originals kept; nothing sent.';
       // The real compaction is already committed; saving cannot undo its event.
@@ -646,7 +708,23 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
         const feedback = manualCompactionFailureView(error);
         compactMessage = feedback.message; setStatus(compactMessage, feedback.error);
       }
-    } finally { if (compactController === controller) compactController = null; busy = false; if (!disposed) refresh(); }
+    } finally {
+      if (compactController === controller) compactController = null;
+      busy = false;
+      if (!disposed) {
+        // Persisting can span multiple browser frames. Finish every status/readiness
+        // update before scheduling mesh motion, so our own footer cannot cancel it.
+        refresh();
+        const summary = context.summarySnapshot?.();
+        if (committedSummaryEventId && summary?.eventId === committedSummaryEventId) {
+          if (dialog.open && !graphRegion.hidden && isAutomaticView() && !controller.signal.aborted) {
+            graphView(false);
+            compactionPresentation = { eventId: summary.eventId, sourceNodeIds: summary.sourceTurnIds.map(id => 'turn:' + id) };
+            refresh(); navigation.fit(); pendingCompactionCue = compactionCue.take(currentMap.nodes); playCompactionCue();
+          } else compactionCue.take([]);
+        }
+      }
+    }
   });
   listen(canvas, 'rag-camera-frame', overlayPositions);
   listen(fit, 'click', () => { cancelCompactionCue(); navigation.fit(); });
@@ -710,7 +788,8 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
       if (disposed) return;
       const summary = context.summarySnapshot?.();
       if (summary?.eventId !== event.id) return;
-      manualCueNodeIds = summary.sourceTurnIds.map(id => 'turn:' + id); refresh();
+      cancelCompactionCue();
+      compactionPresentation = { eventId: summary.eventId, sourceNodeIds: summary.sourceTurnIds.map(id => 'turn:' + id) }; refresh();
       if (dialog.open && isAutomaticView()) {
         navigation.fit(); pendingCompactionCue = compactionCue.take(currentMap.nodes); playCompactionCue();
       }
@@ -725,9 +804,10 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
       requestHighlightTimer = setTimeout(() => { requestHighlightTimer = 0; requestHighlightUntil = 0; if (!disposed) refresh(); }, 3200);
       queueMicrotask(() => { if (!disposed) refresh(); });
     } else refresh();
-  }), unsubscribeAutomatic = automaticMemory?.subscribe?.(refresh), unsubscribeInspection = context.subscribeInspection?.(() => { if (!disposed) refresh(); }); refresh();
+  }), unsubscribeAutomatic = automaticMemory?.subscribe?.(refresh), unsubscribeInspection = context.subscribeInspection?.(() => { if (!disposed) refresh(); }),
+    unsubscribeUsage = context.subscribeUsage?.(() => { if (!disposed) refresh(); }); refresh();
   return Object.freeze({ button, dialog, refresh, dispose() {
-    if (disposed) return; disposed = true; compactController?.abort(); invalidateSearch(); inspector.dispose(); if (viewFrame) cancelAnimationFrame(viewFrame); viewFrame = 0; clearTimeout(requestHighlightTimer); requestHighlightTimer = 0; if (expandFrame) cancelAnimationFrame(expandFrame); expandFrame = 0; stopRenderer(); summaryEffects.dispose(); compactionCue.dispose(); navigation.dispose(); observer.disconnect(); unsubscribe(); unsubscribeAutomatic?.(); unsubscribeInspection?.(); listeners.abort();
+    if (disposed) return; disposed = true; compactController?.abort(); invalidateSearch(); inspector.dispose(); if (viewFrame) cancelAnimationFrame(viewFrame); viewFrame = 0; clearTimeout(requestHighlightTimer); requestHighlightTimer = 0; if (expandFrame) cancelAnimationFrame(expandFrame); expandFrame = 0; stopRenderer(); summaryStart.dispose(); summaryEffects.dispose(); compactionCue.dispose(); navigation.dispose(); observer.disconnect(); unsubscribe(); unsubscribeAutomatic?.(); unsubscribeInspection?.(); unsubscribeUsage?.(); listeners.abort();
     if (dialog.open) dialog.close(); dialog.remove(); button.remove(); stylesheet?.remove();
   } });
 }

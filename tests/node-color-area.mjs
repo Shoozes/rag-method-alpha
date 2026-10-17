@@ -3,7 +3,22 @@ export const NODE_COLOR_THRESHOLDS=Object.freeze({region:'body disk',radiusFract
 
 // Self-contained for Playwright serialization. Tests may supply raw RGBA; browser proofs
 // supply a screenshot PNG, decoded without transforms or filters in an ephemeral canvas.
-export async function measureNodeColorArea({data,rgba,width,height,samples,thresholds,viewport}){
+export async function measureNodeColorArea({data,rgba,width,height,samples,thresholds,viewport,occlusion}){
+  // The optional mask is renderer geometry only. Reject unknown/incomplete input
+  // rather than silently measuring a foreground sphere as the body behind it.
+  const finite=value=>typeof value==='number'&&Number.isFinite(value);
+  const geometry=point=>point&&typeof point.id==='string'&&point.id.length>0&&point.id.length<=256
+    &&[point.x,point.y,point.radius,point.depth].every(finite)&&point.radius>0&&point.depth>0;
+  let projectedBodies=null;
+  if(occlusion!==undefined){
+    if(!occlusion||occlusion.kind!=='projected-depth-disks-v1'||Object.keys(occlusion).some(key=>!['kind','nodes'].includes(key))
+      ||!Array.isArray(occlusion.nodes)||occlusion.nodes.length>4096||!occlusion.nodes.every(geometry)
+      ||new Set(occlusion.nodes.map(node=>node.id)).size!==occlusion.nodes.length)throw Error('Invalid projected body occlusion geometry.');
+    const byId=new Map(occlusion.nodes.map(node=>[node.id,node]));
+    if(!Array.isArray(samples)||!samples.every(sample=>geometry(sample)&&byId.has(sample.id)
+      &&['x','y','radius','depth'].every(key=>sample[key]===byId.get(sample.id)[key])))throw Error('Each body sample needs its exact projected mask identity.');
+    projectedBodies=occlusion.nodes;
+  }
   if(data){
     const image=new Image();image.src='data:image/png;base64,'+data;await image.decode();
     const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;
@@ -20,17 +35,22 @@ export async function measureNodeColorArea({data,rgba,width,height,samples,thres
   };
   return samples.map(sample=>{
     const x=sample.x*ratioX,y=sample.y*ratioY,r=sample.radius*thresholds.radiusFraction*ratioX;
-    const values=[],sum=[0,0,0];let colored=0;
+    const foreground=(projectedBodies||[]).filter(node=>node.id!==sample.id&&node.depth<=sample.depth);
+    const values=[],sum=[0,0,0];let colored=0,bodySamples=0,occludedSamples=0;
     for(let py=Math.floor(y-r);py<=Math.ceil(y+r);py++)for(let px=Math.floor(x-r);px<=Math.ceil(x+r);px++){
       if((px+.5-x)**2+(py+.5-y)**2>r*r)continue;
       if(px<0||py<0||px>=width||py>=height)throw Error('Body region must be fully inside screenshot.');
+      bodySamples++;
+      // Mask the complete nearer (or depth-tied) projected body disk plus one
+      // CSS pixel for its antialiased edge. Screenshot colors never select ROI.
+      if(foreground.some(node=>(px+.5-node.x*ratioX)**2+(py+.5-node.y*ratioY)**2<=((node.radius+1)*ratioX)**2)){occludedSamples++;continue;}
       const offset=(py*width+px)*4,rgb=[rgba[offset],rgba[offset+1],rgba[offset+2]],value=hsv(rgb);
       values.push(value);rgb.forEach((n,index)=>sum[index]+=n);
       const[h0,h1]=thresholds.hues[sample.scope];
       if(value.s>=thresholds.minimumSaturation&&value.v>=thresholds.minimumValue&&value.h>=h0&&value.h<=h1)colored++;
     }
     const n=values.length,meanRgb=sum.map(value=>value/n),total=meanRgb.reduce((a,b)=>a+b,0);
-    return{...sample,samples:n,coloredFraction:colored/n,meanSaturation:values.reduce((sum,value)=>sum+value.s,0)/n,meanRgb,chromaticity:meanRgb.map(value=>value/total)};
+    return{...sample,samples:n,...(projectedBodies?{bodySamples,occludedSamples}:{}),coloredFraction:colored/n,meanSaturation:values.reduce((sum,value)=>sum+value.s,0)/n,meanRgb,chromaticity:meanRgb.map(value=>value/total)};
   });
 }
 

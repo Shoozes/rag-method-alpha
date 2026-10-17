@@ -9,11 +9,17 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startServer } from '../examples/browser-model-chat/serve.mjs';
 import { NODE_COLOR_THRESHOLDS, measureNodeColorArea, assessNodeColorArea } from './node-color-area.mjs';
+import { assertDistinctReceiptOwner } from './receipt-owner.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url)),live=process.argv.includes('--live');
 const liveProofRoot=resolve(root,'../rag-mobile-memory/.artifacts/proof/memory-mobile');
 if(live&&resolve(process.env.BROWSER_MEMORY_PROOF_ROOT||'')!==liveProofRoot)throw Error('Live proof requires the explicit existing mobile proof root.');
 const output=live?liveProofRoot:join(root,'.artifacts/proof/memory-mobile');
+// Reject an unsafe owner before entering the receipt-writing try/finally.
+// A caught preflight error must never replace the baseline it is protecting.
+const externalBaselinePath=!live&&process.env.BROWSER_MEMORY_BASELINE_RECEIPT
+  ?resolve(process.env.BROWSER_MEMORY_BASELINE_RECEIPT):null;
+if(externalBaselinePath)await assertDistinctReceiptOwner(externalBaselinePath,join(output,'receipt.json'));
 const phase=live||process.argv.includes('--after')?'after':'before',profilePrefix='rag-memory-mobile-';
 const palette={conversation:'#0ea5ff',persona:'#c81fff',global:'#f59e0b'};
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -24,7 +30,7 @@ const assetFailures=[],network={requests:0,bytes:0};
 const limitations=['Trusted mouse detail selection is tested in an emulated touch viewport; physical touch selection and iOS are unqualified.'];
 const cleanup={contextClosed:false,serverClosed:false,ownedProfileRemoved:false};
 const sourcePaths=['bootstrap.mjs','app.mjs','style.css','memory/panel.mjs','memory/panel.css','memory/compaction-cue.mjs','memory/automatic-memory.mjs'];
-let context,server,profile,session,page,error,browserVersion,sourceIdentity,graphIdentity,coreIdentity,prior,lastGesture,base,manifest,preflight,workers=0;
+let context,server,profile,session,page,error,browserVersion,sourceIdentity,graphIdentity,coreIdentity,prior,priorPath,lastGesture,base,manifest,preflight,workers=0;
 const started=Date.now();
 const longText='My notebooks use copper covers. These are exact user words from this labeled touch fixture. '
   +'The long source lets us inspect native detail scrolling without fabricated history. '.repeat(16).trimEnd();
@@ -104,26 +110,62 @@ async function resetGraph(){await tap('#memory-close');await tap('#memory-open')
 async function fitGraph(){await tap('#memory-fit');await settle();assert.equal(await page.locator('[data-memory-node]:visible').count(),8,'Fit recovers all actual nodes');}
 async function nativeZoomControl(){const control=await context.newPage();try{await control.route('**/native-zoom-control',route=>route.fulfill({status:200,contentType:'text/html; charset=utf-8',body:'<meta name="viewport" content="width=device-width,initial-scale=1"><p>LABELED NATIVE ZOOM CONTROL</p><div style="height:2500px">Plain native page without app CSS or scripts</div>'}));await control.goto(new URL('native-zoom-control',base).href);const cdp=await context.newCDPSession(control);await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:5,configuration:'mobile'});const before=await control.evaluate(()=>visualViewport.scale);await cdp.send('Input.synthesizePinchGesture',{x:195,y:350,scaleFactor:1.3,relativeSpeed:400,gestureSourceType:'touch'});await pause(120);return{fixture:true,before,after:await control.evaluate(()=>visualViewport.scale),noAppCss:true};}finally{await control.close();}}
 async function liftNode(id){const rect=await page.locator('[data-memory-node="'+id+'"]').boundingBox();const bounds=await page.locator('#memory-graph').boundingBox(),dy=Math.min(0,bounds.y+bounds.height*.25-(rect.y+22));if(dy>-20)return;
-  const start=await page.evaluate(dy=>{const surface=document.getElementById('memory-graph'),r=surface.getBoundingClientRect();for(const fraction of [.8,.7,.6,.5])for(const x of [.2,.4,.6,.8]){const point={x:r.x+r.width*x,y:r.y+r.height*fraction};if(point.y+dy>r.y+4&&[point,{x:point.x,y:point.y+dy}].every(value=>document.elementFromPoint(value.x,value.y)===surface))return point;}throw Error('No empty graph path for selected-node presentation.');},dy);await swipe(start,{x:start.x,y:start.y+dy});}
+  const start=await page.evaluate(dy=>{const surface=document.getElementById('memory-graph'),r=surface.getBoundingClientRect();for(const fraction of [.8,.7,.6,.5])for(const x of [.2,.4,.6,.8]){const point={x:r.x+r.width*x,y:r.y+r.height*fraction};const contacts=[-12,12].flatMap(dx=>[{x:point.x+dx,y:point.y},{x:point.x+dx,y:point.y+dy}]);if(point.y+dy>r.y+4&&contacts.every(value=>value.x>r.x+2&&value.x<r.right-2&&document.elementFromPoint(value.x,value.y)===surface))return point;}throw Error('No empty graph path for selected-node presentation.');},dy);
+  // A single contact orbits. Pan via two real contacts with constant span.
+  await touch('touchStart',[-12,12].map((dx,index)=>({x:start.x+dx,y:start.y,id:index+1})));
+  for(let step=1;step<=6;step++){await touch('touchMove',[-12,12].map((dx,index)=>({x:start.x+dx,y:start.y+dy*step/6,id:index+1})));await pause(20);}
+  await touch('touchEnd');await pause(80);await settle();}
 function stablePage(before,after){assert.equal(after.viewport.scale,before.viewport.scale,'gesture changes graph, not page zoom');assert.equal(after.page.y,before.page.y);assert.equal(after.page.x,before.page.x);assert.ok(Math.abs(after.graph.width-before.graph.width)<1&&Math.abs(after.graph.height-before.graph.height)<1,'graph viewport stable');}
 function assertPan(before,after){stablePage(before,after);assert.ok(movement(before,after).maximumPixels>8,'actual projected nodes move during intentional pan');assert.notDeepEqual(after.cameraPose,before.cameraPose,'actual native camera pose moves');assert.ok(!after.eventLog.some(event=>event.type==='pointercancel'),'browser did not steal graph pan');assert.equal(after.selection,'');assert.equal(after.eventLog.filter(event=>event.type==='dragstart').length,0);}
+function assertFullOrbit(before,after,dx,dy){
+  assertPan(before,after);
+  const a=before.cameraPose,b=after.cameraPose;
+  const radius=p=>Math.hypot(p.position.x-p.target.x,p.position.y-p.target.y,p.position.z-p.target.z);
+  const theta=p=>Math.atan2(p.position.x-p.target.x,p.position.z-p.target.z);
+  const phi=p=>Math.acos((p.position.y-p.target.y)/radius(p));
+  assert.deepEqual(b.target,a.target,'one-contact orbit preserves its actual target');
+  assert.ok(Math.abs(radius(a)-radius(b))<.00001,'one-contact orbit preserves actual camera distance');
+  const angle=theta(a)-theta(b),observedX=Math.atan2(Math.sin(angle),Math.cos(angle))*before.graph.width/(2*Math.PI);
+  const observedY=(phi(a)-phi(b))*before.graph.height/Math.PI;
+  assert.ok(Math.abs(observedX-dx)<2&&Math.abs(observedY-dy)<2,'overlay capture transfer preserves the full continued drag as an orbit');
+  observations.push({overlayOrbit:{requested:{dx,dy},observed:{dx:observedX,dy:observedY},targetAndRadiusPreserved:true}});
+}
 function pairScale(before,after){const previous=new Map(before.nodes.filter(node=>node.visible!==false).map(node=>[node.id,node]));const common=after.nodes.filter(node=>node.visible!==false&&previous.has(node.id));for(let a=0;a<common.length;a++)for(let b=a+1;b<common.length;b++){const oldA=previous.get(common[a].id),oldB=previous.get(common[b].id),distance=Math.hypot(oldA.x-oldB.x,oldA.y-oldB.y);if(distance>50)return Math.hypot(common[a].x-common[b].x,common[a].y-common[b].y)/distance;}throw Error('Two common visible graph nodes required for pinch proof.');}
 async function colorProof(label,requiredScopes=Object.keys(palette)){
   await settle();const state=await snapshot(),colors=new Map((state.nodeColors||[]).map(value=>[value.node_id,typeof value.base_color==='number'?'#'+value.base_color.toString(16).padStart(6,'0'):value.base_color?.toLowerCase()]));
   for(const node of state.nodes)assert.equal(colors.get(node.id),palette[node.scope],'actual resolved style '+node.id);
-  const projected=await page.locator('#memory-graph canvas').evaluate(canvas=>({targets:JSON.parse(canvas.dataset.nodeTargets),hitIds:JSON.parse(canvas.dataset.hitNodeIds||'[]'),selected:canvas.dataset.selectedNodeId}));
-  const pose=state.cameraPose;assert.ok(pose);assert.ok(Math.abs(pose.position.x-pose.target.x)<.0001&&Math.abs(pose.position.y-pose.target.y)<.0001,'front-facing fixture radius contract');
+  const projected=await page.locator('#memory-graph canvas').evaluate(canvas=>{const detail=document.getElementById('memory-detail'),r=detail&&!detail.hidden?detail.getBoundingClientRect():null;return{targets:JSON.parse(canvas.dataset.nodeTargets),hitIds:JSON.parse(canvas.dataset.hitNodeIds||'[]'),selected:canvas.dataset.selectedNodeId,opaqueReader:r?{x:r.x,y:r.y,width:r.width,height:r.height}:null};});
+  const pose=state.cameraPose;assert.ok(pose);
   // Pinned real styled radius: chunk1.9/source3.8, z0/2, FOV50, native minima1/1.8CSS px.
   const units=2*Math.abs(pose.position.z-pose.target.z)*Math.tan(25*Math.PI/180)/state.graph.height;
-  const samples=state.nodes.filter(node=>node.visible&&node.centerOwner===node.id).map(node=>{
-    const target=projected.targets.find(value=>value.node_id===node.id);assert.ok(target?.visible,'actual TSL projection '+node.id);
+  const metadata=new Map(state.nodes.map(node=>[node.id,node]));
+  assert.equal(metadata.size,state.nodes.length,'projected scope identities stay unique');
+  const bodies=projected.targets.flatMap(target=>{
+    const node=metadata.get(target.node_id);assert.ok(node,'actual TSL node identity '+target.node_id);
+    assert.ok(Number.isFinite(target.x)&&Number.isFinite(target.y)&&typeof target.visible==='boolean','finite actual TSL projection '+node.id);
+    // The spatial adapter reports its real body radius after perspective and
+    // native selected/hit scaling. Keep the old front-facing calculation only
+    // for historical renderers without this diagnostic; pixel thresholds stay
+    // fixed and are never inferred from the screenshot's colors.
+    if(Number.isFinite(target.radius_px)){
+      if(!target.visible&&Number.isFinite(target.depth)&&target.depth<=0)return[];
+      assert.ok(target.radius_px>0&&target.depth>0,'actual projected body radius and camera depth');
+      return[{id:node.id,scope:node.scope,x:state.graph.x+target.x,y:state.graph.y+target.y,radius:target.radius_px,depth:target.depth,visible:target.visible}];
+    }
+    assert.ok(!('radius_px'in target)&&!('depth'in target),'unknown spatial body diagnostics fail closed');
+    assert.ok(Math.abs(pose.position.x-pose.target.x)<.0001&&Math.abs(pose.position.y-pose.target.y)<.0001,'historical front-facing fixture radius contract');
     const global=node.scope==='global',base=Math.max(global?3.8:1.9,units*(global?1.8:1)),scale=(projected.selected===node.id?1.42:1)*(projected.hitIds.includes(node.id)?1.2:1);
-    return{id:node.id,scope:node.scope,x:state.graph.x+target.x,y:state.graph.y+target.y,radius:base*scale*state.graph.height/(2*(pose.position.z-(global?2:0))*Math.tan(25*Math.PI/180))};
-  }).filter(node=>node.x-node.radius>state.graph.x&&node.x+node.radius<state.graph.x+state.graph.width&&node.y-node.radius>state.graph.y&&node.y+node.radius<state.graph.y+state.graph.height);
+    return[{id:node.id,scope:node.scope,x:state.graph.x+target.x,y:state.graph.y+target.y,radius:base*scale*state.graph.height/(2*(pose.position.z-(global?2:0))*Math.tan(25*Math.PI/180)),depth:pose.position.z-(global?2:0),visible:target.visible}];
+  });
+  const insideGraph=bodies.filter(node=>node.visible&&node.x-node.radius>state.graph.x&&node.x+node.radius<state.graph.x+state.graph.width&&node.y-node.radius>state.graph.y&&node.y+node.radius<state.graph.y+state.graph.height);
+  // An opaque reader covers part of the canvas. Sample complete unobstructed
+  // disks; required scope presence and minimum visible pixels still apply.
+  const samples=insideGraph.filter(node=>{const r=projected.opaqueReader;return !r||node.x+node.radius<r.x||node.x-node.radius>r.x+r.width||node.y+node.radius<r.y||node.y-node.radius>r.y+r.height;});
+  const occlusion={kind:'projected-depth-disks-v1',nodes:bodies.map(({id,x,y,radius,depth})=>({id,x,y,radius,depth}))};
   const saved=await page.locator('.memory-map-node').evaluateAll(nodes=>nodes.map(node=>{const previous=node.getAttribute('style');node.style.setProperty('opacity','0','important');return previous;}));
   let png;try{await settle();png=await page.screenshot();}finally{await page.locator('.memory-map-node').evaluateAll((nodes,saved)=>nodes.forEach((node,index)=>saved[index]===null?node.removeAttribute('style'):node.setAttribute('style',saved[index])),saved);}
-  const pixels=await page.evaluate(measureNodeColorArea,{data:png.toString('base64'),samples,thresholds:NODE_COLOR_THRESHOLDS,viewport:state.viewport});
-  const result=assessNodeColorArea(pixels,{requiredScopes});observations.push({colors:label,...result,palette,thresholds:NODE_COLOR_THRESHOLDS});
+  const pixels=await page.evaluate(measureNodeColorArea,{data:png.toString('base64'),samples,thresholds:NODE_COLOR_THRESHOLDS,viewport:state.viewport,occlusion});
+  const result=assessNodeColorArea(pixels,{requiredScopes});observations.push({colors:label,...result,palette,thresholds:NODE_COLOR_THRESHOLDS,occlusion:{kind:occlusion.kind,bodies:occlusion.nodes.length,edgePaddingCssPixels:1,opaqueReader:projected.opaqueReader,readerCoveredDisksExcluded:insideGraph.length-samples.length,roiSelectedFromColors:false,domCenterOwnerUsed:false}});
   assert.deepEqual(result.failures,[],'actual body area, not text or isolated tint: '+label);
 }
 
@@ -143,7 +185,10 @@ try{
     sourceIdentity=await Promise.all(sourcePaths.map(async path=>({path,sha256:digest(await readFile(join(root,'examples/browser-model-chat',path)))})));
     server=await startServer({memoryCoreRoot:coreRoot,memoryGraphRoot:graphRoot,runtimeRoot:join(prepared,'model-chat/runtime')});base=new URL(server.url);
   }
-  prior=await readFile(join(output,'receipt.json'),'utf8').then(JSON.parse).catch(cause=>{if(cause.code==='ENOENT')return null;throw cause;});
+  // Reuse an immutable historical baseline without copying its proof directory
+  // or writing a new candidate result into that baseline owner's receipt.
+  priorPath=externalBaselinePath||join(output,'receipt.json');
+  prior=await readFile(priorPath,'utf8').then(JSON.parse).catch(cause=>{if(cause.code==='ENOENT')return null;throw cause;});
   if(phase==='after'){const baseline=prior?.before||prior;assert.equal(baseline?.phase,'before');assert.equal(baseline.status,'pass');assert.equal(baseline.screenshots[0].sha256,'13a6d4d182f77bb31e924d30086c2bfe97c644774406864058cc6cd1768bcc3d');}
   await mkdir(output,{recursive:true});if(live)cleanup.serverClosed=true;
   const {chromium}=await import(pathToFileURL(resolve(driver)).href);profile=await mkdtemp(join(tmpdir(),profilePrefix));
@@ -185,7 +230,7 @@ try{
   await check('overlay button tap, drag and cancel routes are captured',async()=>{
     await recordGesture('overlay-node-tap',()=>tap('[data-memory-node="turn:t-0003"]'));assert.equal(await page.locator('#memory-detail-title').textContent(),'Your message');await back();
     const box=await page.locator('[data-memory-node="turn:t-0003"]').boundingBox(),start={x:box.x+22,y:box.y+22};
-    const drag=await recordGesture('overlay-node-drag',()=>swipe(start,{x:start.x+45,y:start.y+25}));if(phase==='after'){assertPan(drag.before,drag.after);const deltas=movement(drag.before,drag.after).moves;assert.ok(deltas.length>=2&&deltas.every(value=>Math.abs(value.dx-45)<2&&Math.abs(value.dy-25)<2),'overlay capture transfer must preserve the full continued45x25 drag');assert.equal(drag.after.detail.visible,false,'overlay drag does not activate a tap');await resetGraph();}await back();
+    const drag=await recordGesture('overlay-node-drag',()=>swipe(start,{x:start.x+45,y:start.y+25}));if(phase==='after'){assertFullOrbit(drag.before,drag.after,45,25);assert.equal(drag.after.detail.visible,false,'overlay drag does not activate a tap');await resetGraph();}await back();
     const empty=await blankPoint();await recordGesture('empty-canvas-cancel',()=>swipe(empty,{x:empty.x+20,y:empty.y+15},{cancel:true}));
     assert.equal(await page.locator('#memory-detail').isVisible(),false);observations.push({postCancelSelectionVisible:false});
     if(phase==='after'){await resetGraph();const target=await page.locator('[data-memory-node="turn:t-0003"]').boundingBox();const origin={x:target.x+22,y:target.y+22};
@@ -266,6 +311,13 @@ finally{
     coverage:{browserActions:['CDP contact pan/pinch/tap/drag/cancel','overlay cancel and fresh-tap recovery','Fit','native detail scroll','native mouse detail selection','keyboard/source actions','idle orientation resize','rendered scope tint/search/selection/reduced-motion'],unitOnlyInterruptions:['active blur/hidden/resize','third contact','pinch-to-one-contact continuation','explicit graph-surface capture loss','inactive renderer/disposal','wheel bounds'],actualImageElements:0},
     boundary:{localOnly:true,productionBootstrapReplaced:false,adapterReplacedByLabeledFixture:true,realStores:true,realCore:true,realTsl:true,cdpTouchContacts:true,physicalDevice:false,iosQualified:false,nativeInference:false,modelLoaded:false,modelDownloads:0,runtimeWasmFetched:false,workers,unexpectedRequests:forbidden.length},cleanup,
     ...(phase==='after'&&prior?{before:prior.before||prior}:{})};
+  if(phase==='after'&&process.env.BROWSER_MEMORY_BASELINE_RECEIPT&&receipt.before){
+    const retained=receipt.before;
+    receipt.before={schema:'reference-only-historical-touch-baseline/v1',phase:retained.phase,status:retained.status,
+      harnessSha256:retained.harnessSha256,sourceIdentity:retained.sourceIdentity,graphIdentity:retained.graphIdentity,
+      screenshots:retained.screenshots,ownerReceipt:priorPath,ownerReceiptSha256:digest(await readFile(priorPath)),
+      fullBodyRetainedAtOwner:true,bodyCopiedIntoCandidate:false};
+  }
   for(const part of [receipt.before,receipt])for(const observation of part?.observations||[])for(const snapshot of [observation.before,observation.after])if(snapshot){if(snapshot.selection?.length===0)snapshot.selection={length:0};if(observation.gesture!=='empty-canvas-pan'){delete snapshot.canvas;delete snapshot.images;}}
   if(Buffer.byteLength(JSON.stringify(receipt))>56*1024){for(const part of [receipt.before,receipt])for(const observation of part?.observations||[])if(observation.gesture&&!['empty-canvas-pan','two-contact-pinch'].includes(observation.gesture)){delete observation.after.events.first;delete observation.after.events.last;delete observation.after.nodeProjection.first;delete observation.after.nodeProjection.last;}receipt.retentionTrimmedExamples=true;}
   if(Buffer.byteLength(JSON.stringify(receipt))>64*1024){receipt.status='fail';receipt.error=(receipt.error?receipt.error+' ':'')+'Compact receipt exceeds64KiB bound.';process.exitCode=1;}

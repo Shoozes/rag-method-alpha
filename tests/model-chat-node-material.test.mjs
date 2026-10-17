@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 import { runInNewContext } from 'node:vm';
-import { MEMORY_SCOPE_COLORS, memoryScopeColor } from '../examples/browser-model-chat/memory/panel.mjs';
+import { MEMORY_SCOPE_COLORS, MEMORY_SUMMARY_COLOR, memoryScopeColor, memoryNodeColor } from '../examples/browser-model-chat/memory/panel.mjs';
 
 const rendererPath = new URL('../modules/browser-rag-ts/src/application/graphRenderer.ts', import.meta.url);
 const palettePath = new URL('../modules/browser-rag-ts/src/application/graphPalette.ts', import.meta.url);
@@ -76,8 +76,27 @@ test('memory scope palette supplies saturated body colors, readable labels and s
     const value = Number.parseInt(channel, 16) / 255;
     return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
   }).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
-  for (const [scope, color] of Object.entries(MEMORY_SCOPE_COLORS)) {
+  for (const [scope, color] of Object.entries({ ...MEMORY_SCOPE_COLORS, summary: MEMORY_SUMMARY_COLOR })) {
     const contrast = (luminance(color) + 0.05) / (luminance(background) + 0.05);
     assert.ok(contrast >= 4.5, `${scope} label contrast ${contrast.toFixed(3)} must reach 4.5:1.`);
   }
+});
+
+test('retained conversation summaries have a distinct visual type without becoming a new scope', () => {
+  const summary = { kind: 'summary', scope: 'conversation', derived: true };
+  const before = structuredClone(summary);
+  assert.equal(memoryNodeColor(summary), 0x22e37f);
+  assert.equal(memoryNodeColor({ kind: 'message', scope: 'conversation' }), 0x0ea5ff);
+  assert.equal(memoryNodeColor({ kind: 'summary', scope: 'persona' }), 0xc81fff);
+  assert.equal(memoryScopeColor('summary'), undefined);
+  assert.deepEqual(summary, before);
+});
+
+test('fixed spatial memory placement preserves scope hue without changing the generic pinned appearance', async () => {
+  const memory = await graphOptions({ presentation: 'memory-spatial', nodeSurface: 'scope-colored', preserveNodeColors: true });
+  assert.deepEqual(memory.stateTheme.pinned, { colorMix: 0 });
+  assert.equal(memory.nodeSurface.profile, 'metallic');
+  assert.equal(memory.nodeSurface.metalness, 0);
+  assert.ok(!Object.hasOwn((await graphOptions()).stateTheme, 'pinned'));
+  assert.ok(!Object.hasOwn((await graphOptions({ nodeSurface: 'scope-colored', preserveNodeColors: true })).stateTheme, 'pinned'));
 });

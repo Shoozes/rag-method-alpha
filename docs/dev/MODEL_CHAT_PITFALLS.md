@@ -79,15 +79,185 @@ native budget and authority gates. Successful fixture replies do not establish
 model answer quality. Clear memory must invalidate writers before deleting only
 owned state; reset settings must preserve memories and downloaded model cache.
 
-**Effectiveness:** Application regression guards pass. Native answer-quality
+**Effectiveness at the prior repair:** Application regression guards pass. Native answer-quality
 effectiveness remains unknown: the pinned existing model file was unavailable
 in the scoped artifact/Hugging Face caches. No new weights, inference or paid
 calls occurred; fixture token counts are not native measurements.
 
 **Relevance check:** Current; the affected paths own normal chat requests.
 
-**Next prevention step:** When the existing pinned model file is available,
+**Next prevention step recorded at the prior repair:** When the existing pinned model file is available,
 replay the same prefixes with memory off/on/scope-switch under identical native
 settings before claiming improved generated answers. Keep Settings clear and
 startup pending-reset recovery on the same actor lock, with a durable reset
 epoch; regression tests must reject stale replies, saves and recovery deletion.
+
+### Q: Light trails hid a stationary graph
+
+**Story ID / status / search synopsis:** RAG-CHAT-002; resolved for the local
+bounded renderer lease and fixture checks. Search hooks: particles without node
+motion, zero merge frames, footer resize, source meshes, summary convergence.
+
+**Sources:** `Shoozes/rag-method-alpha`, candidate based on `992b230e`, wllama
+3.5.1, LFM2.5-230M Q4_K_M; pinned forcegraph/Three 0.185.0 presentation.
+**What:** A success particle capture could coexist with stationary source meshes.
+**Context and constraints:** Compaction must retain canonical originals and real
+source provenance while showing their actual graph nodes converge to a summary.
+**Why it happened:** The first effect was DOM/SVG-only. After adding real motion,
+asynchronous persistence left the old one-line footer during effect startup;
+the final two-line footer resized the canvas and cancelled the lease at frame 0.
+**Where:** `memory/panel.mjs`, `summary-effects.mjs`, application
+`graphRenderer.ts`, summary-pocket browser and node-merge tests.
+**Evidence:** A real manual 913-to-531-token compaction at 48.4% usable capacity
+retained eight sources, but its effect moved no meshes. Controlled layout traces
+showed the canvas height changing 386 to 368 pixels. The compact receipt retains
+the failed capture and the later actual-position fixture proof.
+**Developer story:** Visual inspection prompted a world-coordinate guard. The
+first real-node repair then exposed a layout race. Two stable frames before the
+save finished were insufficient; queuing after persistence and final UI refresh
+removed the cancellation trigger.
+**How to catch it:** Assert timestamped actual source XYZ approach the target;
+particles alone cannot pass. Also test real resize cancellation, reduced motion,
+search revealing canonical originals, settlement and no replay.
+**Solutions tried:** DOM particles failed the mesh criterion; an early two-frame
+gate still raced persistence; final-layout scheduling passed the focused browser.
+**Current solution:** Reversible position lease, at most 12 sources/90 frames,
+1.08-second convergence, 1.32-second expiry and bounded start gate. Reduced motion
+settles immediately. Canonical layout remains intact.
+**Decision rationale:** Repair presentation ownership without changing retrieval
+or mutating original conversation records.
+**Effectiveness:** Focused browser and Node guards pass; physical-device/GPU
+coverage and the full native journey have separate evidence in the receipt.
+**Relevance check:** Current; the visible compaction route uses these modules.
+**Next prevention step:** Keep actual mesh motion and layout completion as
+required guards when changing footer, persistence or graph rendering.
+
+### Q: Repeated reminders crowded unique facts out of a summary
+
+**Story ID / status / search synopsis:** RAG-CHAT-003; resolved for exact-passage
+selection tests, native requalification recorded separately. Search hooks:
+seven repeated excerpts, Cedar-17 missing, top-k duplicates, Tuesday correction.
+
+**Sources:** Same local RAG candidate and pinned 230M/native runtime; automatic
+extractor using the unchanged keyword-only RAG core.
+**What:** Seven exact copies of a reminder occupied eight bounded summary slots.
+**Context and constraints:** A real overflow reduced 1,973 to 694 prompt tokens,
+yet omitted the authored notebook code and corrected watch day.
+**Why it happened:** Selection deduplicated candidate IDs, while each identical
+quote had its own ID and entered the core's top-k independently.
+**Where:** `memory/automatic-context.mjs` and
+`tests/model-chat-automatic-dedup.test.mjs`.
+**Evidence:** Reconstructed all 34 original turn hashes from failed event e-38;
+baseline extraction reproduced its exact summary hash. Deduplication changes
+105 scanned candidates to 33 unique ranker inputs; the eight distinct selected
+quotes retain Cedar-17 and Tuesday replacing Monday.
+**Developer story:** The strict authored-fact assertion failed despite a large
+token reduction. Replaying the exact hash-bound prefix isolated ranking crowding
+from model generation. Exact text deduplication before core ranking restored
+space for the unique authored facts without changing the RAG core.
+**How to catch it:** Repeat one instruction twelve times around unique authored
+code/correction; assert each quote enters the actual ranker once, source spans
+and hashes remain exact, and protected/assistant copies never become references.
+**Solutions tried:** ID-only filtering failed; exact quote filtering passed.
+**Current solution:** Retain the first eligible exact quote before top-k;
+case, Unicode composition and internal whitespace remain distinct. Report
+scanned, unique, duplicate and omitted counts honestly. Preserve newest fallback,
+2,048-candidate scan refusal and canonical source hashes.
+**Decision rationale:** Fix bounded selection without fuzzy truth merging,
+automatic memory promotion or new retrieval behavior.
+**Effectiveness:** 82 focused extraction/workspace tests and the final 435-test
+suite pass. Native and generated-answer acceptance remain separate.
+**Relevance check:** Current; repeated chat instructions can consume top-k slots.
+**Next prevention step:** Require distinct retained passages and a unique
+authored-fact assertion in real automatic and manual compaction journeys.
+
+### Q: A correct request still produced Fred boilerplate
+
+**Story ID / status / search synopsis:** RAG-CHAT-004; unresolved. Search hooks:
+"What are their names?", Fred programming assistant, Phobos Deimos missing,
+native meter versus fresh Worker, small-model quality.
+
+**Sources:** Same candidate, official pinned LFM2.5-230M Q4_K_M, native embedded
+chat template, seed 42, temperature 0, context 2,048, one CPU thread.
+**What:** The short moons follow-up received irrelevant Fred boilerplate.
+**Context and constraints:** Exact role-ordered request and source hashes were
+correct; generated text must remain the actual model output.
+**Why it happened:** The model-side quality cause is unresolved. A native meter
+or prior native history is not necessary to reproduce the observed failure.
+**Where:** `tests/model-chat-space-journey.mjs`, the retained diagnostic helper,
+and the single acceptance receipt.
+**Evidence:** Fresh reply-only, fresh measure-then-reply, and unrelated warm-up
+then measure/reply returned the same wrong answer for the same failed request
+hash. A generic follow-up hint fixed one replay but failed in the full dialogue.
+**Developer story:** The real journey exposed a failure hidden by deterministic
+UI fixtures. Controlled same-request comparisons tested meter/cache suspicion
+before changing unrelated runtime paths. Their identical outputs prevented a
+false orchestration diagnosis.
+**How to catch it:** Run the actual native authored journey and inspect separate
+semantic failures. Do not treat fixture acknowledgements or successful dispatch
+as a correct answer.
+**Solutions tried:** Generic follow-up instruction had a narrow positive result;
+it did not establish general conversational quality. A bounded 12-reply matrix
+reconstructed the two failed request hashes through real production operations.
+Both baseline failures repeated byte-for-byte across two fresh Workers each.
+One generic append fixed the frozen moons case twice but regressed recall twice,
+omitting code and corrected day. Two held-out families passed once per arm.
+**Current solution:** Keep the failure explicit. No hardcoded moon answers,
+model substitution or answer rewriting. Reject the generic append; keep product
+prompts unchanged. These diagnostic-exposed families cannot serve as a sealed
+future final benchmark or become training rows automatically.
+**Decision rationale:** Product correctness requires honest native quality
+evidence; source retention and answer quality are distinct gates.
+**Effectiveness:** Unknown; a general repair has not passed the quality gate.
+**Relevance check:** Current; this is the intended model and conversation route.
+**Next prevention step:** Review the failed exact requests before choosing a
+separately scoped prompt or model experiment; preserve the same semantic checks.
+
+### Q: A front-facing color test misread overlapping spheres
+
+**Story ID / status / search synopsis:** RAG-CHAT-005; resolved locally with
+regression guards. Hooks: front-facing fixture radius contract, 45x25 overlay
+drag, centerOwner, body occlusion, pinned amber tint, chromaticity distance 0.198.
+**Sources:** Local RAG candidate, historical graph bundle `4949fd33` and fixed
+bundle `32fe9a87`,
+Chrome 155 with real TSL/WebGL rendering and CDP touch; no native model fixture.
+**What:** An older planar proof misclassified the new angled 3D presentation.
+**Context and constraints:** Preserve the frozen hue, saturation, body-area,
+minimum-pixel and 0.20 separation thresholds; selection grants no permissions.
+**Why it happened:** Old radius math assumed a front camera, overlay dragging
+assumed translation, and DOM label ownership chose sphere samples. Foreground
+persona pixels were then counted against a blue body behind them. After repairing
+measurement, a real material defect remained: fixed XYZ sets the producer's
+Pinned flag, whose default 18% amber mix dulled memory scope hues.
+**Where:** Mobile browser harness and `tests/node-color-area.mjs`.
+**Evidence:** Actual targets report radius/depth. Camera-angle measurement proves
+the full 45x25 orbit with conserved target/radius. Geometry-only masking fixes
+the false hue-area failure. The pinned-state color equation predicts observed
+pastel blue (RGB 113.46,170.40,232.60 versus 113.57,170.55,232.78). With the
+memory-only pinned mix disabled, the complete eight-group browser route passes;
+blue/persona separation is about 0.48–0.51 against the same 0.20 minimum.
+**Developer story:** The existing touch route exposed stale assumptions in order.
+Actual projection and orbit replaced those assumptions; the next failed pixel
+check was inspected before changing measurement. A causal pinned-style analysis
+then justified a narrow adapter change; the original failed image remains.
+**How to catch it:** Thirteen pure pixel tests reject wrong unoccluded hues,
+foreground color contamination, insufficient/fully occluded samples and malformed
+mask identities. Run the mobile harness against the current bundle as well.
+**Solutions tried:** Fixed front-plane radius and unmasked body disks failed;
+actual projection plus conservative depth masks passed those boundaries. The
+selected-source presentation also needed genuine two-contact pan: a one-contact
+drag now orbits and cannot stand in for translation. Full disks behind an opaque
+source reader are excluded geometrically while all bodies still mask occlusion.
+**Current solution:** Measure all actual projected bodies, excluding nearer or
+depth-tied disks geometrically; keep thresholds and per-scope presence intact.
+Set `stateTheme.pinned.colorMix: 0` only for memory-spatial nodes. Preserve palette,
+sphere material, fixed placement and generic pinned styling. A focused adapter
+test guards both the memory option and untouched generic/legacy behavior.
+**Decision rationale:** A test repair must not fabricate a material-quality pass.
+**Effectiveness:** Pure pixel and adapter guards pass. All eight actual browser
+groups pass, including search/selection/reduced motion, keyboard/source access,
+generic wrapper and graph-disabled fallback. Physical iOS remains unqualified.
+**Relevance check:** Current; orbit, resize and real body overlap are normal.
+**Next prevention step:** Require the unchanged complete touch/color route after
+graph state-theme changes; check fixed-coordinate semantics before adjusting
+palette anchors or a pixel threshold.

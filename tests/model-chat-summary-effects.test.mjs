@@ -79,7 +79,7 @@ test('a committed presentation has bounded source trails and particles ending at
   assert.deepEqual([...f.scheduled.values()].map(task => task.ms), [SUMMARY_EFFECT_MS]);
   f.expire(); assert.equal(f.container.children.length, 0); assert.ok(f.animations.every(animation => animation.cancelled));
   assert.deepEqual(f.effects.diagnostics(), { disposed: false, active: false, eventId: null, particleCount: 0, trailCount: 0,
-    animationCount: 0, scheduledCallbacks: 0, consumedEventCount: 1 });
+    animationCount: 0, scheduledCallbacks: 0, movingNodeCount: 0, framePending: false, frameCount: 0, nodeMergePhase: null, consumedEventCount: 1 });
   assert.equal(f.effects.play(input('committed-only', sourceNodeIds)).reason, 'already-seen');
 });
 

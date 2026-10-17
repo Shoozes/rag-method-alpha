@@ -61,8 +61,11 @@ or the wheel to zoom, and use
 dragging does not select it. Only the graph captures navigation gestures.
 Details and the graph-disabled list retain native scrolling and selection;
 page zoom is left unrestricted outside the graph. Reduced motion disables graph
-animation. Conversation is sky blue, Persona pink and Global amber,
-with scope labels and base colors retained during search/selection. The memory
+animation. Conversation is sky blue, Persona purple and Global amber.
+Retained Conversation summaries are saturated emerald (`#22e37f`), with a
+matching “Conversation summary” legend and label. This is a visual subtype;
+the summary keeps Conversation scope and never becomes Persona memory.
+Labels and base colors persist during search/selection. The memory
 view uses shaded scope-colored cores and restrained matching auras; other
 renderer consumers keep their defaults. Colors do not
 change memory ownership, access or compaction policy.
@@ -95,11 +98,17 @@ the protected recent exchange remain intact. The node records what that event
 retained; it does not claim the whole conversation was kept or every later
 request includes the same selection.
 
-On a new committed output, brief blue light trails gather only its actual authored
-source nodes toward this real summary node and finish with a soft pulse. At most
-12 visible sources and 24 sparks animate for 1.32 seconds, using bounded Web
-Animations and one expiry timer; no application frame loop is added. Reduced
-motion shows a static target ring and completion text. Failed, cancelled and
+On a new committed output, light trails gather only its actual authored
+source nodes toward this real summary node and finish with a soft pulse. Actual
+source bodies and particles transition from blue to destination emerald; an
+interrupted presentation restores their original colors and positions. At most
+12 visible sources and 24 sparks animate for 1.32 seconds. A reversible renderer
+lease moves actual source meshes for at most 90 frames over 1.08 seconds; bounded
+Web Animations draw the trails. Playback starts after persistence and final
+layout, with a two-stable-frame gate capped at eight frames. Settled overview
+absorbs represented sources into the summary; search still reveals their exact
+canonical originals. Reduced motion settles immediately with a static target
+ring and completion text. Failed, cancelled and
 no-reduction attempts create no success effect. Historical reload, repeated opens
 and interrupted playback stay silent. This does not fix the pinned Three
 renderer's separate visible idle-clock limitation.
@@ -195,7 +204,10 @@ native token counts, model accuracy or physical-iOS support. The retained 230M
 experiment selected correct passages over two capacity crossings: its first
 reply recalled all fields; after correction it returned Thursday but omitted
 codename/city. Earlier unrelated-question abstention and answer-format checks
-also failed. That historical run was not repeated for automatic indexing.
+also failed. Those are historical experiment results. The separate
+[native Space journey](../../../docs/dev/SPACE_JOURNEY_ACCEPTANCE.md) now exercises
+actual automatic/manual compaction and records current functional and answer
+quality failures separately; its receipt controls the current claim.
 Selected evidence does not guarantee a correct answer. No semantic promotion,
 training, paid inference, teams or worker orchestration is included.
 
@@ -249,8 +261,25 @@ The Expand/Collapse control fills the app viewport without the browser Fullscree
 
 Mirrorlight RAG is a read-only historical donor for visible source IDs, pocket labels and score-linked match emphasis. Its chat injection, memory assignment UI and automatic writing were future work; no legacy subsystem is imported here.
 
-Search glows identify actual matches. A finite last-dispatch emphasis reads the existing authoritative automatic used-node set, updated only after successful Worker postMessage; it means “Sent in last model request,” never model use or a completed answer. Reload does not replay it. The current dispatch event omits automatic IDs and their request-hash association, so this remains session-only visual evidence; no durable per-request automatic provenance is invented.
+Search glows identify actual matches. A finite last-dispatch emphasis reads
+`submittedMemoryNodeIds`, bound to the inspected submitted request hash and
+current scope/source ownership after successful Worker postMessage. It means
+"Sent in last model request," never model use or a completed answer. Reload does
+not replay it. This remains session-only inspection; no durable per-request
+automatic provenance is invented.
 
 The Graph tab remains the default. Context adapts Mirrorlight’s query/source-text/ID inspection pattern to the real modern request lifecycle: actual returned candidates (already core top-k/token filtered), final admitted sources, literal supplied scores, bounded verbatim leading system/memory messages and optionally full request messages. Prepared and submitted records are distinct, submitted records bind the actual accepted reply when available, and failed/stale/cancelled preparation cannot be promoted. Only the latest prepared and last submitted snapshots are retained in session memory (96 KiB each); reload clears them. Older reply contexts, hidden model reasoning, native chat-template expansion and KV state are not retained or represented. Unavailable/oversize fields are explicit, with no clipped text presented as exact.
 
-Idle limitation: pinned Three 0.185.0 starts its internal node-frame clock even with a null user animation callback. Application motion and graph redraws settle, including under reduced motion, but zero idle RAF callbacks is not achieved while Graph is visible. The renderer is disposed while Context is shown, on document-hidden events, or when Memory is closed. Graph return recreates it and restores the camera for the same current node/scope identity; closing retains the existing Fit-on-reopen behavior. No private Three fields are modified. Callback activity and actual scene/GPU work must be reported separately; the strict visible zero-RAF criterion remains unmet. Actual hidden-state behavior, physical iOS and new native-inference qualification remain unproved. All three canonical TypeScript checks pass with cached 5.9.3, but unavailable vite/client declarations and unchanged skipLibCheck leave full installed dependency parity unproved. The delivery receipt identifies the exact source and live verification scope; deployment does not qualify a broader product release.
+Idle limitation: pinned Three 0.185.0 starts its internal node-frame clock even
+with a null user animation callback. Application motion and graph redraws settle,
+including under reduced motion, but zero idle RAF callbacks is not achieved
+while Graph is visible. The renderer is disposed while Context is shown, on
+document-hidden events, or when Memory is closed. Graph return recreates it and
+restores the camera for the same current node/scope identity; closing retains
+Fit-on-reopen behavior. No private Three fields are modified. Report callback
+activity separately from actual scene/GPU work. The native Space receipt records
+current local inference and cleanup separately from physical iOS and hardware
+GPU qualification. All three canonical TypeScript checks pass with cached
+5.9.3, but unavailable vite/client declarations and unchanged skipLibCheck leave
+full installed dependency parity unproved. Deployment does not qualify a broader
+product release.

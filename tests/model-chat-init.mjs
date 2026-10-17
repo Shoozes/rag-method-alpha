@@ -21,9 +21,11 @@ const modelPath = await realpath(resolve(modelInput));
 const { chromium } = await import(pathToFileURL(resolve(playwrightInput)).href);
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const pause = ms => new Promise(done => setTimeout(done, ms));
-const runtimeRoot = join(root, '.artifacts/model-chat/runtime');
-const output = join(root, '.artifacts/proof/model-chat/init-result.json');
-const sourcePaths = ['examples/browser-model-chat/engine-worker.mjs', 'examples/browser-model-chat/runtime-errors.mjs', 'examples/browser-model-chat/runtime-profile.mjs', 'examples/browser-model-chat/wasm-memory.mjs', 'examples/browser-model-chat/capabilities.mjs', 'examples/browser-model-chat/model-contract.mjs', 'tests/model-chat-init.mjs'];
+const runtimeRoot = resolve(process.env.BROWSER_MODEL_RUNTIME_ROOT || join(root, '.artifacts/model-chat/runtime'));
+const output = resolve(process.env.BROWSER_MODEL_INIT_OUTPUT || join(root, '.artifacts/proof/model-chat/init-result.json'));
+const sourcePaths = ['examples/browser-model-chat/engine-worker.mjs', 'examples/browser-model-chat/runtime-errors.mjs', 'examples/browser-model-chat/runtime-profile.mjs', 'examples/browser-model-chat/wasm-memory.mjs', 'examples/browser-model-chat/capabilities.mjs', 'examples/browser-model-chat/model-contract.mjs',
+  'examples/browser-model-chat/app.mjs', 'examples/browser-model-chat/bootstrap.mjs', 'examples/browser-model-chat/index.html',
+  'examples/browser-model-chat/session-storage.mjs', 'examples/browser-model-chat/runtime-adapter.mjs', 'examples/browser-model-chat/loader-controller.mjs', 'tests/model-chat-init.mjs'];
 const sourceIdentity = await Promise.all(sourcePaths.map(async path => ({ path, sha256: sha(await readFile(join(root, path))) })));
 const checks = [], diagnostics = [], requests = [], errors = [];
 const injectedBrowserErrors = new Set([
@@ -93,7 +95,7 @@ try {
   const hash = createHash('sha256'); for await (const chunk of createReadStream(modelPath)) hash.update(chunk);
   assert.equal(hash.digest('hex'), MODEL.sha256);
   for (const [name, identity] of Object.entries({ ...RUNTIME.files, ...COMPAT.files })) assert.equal(sha(await readFile(join(runtimeRoot, name))), identity.sha256, name);
-  preview = await startServer();
+  preview = await startServer({ runtimeRoot });
   const upstream = new URL(preview.url);
   const workerSource = await readFile(join(root, 'examples/browser-model-chat/engine-worker.mjs'), 'utf8');
   server = createServer(async (request, response) => {
@@ -147,7 +149,7 @@ try {
           if (data.type === 'error') reject(Error(data.value));
           if (data.type === 'result') resolve(data.value);
         };
-        worker.onerror = error => reject(Error(error.message));
+        worker.onerror = error => reject(Error(error.message || 'The model Worker failed without a readable error message.'));
         worker.postMessage({ id, operation, payload });
       });
       try {
@@ -163,7 +165,7 @@ try {
       } catch (error) { return { error: error.message, phases, diagnostics }; }
       finally { clearTimeout(timer); worker.terminate(); }
     });
-    if (result.error) throw Object.assign(Error(result.error), { diagnosis: result });
+    if (Object.hasOwn(result, 'error')) throw Object.assign(Error(result.error || 'The model Worker request failed without an error message.'), { diagnosis: result });
     assert.equal(result.prepared.runtimeProfile, 'memory32-asyncify'); assert.ok(result.reply.trim());
     checks.push({ name, passed: true, ...result });
     console.log(JSON.stringify({ check: name, preparedMs: result.preparedMs, cached: result.prepared.cached, reply: result.reply }));
@@ -247,6 +249,72 @@ try {
     const abortRecovered = await run('production-fresh-worker-recovers-from-structured-aborts-with-cache');
     assert.equal(abortRecovered.prepared.cached, true); assert.equal(modelTransfers, 1);
   }
+  // The actual basic app is mounted but idle: preceding native Workers were
+  // called directly and terminated. Exercise its real Settings listeners in
+  // this same disposable origin/profile, where the cold run created the real
+  // pinned wllama OPFS cache. Seed only clearly fictional workspace/local keys;
+  // the cache is never fabricated, copied or replaced by a sentinel.
+  await page.waitForFunction(() => document.getElementById('app')?.dataset.phase === 'idle' && document.getElementById('send')?.disabled);
+  const uiState = await page.evaluate(async () => {
+    const { storageKey, defaultWorkspaceOwner, sharedWorkspaceStorageKeys } = await import('./session-storage.mjs');
+    const entries = [storageKey, ...sharedWorkspaceStorageKeys(defaultWorkspaceOwner)].map((key, index) => [key,
+      JSON.stringify({ fixture: 'Disposable cache-UI acceptance state; not a model/cache artifact.', index })]);
+    for (const [key, value] of entries) localStorage.setItem(key, value);
+    const unrelatedKey = 'init-probe-unrelated-ui-state'; localStorage.setItem(unrelatedKey, 'preserve-disposable-unrelated-state');
+    return { entries, workspaceKey: storageKey, sharedKeys: sharedWorkspaceStorageKeys(defaultWorkspaceOwner), unrelatedKey };
+  });
+  const localUIState = () => page.evaluate(({ entries, unrelatedKey }) => ({
+    entries: entries.map(([key]) => [key, localStorage.getItem(key)]), unrelated: localStorage.getItem(unrelatedKey),
+  }), uiState);
+  const unchangedUIState = { entries: uiState.entries, unrelated: 'preserve-disposable-unrelated-state' };
+  const settings = page.locator('#chat-options');
+  if (!await settings.evaluate(node => node.open)) await page.locator('#chat-options > summary').click();
+  await page.locator('#effects').uncheck();
+  assert.equal(await page.locator('#app').evaluate(node => node.classList.contains('quiet')), true);
+  await page.locator('#reset-settings').click();
+  await page.waitForFunction(() => document.getElementById('settings-status').textContent.startsWith('Settings reset.'));
+  assert.equal(await page.locator('#effects').isChecked(), true);
+  assert.equal(await page.locator('#app').evaluate(node => node.classList.contains('quiet')), false);
+  assert.equal(await page.locator('#app').getAttribute('data-phase'), 'idle');
+  assert.deepEqual(await localUIState(), unchangedUIState, 'Settings reset preserves all fictional workspace keys and unrelated state.');
+  assert.equal(modelTransfers, 1);
+  checks.push({ name: 'production-basic-app-settings-reset-preserves-workspace-and-existing-cache', passed: true,
+    actualUI: true, appControllerIdle: true, workspaceKeysPreserved: uiState.entries.length, ambientLightReset: true, modelTransfers });
+  console.log(JSON.stringify({ check: checks.at(-1).name, modelTransfers }));
+  await page.locator('#clear').click();
+  assert.equal(await page.locator('#clear-confirmation').evaluate(node => node.open), true);
+  await page.locator('#clear-cancel').click();
+  assert.equal(await page.locator('#clear-confirmation').evaluate(node => node.open), false);
+  await page.waitForFunction(() => document.getElementById('chat-options').open && document.activeElement?.id === 'clear');
+  assert.deepEqual(await localUIState(), unchangedUIState, 'Cancelling the real confirmation must preserve local state.');
+  assert.equal(modelTransfers, 1);
+  checks.push({ name: 'production-basic-app-clear-confirmation-cancel-preserves-local-state', passed: true,
+    actualUI: true, confirmationCancelled: true, workspaceKeysPreserved: uiState.entries.length, modelTransfers });
+  console.log(JSON.stringify({ check: checks.at(-1).name, modelTransfers }));
+  if (!await settings.evaluate(node => node.open)) await page.locator('#chat-options > summary').click();
+  await page.locator('#clear').click();
+  await Promise.all([page.waitForEvent('domcontentloaded', { timeout: 15000 }), page.locator('#clear-confirm').click()]);
+  await page.waitForFunction(() => document.getElementById('app')?.dataset.phase === 'idle' && document.getElementById('send')?.disabled);
+  const cleared = await page.evaluate(async ({ workspaceKey, sharedKeys, unrelatedKey }) => {
+    const { defaultWorkspaceOwner, isWorkspaceResetMarker } = await import('./session-storage.mjs');
+    const marker = JSON.parse(localStorage.getItem(workspaceKey));
+    return { validResetMarker: isWorkspaceResetMarker(marker, defaultWorkspaceOwner), pending: marker.pending,
+      sharedValues: sharedKeys.map(key => localStorage.getItem(key)), unrelated: localStorage.getItem(unrelatedKey),
+      messages: document.querySelectorAll('.message').length, confirmationOpen: document.getElementById('clear-confirmation').open };
+  }, uiState);
+  assert.equal(cleared.validResetMarker, true); assert.equal(cleared.pending, false);
+  assert.deepEqual(cleared.sharedValues, uiState.sharedKeys.map(() => null));
+  assert.equal(cleared.unrelated, unchangedUIState.unrelated); assert.equal(cleared.messages, 0); assert.equal(cleared.confirmationOpen, false);
+  assert.equal(modelTransfers, 1, 'Confirmed UI clear/reload must not request model weights.');
+  checks.push({ name: 'production-basic-app-confirmed-workspace-clear-and-reload-is-scoped', passed: true,
+    actualUI: true, explicitConfirmation: true, reloadCompleted: true, validCompletedResetMarker: true, sharedKeysRemoved: uiState.sharedKeys.length,
+    unrelatedLocalStatePreserved: true, appControllerIdle: true, modelTransfers });
+  console.log(JSON.stringify({ check: checks.at(-1).name, modelTransfers }));
+  const clearRecovered = await run('production-cache-survives-confirmed-workspace-clear');
+  assert.equal(clearRecovered.prepared.cached, true, 'The actual pinned OPFS cache survives Settings reset and confirmed UI workspace clear.');
+  assert.equal(clearRecovered.phases.some(item => item.phase === 'downloading'), false);
+  assert.ok(clearRecovered.phases.some(item => item.phase === 'verifying'), 'A surviving cached artifact still passes production SHA-256 verification.');
+  assert.equal(modelTransfers, 1); assert.equal(modelTransferBytes, MODEL.bytes);
   assert.deepEqual(errors.filter(message => !injectedBrowserErrors.has(message)), [], 'Only explicitly injected browser errors are expected');
 } catch (error) { failure = error; if (error.diagnosis) diagnostics.push(error.diagnosis); console.error(error.stack || error.message); }
 finally {
