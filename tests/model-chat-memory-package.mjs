@@ -280,13 +280,19 @@ try {
       workspace.conversation.append({ role: 'user', content: 'What are the destination city and delivery day?' });
       const before = workspace.conversation.exportState();
       const prepared = await workspace.prepare();
+      const summary = workspace.context.snapshot().compacted;
+      const admitted = workspace.context.inspectionSnapshot().latestPrepared.admitted;
+      const usedBeforeDispatch = workspace.automaticMemory.snapshot().usedNodeIds;
       const answer = await workspace.provider.reply(prepared.messages);
+      const submitted = workspace.context.inspectionSnapshot().lastSubmitted;
       const accepted = workspace.conversation.append({ role: 'assistant', content: answer });
       const citations = await workspace.captureAnswerSources({ answerTurnId: accepted.id, requestSha256: prepared.measurement.requestSha256 });
       const persisted = await workspace.persist();
       return { label, calls, original, before, after: workspace.conversation.exportState(), answerTurnId: accepted.id,
         strategy: prepared.compaction?.strategy, sources: citations, savedRecords: workspace.memory.snapshot().records,
         memorySources: prepared.memorySources, automaticNodes: workspace.automaticMemory.snapshot().nodes,
+        summary, admitted, usedBeforeDispatch, submitted,
+        systemMessages: prepared.messages.filter(message => message.role === 'system'),
         usedNodeIds: workspace.automaticMemory.snapshot().usedNodeIds,
         durable: persisted.durable, originalHash: await hashText(authored), requestSha256: prepared.measurement.requestSha256,
         eventTypes: workspace.events.list().map(event => event.type) };
@@ -296,9 +302,30 @@ try {
     assert.equal(fixture.savedRecords.length, 0); assert.equal(fixture.durable, true);
     assert.deepEqual(JSON.parse(fixture.after).turns.slice(0, 3), JSON.parse(fixture.before).turns, 'all originals survive fixture compaction');
     assert.ok(fixture.sources.length > 0 && fixture.sources.every(source => source.kind === 'extractive'));
-    assert.ok(fixture.memorySources.some(source => source.nodeId === 'turn:' + fixture.original.id && source.role === 'user'));
+    assert.equal(fixture.memorySources.some(source => source.nodeId === 'turn:' + fixture.original.id), false,
+      'a source represented in the real summary is not recalled a second time');
     assert.ok(fixture.memorySources.every(source => source.role !== 'assistant'), 'generated text is never quoted as authored memory evidence');
-    assert.ok(fixture.usedNodeIds.includes('turn:' + fixture.original.id), 'only the actual dispatched memory source is marked used');
+    assert.deepEqual(fixture.usedBeforeDispatch, [], 'real compaction completion alone cannot mark a request source');
+    assert.equal(fixture.systemMessages.filter(message => message.content === fixture.summary.text).length, 1,
+      'the actual retained summary body appears exactly once in the system context');
+    assert.equal(digest(fixture.summary.text), fixture.summary.contentHash);
+    assert.ok(fixture.summary.items.length > 0 && fixture.summary.items.every(item => item.turnId === fixture.original.id));
+    for (const item of fixture.summary.items) {
+      assert.equal(fixture.original.content.slice(item.offsets.start, item.offsets.end), item.quote, 'summary item is an exact original span');
+      assert.equal(fixture.systemMessages.map(message => message.content).join('\n').split(item.quote).length - 1, 1,
+        'the real authored quote is admitted once rather than duplicated by automatic recall');
+    }
+    const sourceIdentity = source => ({ turnId: source.turnId, turnHash: source.turnHash, offsets: source.offsets, lineHash: source.lineHash });
+    const derived = fixture.admitted.filter(source => source.kind === 'derived-context');
+    assert.deepEqual(derived.map(sourceIdentity), fixture.sources.map(sourceIdentity), 'exact derived source hashes and offsets are admitted');
+    assert.ok(derived.every(source => source.nodeId === 'turn:' + fixture.original.id && source.role === 'user'));
+    assert.equal(fixture.admitted.some(source => source.kind === 'conversation' && source.turnId === fixture.original.id), false,
+      'the inspector cannot claim a duplicate automatic admission');
+    assert.equal(fixture.submitted.requestSha256, fixture.requestSha256, 'only the actual request binding authorizes the highlight');
+    assert.deepEqual(fixture.submitted.admitted, fixture.admitted);
+    assert.deepEqual([...fixture.usedNodeIds].sort(), [...new Set([
+      ...fixture.memorySources.map(source => source.nodeId), ...fixture.summary.items.map(item => 'turn:' + item.turnId),
+    ])].sort(), 'only the actual primary admitted source refs are marked at dispatch');
     assert.equal(fixture.automaticNodes.filter(node => node.kind === 'message').length, 4, 'all canonical user and generated turns become real nodes');
     assert.ok(fixture.sources.some(source => source.offsets.start > 120));
     for (const source of fixture.sources) {
@@ -309,6 +336,8 @@ try {
     observations.push({ fixtureLabel: fixture.label, fixtureOperations: fixture.calls, actualNativeCalls: 0,
       savedRecordsCreated: 0, strategy: fixture.strategy, sourceCount: fixture.sources.length, originalHash: fixture.originalHash,
       requestSha256: fixture.requestSha256, usedNodeIds: fixture.usedNodeIds, automaticMessageNodes: 4,
+      retainedSummaryHash: fixture.summary.contentHash, derivedSourceCount: derived.length,
+      originalRecallDuplicated: false, quoteAdmittedOnce: true,
       fixtureMeterIsNotNativeTokenProof: true });
   });
   await check('production bootstrap restores exact answer links and automatic message nodes without manual saves', async () => {
