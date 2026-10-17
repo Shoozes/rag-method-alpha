@@ -9,6 +9,25 @@ export function memoryScopeColor(scope) {
   return color === undefined ? undefined : Number.parseInt(color.slice(1), 16);
 }
 
+/** A checked no-change result is different from a failed context operation. */
+export function manualCompactionFailureView(error) {
+  if (error?.name === 'AbortError') return { message: 'Compaction cancelled. Prior context and originals kept.', error: false };
+  if (error?.code === 'MANUAL_COMPACTION_NO_SOURCE_CONTEXT') return {
+    message: 'Nothing changed. No new older user excerpt was selected for your latest message. Recent messages and originals are kept.', error: false,
+  };
+  if (error?.code === 'MANUAL_COMPACTION_NO_REDUCTION') {
+    const check = error.compactionCheck;
+    const counted = Number.isSafeInteger(check?.beforePromptTokens) && check.beforePromptTokens > 0
+      && Number.isSafeInteger(check.afterPromptTokens) && check.afterPromptTokens >= check.beforePromptTokens;
+    const counts = counted ? ' The summary would use ' + check.afterPromptTokens.toLocaleString('en-US')
+      + ' prompt tokens versus ' + check.beforePromptTokens.toLocaleString('en-US') + ' now.' : '';
+    return { message: 'Nothing changed. A source-linked summary would not reduce this conversation.' + counts
+      + ' Recent messages and originals are kept.', error: false };
+  }
+  const detail = typeof error?.message === 'string' ? error.message.slice(0, 180) : 'The context operation could not finish.';
+  return { message: 'Compaction did not finish. ' + detail, error: true };
+}
+
 /** Only the inspected dispatched request can authorize a last-request source cue. */
 export function submittedMemoryNodeIds(snapshot, requestSha256, currentScope) {
   const request = snapshot?.lastSubmitted;
@@ -237,14 +256,14 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
     openSummary.disabled = busy || Boolean(compactController);
     compactCancel.hidden = !compactController;
     compactCancel.disabled = !compactController || compactController.signal.aborted;
-    const reason = { ready: 'Selects older context; recent messages and originals stay intact.',
+    const reason = { ready: 'Check whether older context can be reduced; recent messages and originals stay intact.',
       'model-not-ready': 'Load the model before compacting context.', unavailable: 'Manual compaction is unavailable.',
       busy: 'Wait for the active reply or context operation.', empty: 'No conversation to compact.',
       'insufficient-history': 'More eligible older history is needed; the recent exchange is protected.',
       'policy-refresh': 'Memory rules changed. Send a message to refresh checked context before compacting.',
       'scope-disabled': 'Select All pockets or Conversation to compact older context.', disposed: 'This workspace is closed.' };
     const readiness = reason[state.reason] || 'Manual compaction is unavailable.';
-    compact.title = state.eligible ? 'Retain eligible older excerpts in this conversation. Originals stay intact.' : readiness + ' Select for an explanation.';
+    compact.title = state.eligible ? 'Check older excerpts for a smaller prompt. No messages are sent or deleted.' : readiness + ' Select for an explanation.';
     compactNote.textContent = compactController ? 'Compacting context…'
       : compactMessage ? compactMessage + (state.eligible ? '' : ' ' + readiness) : readiness;
   }
@@ -606,7 +625,7 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
             : eligibility.reason === 'busy' ? 'Nothing changed. Wait for the active reply or context operation.' : 'Nothing changed. Conversation context must be available to compact.';
       setStatus(compactMessage); buttons(); return;
     }
-    invalidateSearch(); query.value = ''; setSearchSummary(''); hidePreview(); cancelCompactionCue();
+    invalidateSearch(); query.value = ''; setSearchSummary(''); setStatus(''); hidePreview(); cancelCompactionCue();
     const controller = compactController = new AbortController(); compactMessage = ''; busy = true; buttons();
     try {
       const result = await context.compactNow({ signal: controller.signal });
@@ -624,8 +643,8 @@ export function mountMemoryPanel({ conversation, memory, retrieval, events, grap
       if (persistenceFailed) compactMessage += ' Saving did not finish; this change is session-only.';
     } catch (error) {
       if (!disposed) {
-        compactMessage = error.name === 'AbortError' ? 'Compaction cancelled. Prior context and originals kept.' : 'Compaction did not finish. ' + errorText(error);
-        setStatus(compactMessage, error.name !== 'AbortError');
+        const feedback = manualCompactionFailureView(error);
+        compactMessage = feedback.message; setStatus(compactMessage, feedback.error);
       }
     } finally { if (compactController === controller) compactController = null; busy = false; if (!disposed) refresh(); }
   });

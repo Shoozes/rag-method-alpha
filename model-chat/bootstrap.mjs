@@ -1,5 +1,11 @@
 import { mountApp } from './app.mjs';
 import { createRuntimeAdapter } from './runtime-adapter.mjs';
+import { clearWorkspaceStorage, defaultWorkspaceOwner } from './session-storage.mjs';
+
+const clearStoredMemory = () => {
+  const clear = () => clearWorkspaceStorage({ storage: localStorage });
+  return navigator.locks?.request ? navigator.locks.request('rag-local-memory:' + defaultWorkspaceOwner.actorId, clear) : clear();
+};
 
 if (new URL(location.href).searchParams.get('memory') === '1') {
   const adapter = createRuntimeAdapter();
@@ -17,7 +23,7 @@ if (new URL(location.href).searchParams.get('memory') === '1') {
     const warning = document.createElement('p'); warning.setAttribute('role', 'alert');
     warning.textContent = 'Local memory is unavailable. Basic chat is available. ' + error.message;
     document.getElementById('loading-stage').prepend(warning);
-    mountApp(adapter);
+    mountApp(adapter, { clearStoredMemory });
   }
   if (app) {
     try { workspace.attachPanel(mountPanel({ ...workspace, onChange: () => workspace.persist() })); }
@@ -29,4 +35,4 @@ if (new URL(location.href).searchParams.get('memory') === '1') {
     // Inspectable browser-local preview state; no remote endpoint or cross-repo service.
     window.localMemoryPreview = { workspace, app };
   }
-} else mountApp();
+} else mountApp(undefined, { clearStoredMemory });
