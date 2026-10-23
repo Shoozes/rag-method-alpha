@@ -28,6 +28,8 @@ python -B scripts/browser_smoke.py
 
 The backend tests run from `source/backend`; the menu supplies that directory, so no editable install is needed.
 
+The exhaustive browser adapter comparison uses Python 3.12, matching the checked-in Python-Unicode normalization tables. After `test-browser-unit` has compiled the current tests, run `py -3.12 -B scripts/browser_rag_adapter_conformance.py --prepared-module` on Windows (or select Python 3.12 as `python` elsewhere). A different Python minor version fails explicitly; do not regenerate the frozen tables to bypass that check. The older casefold fixture records its own generator version separately.
+
 The browser proof discovers prepared Playwright Chromium or supported local Chrome/Edge. `BROWSER_RAG_CHROMIUM_PATH` (explorer) or `RAG_METHOD_CHROMIUM_PATH` (Lab) can select an explicit executable. It never downloads a browser. Viewport emulation is useful responsive proof; it is not physical-device or all-GPU qualification.
 
 ## Atlas presentation and public media

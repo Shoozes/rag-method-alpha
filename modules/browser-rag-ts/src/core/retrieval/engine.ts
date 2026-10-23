@@ -49,12 +49,13 @@ function scopeValues(values: readonly string[] | undefined, field: string): read
 
 function scopePriorities(values: Readonly<Record<string, number>> | undefined): Readonly<Record<string, number>> {
   if (values === undefined) return {};
-  const output: Record<string, number> = {};
+  if (!values || typeof values !== "object" || Array.isArray(values)) throw new ContractError("scope_priorities must be an object");
+  const output: Record<string, number> = Object.create(null);
   for (const [scope, priority] of Object.entries(values)) {
     assertValidUnicodeScalars(scope, "scope priority scope");
     const normalized = trimPythonUnicodeWhitespace(scope);
     if (!normalized || !Number.isInteger(priority) || priority < -100 || priority > 100) throw new ContractError("scope_priorities is invalid");
-    if (normalized in output) throw new ContractError("scope_priorities contains duplicate normalized scopes");
+    if (Object.hasOwn(output, normalized)) throw new ContractError("scope_priorities contains duplicate normalized scopes");
     output[normalized] = priority;
   }
   return output;

@@ -12,6 +12,6 @@ export function allowedByAuthority(record: RagRecord, policy: string): boolean {
 }
 
 export function matchingScopePriority(record: RagRecord, priorities: Readonly<Record<string, number>>): number {
-  const values = record.scopes.filter((scope) => scope in priorities).map((scope) => priorities[scope]!);
+  const values = record.scopes.filter((scope) => Object.hasOwn(priorities, scope)).map((scope) => priorities[scope]!);
   return values.length ? Math.max(...values) : 0;
 }

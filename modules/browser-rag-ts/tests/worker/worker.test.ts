@@ -14,6 +14,25 @@ function okResult(response: Awaited<ReturnType<typeof handleRequest>>): unknown 
   return response.result;
 }
 
+test("Worker searches admit prototype-like scope priority keys and preserve query reports", async () => {
+  okResult(await handleRequest(request({ request_id: "scope-keys-load", operation: "load-documents", payload: {
+    documents: [{ path: "scope.md", format: "text", content: "scope priority beacon" }],
+  } })));
+  const searched = await handleRequest(request({ request_id: "scope-keys-search", operation: "search", payload: {
+    query: "scope priority beacon", options: { mode: "exact_only", scope_priorities: Object.fromEntries([
+      ["constructor", 1], ["toString", 2], ["__proto__", 3], ["browser:local", 23],
+    ]) },
+  } }));
+  const observation = okResult(searched) as { scores: Array<{ score_micro: number; components: { priority_micro: number } }> };
+  assert.equal(observation.scores.length, 1);
+  assert.equal(observation.scores[0]?.components.priority_micro, 230_000);
+  assert.ok(Number.isFinite(observation.scores[0]?.score_micro));
+  const report = okResult(await handleRequest(request({ request_id: "scope-keys-report", operation: "export-report", payload: {
+    kind: "query", expected_query: "scope priority beacon",
+  } }))) as { observation: unknown };
+  assert.deepEqual(report.observation, observation);
+});
+
 function initializationResult(): Record<string, unknown> {
   const identity = (id: "rag-indexing-v1" | "rag-behavior-v2") => ({
     id,
