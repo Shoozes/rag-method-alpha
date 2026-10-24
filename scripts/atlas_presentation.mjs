@@ -3,20 +3,27 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
+import { createServer as createNetServer } from 'node:net';
 import { copyFile, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { launchChromium } from './browser_runtime.mjs';
 import { assertCaptureSource } from './capture_source.mjs';
+import { readBrowserGpu, readCanvasGraphics, requireNativeGraphics } from './browser_gpu.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MODULE = join(ROOT, 'modules/browser-rag-ts');
 const SITE = join(MODULE, '.artifacts/release/browser-rag-ts');
-const OUTPUT = join(ROOT, '.artifacts/proof/atlas-presentation');
 const require = createRequire(join(MODULE, 'package.json'));
 const { chromium } = require('playwright');
 const updateMedia = process.argv.includes('--update-media');
-if (process.argv.slice(2).some(arg => arg !== '--update-media')) throw new Error('Only --update-media is supported. Build the browser application first.');
+const requireNativeGpu = process.argv.includes('--require-native-gpu');
+const softwareRequested = process.env.LOCAL_BROWSER_SOFTWARE_WEBGL === '1';
+if (process.argv.slice(2).some(arg => !['--update-media', '--require-native-gpu'].includes(arg))) {
+  throw new Error('Supported options: --update-media, --require-native-gpu. Build the browser application first.');
+}
+const OUTPUT = join(ROOT, '.artifacts/proof/atlas-presentation', requireNativeGpu
+  ? (softwareRequested ? 'native-gpu-rejected-software' : 'native-gpu') : '');
 const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml' };
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 await realpath(SITE);
@@ -35,7 +42,8 @@ const server = createServer(async (request, response) => {
   } catch { response.writeHead(404); response.end('Not found'); }
 });
 await new Promise((ok, fail) => { server.once('error', fail); server.listen(0, '127.0.0.1', ok); });
-const origin = `http://127.0.0.1:${server.address().port}`;
+const serverPort = server.address().port;
+const origin = `http://127.0.0.1:${serverPort}`;
 const checks = [];
 const captures = [];
 const errors = [];
@@ -43,6 +51,7 @@ const matrix = [];
 let browser;
 let runtime = {};
 let failure;
+const termination = { browser_closed: false, server_closed: false, server_port_released: false };
 const check = (name, condition, details) => { assert.ok(condition, `${name}: ${JSON.stringify(details)}`); checks.push(name); };
 const frames = page => page.evaluate(() => new Promise(ok => requestAnimationFrame(() => requestAnimationFrame(ok))));
 async function ready(page) {
@@ -60,12 +69,18 @@ async function quiet(page) {
 async function capture(page, name, state, fullPage = false) {
   await page.evaluate(() => window.scrollTo(0, 0));
   await frames(page);
+  const graphics = await readCanvasGraphics(page, runtime.graphics.browser_gpu, softwareRequested);
+  if (requireNativeGpu) {
+    requireNativeGraphics(graphics);
+    check(`${name}: live canvas uses native GPU WebGL2`, graphics.status === 'native');
+  }
   const path = join(OUTPUT, `${name}.png`);
   const bytes = await page.screenshot({ path, fullPage, animations: 'disabled' });
   captures.push({ name, state, file: `${name}.png`, viewport: page.viewportSize(), full_page: fullPage,
     renderer: await page.locator('#graph-surface').getAttribute('data-renderer'),
     backend: await page.locator('#graph-tsl-canvas').evaluate(canvas => JSON.parse(canvas.dataset.rendererDiagnostics ?? '{}').selected_backend ?? 'svg'),
-    backend_status: await page.locator('#renderer-state').textContent(), sha256: sha256(bytes), bytes: bytes.length });
+    backend_status: await page.locator('#renderer-state').textContent(), graphics,
+    sha256: sha256(bytes), bytes: bytes.length });
 }
 async function layout(page, name, desktop = false) {
   await frames(page);
@@ -96,7 +111,7 @@ try {
   const launched = await launchChromium(chromium, { headless: true }, 'BROWSER_RAG_CHROMIUM_PATH');
   browser = launched.browser;
   runtime = { browser: browser.version(), executable: launched.executable, playwright: require('playwright/package.json').version,
-    software_webgl_requested: process.env.LOCAL_BROWSER_SOFTWARE_WEBGL === '1' };
+    software_webgl_requested: softwareRequested };
   const context = await browser.newContext({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 });
   context.on('page', monitor);
   const page = await context.newPage();
@@ -106,6 +121,11 @@ try {
   await ready(page);
   await quiet(page);
   await page.waitForFunction(() => document.querySelector('#graph-surface')?.dataset.renderer === 'tsl', undefined, { timeout: 30000 });
+  runtime.graphics = await readCanvasGraphics(page, await readBrowserGpu(browser), softwareRequested);
+  if (requireNativeGpu) {
+    requireNativeGraphics(runtime.graphics);
+    check('browser and live Atlas canvas prove native GPU WebGL2', runtime.graphics.status === 'native');
+  }
   check('real public vault loaded', (await page.locator('#active-collection').textContent()).includes('921 documents'));
   const initial = await page.locator('#result-list button[data-record-id]').evaluateAll(nodes => nodes.map(n => n.dataset.recordId));
   const packet = await page.locator('#context-content').textContent();
@@ -219,17 +239,37 @@ try {
   await landing.close();
   await context.close();
   check('healthy journeys report no browser errors', errors.length === 0, errors);
+  await assertCaptureSource(ROOT, SITE);
 } catch (error) {
   failure = error.stack ?? String(error);
   console.error(failure);
 } finally {
-  if (browser) await browser.close();
-  await new Promise(ok => { server.close(ok); server.closeAllConnections(); });
+  try {
+    if (browser) {
+      await browser.close();
+      termination.browser_closed = !browser.isConnected();
+    }
+  } catch (error) { failure ??= `Browser cleanup failed: ${error.message}`; }
+  try {
+    await new Promise((ok, fail) => {
+      server.close(error => error ? fail(error) : ok());
+      server.closeAllConnections();
+    });
+    termination.server_closed = !server.listening;
+    const probe = createNetServer();
+    await new Promise((ok, fail) => {
+      probe.once('error', fail);
+      probe.listen(serverPort, '127.0.0.1', () => probe.close(error => error ? fail(error) : ok()));
+    });
+    termination.server_port_released = true;
+  } catch (error) { failure ??= `Server cleanup failed: ${error.message}`; }
 }
+if (!Object.values(termination).every(Boolean)) failure ??= 'Presentation resource cleanup is incomplete';
 let sourceCommit = 'unavailable';
 try { sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim(); } catch { /* Archive verification has no Git metadata. */ }
 const manifest = { schema: 'rag-method-atlas-presentation-v1', status: failure ? 'fail' : 'pass',
-  source_commit: sourceCommit, source_identity: sourceIdentity, runtime, checks, responsive_matrix: matrix, captures, errors, ...(failure ? { failure } : {}) };
+  source_commit: sourceCommit, source_identity: sourceIdentity, native_gpu_required: requireNativeGpu,
+  runtime, checks, responsive_matrix: matrix, captures, errors, termination, ...(failure ? { failure } : {}) };
 await writeFile(join(OUTPUT, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 if (failure) process.exitCode = 1;
 else if (updateMedia) {

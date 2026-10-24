@@ -15,7 +15,7 @@
     "tool:info": "node scripts/tool-info.mjs",
     "typecheck": "node scripts/tsc.mjs",
     "build": "node scripts/build.mjs",
-    "test": "node scripts/check-vendor.mjs && node --test tests/artifact/capture-source.test.mjs tests/artifact/static-artifact.test.mjs tests/artifact/public-source.test.mjs tests/presentation/node-spawn-motion.test.mjs tests/artifact/threejs-doc-links.test.mjs && node scripts/test.mjs",
+    "test": "node scripts/check-vendor.mjs && node --test tests/artifact/browser-gpu.test.mjs tests/artifact/capture-source.test.mjs tests/artifact/static-artifact.test.mjs tests/artifact/public-source.test.mjs tests/presentation/node-spawn-motion.test.mjs tests/artifact/threejs-doc-links.test.mjs && node scripts/test.mjs",
     "test:indexing": "node scripts/test.mjs indexing",
     "test:retrieval": "node scripts/test.mjs retrieval",
     "test:shared": "node scripts/test.mjs shared",

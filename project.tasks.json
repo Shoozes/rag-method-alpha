@@ -116,6 +116,34 @@
       }
     },
     {
+      "id": "atlas-native-gpu",
+      "label": "Verify Atlas on native GPU",
+      "description": "Build current source and require live hardware WebGL2 evidence throughout the Atlas capture journey.",
+      "alias": "test-native-gpu",
+      "menu": false,
+      "spec": {
+        "kind": "sequence",
+        "tasks": [
+          {
+            "kind": "check",
+            "program": "node",
+            "args": ["run.mjs", "build-browser"],
+            "working_directory": ".",
+            "timeout_ms": 180000,
+            "max_output_bytes": 4194304
+          },
+          {
+            "kind": "check",
+            "program": "node",
+            "args": ["scripts/atlas_presentation.mjs", "--require-native-gpu"],
+            "working_directory": ".",
+            "timeout_ms": 300000,
+            "max_output_bytes": 4194304
+          }
+        ]
+      }
+    },
+    {
       "id": "setup-lab",
       "label": "Set up Python/React Lab",
       "description": "Explicit Python 3.12 locked environment and frontend npm installation.",
